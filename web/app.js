@@ -253,6 +253,11 @@
   // The saved note, for the next pick or round. Words sent as the answer are that answer, not a note to carry over;
   // a reply item's reply still goes with the answer picked after it.
   const noteOf = (d) => (answerOf(d.key)?.answer === 'text' && !d.reply ? '' : answerOf(d.key)?.note ?? '');
+  // A read in flight says so: a hairline that sweeps along the page's top edge while the board is being read, gone when what it read is on screen.
+  // It is fixed to the edge and 2 px tall, so it never moves the list or the control under a thumb.
+  const net = document.getElementById('net');
+  const busy = (on) => { if (net) net.hidden = !on; };
+
   // The toast stays while the pointer is on it or the keyboard is on Undo.
   const later = (ms) => { clearTimeout(hide); hide = setTimeout(() => (toast.matches(':hover') || undoBtn.matches(':focus-visible') ? later(1500) : (toast.hidden = true)), ms); };
   /** The toast keeps its place unless that would cover Decide's bar: a bar not yet stuck can sit in the toast's band, and then the toast goes just above it. */
@@ -683,7 +688,7 @@
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
       ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       box, reply || more ? el('div', { class: 'actions' }, reply ? sendBtn : '', more) : '');
-    fold.ontoggle = () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key));
+    fold.addEventListener('toggle', () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key)));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
     return el('div', { class: 'note' }, saved?.answer === 'text' ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your reply: ${saved.note}`) : '',
       kept ? el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, sent with ${saved.label}: ${kept}`) : '', fold, sendLine(`card:${d.key}`));
@@ -741,7 +746,7 @@
         node = el('a', { href: live || url, class: 'media-open', ...(!live && { target: '_blank', rel: 'noopener' }), 'aria-label': `Open ${name}` }, shot(light, name));
         node.onclick = (e) => { e.preventDefault(); openMediaViewer(items, i, node); };
       }
-      (node.tagName === 'A' ? node.querySelector('img') : node).onerror = () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`));
+      (node.tagName === 'A' ? node.querySelector('img') : node).addEventListener('error', () => node.replaceWith(el('p', { class: 'gone' }, `${name} can't be shown: the file is missing, changed since it was posted, or in a format this browser can't play.`)));
       return d.captions?.[i] ? el('figure', { class: 'cap' }, node, el('figcaption', { dir: 'auto' }, d.captions[i])) : node;
     }));
   }
@@ -772,7 +777,7 @@
     const result = RESULT[of.evidenceCard?.result], name = of === d ? 'Capture' : of.title, update = of.type === 'evidence', img = el('img', { src: src(url), alt: '' });
     const status = () => el('span', { class: 'pst' }, result ? el('span', { class: `res ${result[0]}` }, result[2]) : '', of.filed ? `${result ? ' · checked ' : 'Filed '}${when(of.filed)}` : '');
     const row = el('button', { class: 'proof-row', 'aria-label': `View proof, ${name}` }, el('span', { class: 'pthumb' }, img), el('span', { class: 'pt' }, el('b', { dir: 'auto' }, name), status()), glyph('right'));
-    img.onerror = () => row.parentElement?.remove();
+    img.addEventListener('error', () => row.parentElement?.remove());
     row.onclick = () => {
       const items = mediaItemsOf(of);
       if (items.length) {
@@ -1041,7 +1046,7 @@
       const img = el('img', { src: src(url), alt: `Diagram: ${d.title}` });
       // The picture is a tap target too; keyboard and screen reader users get the one link below.
       body = el('a', { class: 'frame', ...open, tabindex: '-1' }, img);
-      img.onerror = () => body.replaceWith(el('p', { class: 'gone' }, "The diagram can't be shown: its file is missing or in a format this browser can't draw."));
+      img.addEventListener('error', () => body.replaceWith(el('p', { class: 'gone' }, "The diagram can't be shown: its file is missing or in a format this browser can't draw.")));
     }
     return el('div', { class: 'rung' }, body, page ? fullButton(d) : el('a', { class: 'meta', ...open, 'aria-label': `Open the ${name} full size, ${d.title}` }, 'Open full size'));
   }
@@ -1258,7 +1263,7 @@
     if (v) v.muted = true;
     return v;
   };
-  const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.onerror = () => img.replaceWith(icon(a)); return img; };
+  const thumb = (a, url) => { if (!url) return icon(a); const img = el('img', { class: 'thumb', src: src(url), alt: '', loading: 'lazy', decoding: 'async' }); img.addEventListener('error', () => img.replaceWith(icon(a))); return img; };
 
   const LEASH = { ask: ['Ask me first', 'Ask first', 'Agents wait for you on every ask.'], matters: ['Ask when it matters', 'When it matters', 'At an ask\u2019s deadline the board takes its default. Money, deletes and security always wait for you.'],
     act: ['Act, then tell me', 'Act, then tell', 'Agents take their pick at once and tell you. Money, deletes and security always wait for you.'] };
@@ -1314,7 +1319,7 @@
     const p = name && (state.projects ?? []).find((p) => p.name.toLowerCase() === name.toLowerCase());
     if (!p?.icon) return fallback();
     const img = el('img', { src: `/api/project-icon?name=${encodeURIComponent(p.name)}&h=${p.icon.sha256.slice(0, 16)}`, alt: '' });
-    img.onerror = () => img.replaceWith(fallback());
+    img.addEventListener('error', () => img.replaceWith(fallback()));
     return img;
   }
   const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
@@ -1324,7 +1329,7 @@
     const design = d.kind === 'design' || d.type === 'design', tile = design && !projectName(d) ? projectTile('Sign-off', boardPic) : projectTile(projectName(d), () => design ? boardPic() : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
     const frame = design && designFrame(d), demo = isPick(d) && demoThumb(d);
     if (demo) tile.replaceChildren(demo);
-    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), boardPic)); tile.replaceChildren(img); }
+    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.addEventListener('error', () => img.replaceWith(projectPic(projectName(d), boardPic))); tile.replaceChildren(img); }
     return tile;
   };
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
@@ -1578,7 +1583,7 @@
       const last = ends.filter((b) => b <= h + 0.5).at(-1) ?? 0, room = h - last;
       if (room < 40) { l.style.flex = 'none'; l.style.height = `${last}px`; continue; }
       l.style.setProperty('--fz', `${room}px`); l.style.paddingBottom = `${room}px`; l.classList.add('fades');
-      l.onscroll = () => l.classList.toggle('at-end', l.scrollTop + l.clientHeight >= l.scrollHeight - 2);
+      l.addEventListener('scroll', () => l.classList.toggle('at-end', l.scrollTop + l.clientHeight >= l.scrollHeight - 2));
     }
   }
   addEventListener('resize', () => document.querySelector('.tk-desk') && tkSettle());
@@ -1587,8 +1592,9 @@
   const settled = 'ResizeObserver' in window && new ResizeObserver(() => uiSettle());
   function uiSettle() {
     for (const a of document.querySelectorAll('.ui-desk :is(.ui-col, .ui-pane:not(.ask2), .ask2 > .pbody)')) {
-      a.onscroll = () => a.classList.toggle('at-end', a.scrollTop + a.clientHeight >= a.scrollHeight - 2);
-      a.classList.toggle('fades', a.scrollHeight > a.clientHeight + 1); a.onscroll();
+      const atEnd = () => a.classList.toggle('at-end', a.scrollTop + a.clientHeight >= a.scrollHeight - 2);
+      a.addEventListener('scroll', atEnd);
+      a.classList.toggle('fades', a.scrollHeight > a.clientHeight + 1); atEnd();
       if (settled) for (const part of a.children) settled.observe(part);
     }
   }
@@ -1667,7 +1673,7 @@
   function done(items) {
     const line = (d) => {
       const box = el('details', { class: 'done', ...((opened.has(d.key) || jump === d.key) && { open: '' }) }, el('summary', { class: 'compact' }, ...compact(d, 'answered')), row(d, { x: false }));
-      box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
+      box.addEventListener('toggle', () => (box.open ? opened.add(d.key) : opened.delete(d.key)));
       return el('li', {}, box, xBtn(d));
     };
     const fresh = items.filter((d) => isToday(state.answers[d.key].at)), older = items.filter((d) => !fresh.includes(d));
@@ -1776,10 +1782,10 @@
       el('p', { class: 'meta' }, 'Receipts and status notes: short text, with no page to open.'),
       el('ul', { class: 'card rows' }, ...items.map((d) => {
         const line = el('details', { class: 'done', ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'compact' }, ...compact(d, 'reports')), row(d, { x: false }));
-        line.ontoggle = () => (line.open ? opened.add(d.key) : opened.delete(d.key));
+        line.addEventListener('toggle', () => (line.open ? opened.add(d.key) : opened.delete(d.key)));
         return el('li', {}, line, xBtn(d));
       })));
-    box.ontoggle = () => (box.open ? opened.add('#notes') : opened.delete('#notes'));
+    box.addEventListener('toggle', () => (box.open ? opened.add('#notes') : opened.delete('#notes')));
     return box;
   }
 
@@ -2038,7 +2044,7 @@
         el('span', { class: 'dz-cm' }, [plainGroup(d), d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
       // Where it stands fades out at its foot while it holds more than it shows.
       const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);
-      ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
+      ib.addEventListener('scroll', fade); new ResizeObserver(fade).observe(ib);
       return [el('div', { class: 'ui-desk' }, top, ...head, el('div', { class: 'ui-dgrid dz-grid design-review' }, el('div', { class: 'dz-strip' }, ...items.map(card)), open, info))];
     }
     const toReview = reviews.filter((d) => ['In review', 'Draft'].includes(designStatus(d))).length, approved = reviews.filter((d) => designStatus(d) === 'Approved').length;
@@ -2142,7 +2148,7 @@
       leaving.set(k, { d, how, side, t, group: g, before: order.slice(at + 1).find((x) => sideOf(x) === g && !keys.includes(x.key))?.key });
     }
     // Once folded, the rows leave the page for good (and a group left empty loses its head).
-    setTimeout(() => { keys.forEach((k) => leaving.get(k)?.t === t && leaving.delete(k)); if (document.querySelector('.dl-row.leaving')) render(); }, 500);
+    setTimeout(() => { keys.forEach((k) => leaving.get(k)?.t === t && leaving.delete(k)); if (document.querySelector('.dl-row.leaving')) renderKeepingFocus(); }, 500);
   }
   /** When an ask was filed, as Decide says it: today's time, Yesterday, or the date. */
   const filedAt = (at) => (isToday(at) ? hhmm(at) : isToday(Date.parse(at) + 864e5) ? 'Yesterday' : day(at));
@@ -2411,7 +2417,8 @@
     value.classList.add('clip');
     const btn = el('button', { class: 'cp', type: 'button', 'aria-label': `Copy ${name}` }, glyph('copy'));
     btn.dataset.name = btn.getAttribute('aria-label');
-    btn.addEventListener('click', () => copyValue(text, btn));
+    // The value is read at the tap, not closed over: a redraw keeps this button, and a reissued link has to be the one it copies.
+    btn.addEventListener('click', () => copyValue(value.textContent ?? '', btn));
     row.append(btn);
     return row;
   };
@@ -2615,6 +2622,67 @@
     if (k === 'l') { const b = document.querySelector('.decide .later-btn'); if (b) e.preventDefault(), b.click(); }
   });
   const reshow = (control) => { render(); document.querySelector(control)?.focus({ preventScroll: true }); };
+
+  /* A redraw draws into the page it already has. The board is built as a tree of fresh nodes every time, and swapping that tree in whole is what made the
+     board flash: on one answer, or on one poll that brought a change, the main region was torn down and built again two to four times in as many frames,
+     so every row, picture and frame in it was made again (a picture re-decoded, a report's frame reloaded, an entry animation played a second time) and the
+     list jumped under the thumb. So a node the new tree repeats keeps its element: a row is matched by its data-key, anything else by its place, and its
+     attributes and text are brought up to date in place. */
+  // A frame, a player or a canvas carries state of its own (a loaded picture, a scroll, a playing video): a redraw never rebuilds one showing the same thing.
+  const KEEP_WHOLE = new Set(['iframe', 'video', 'audio', 'canvas', 'embed', 'object']);
+  // A field's value and a dialog's open state belong to the element, so these come fresh and take the board's new state with them.
+  const KEEP_FRESH = new Set(['dialog', 'input', 'textarea', 'select']);
+  // The handlers the board puts on its own nodes (every other listener sits on the document or the window).
+  const HANDLERS = ['onclick', 'oninput', 'onchange', 'onsubmit', 'onscroll', 'onerror', 'onload', 'onclose', 'ontoggle', 'onkeydown', 'onplay', 'onpause'];
+  const wired = (n) => n.nodeType === 1 && HANDLERS.some((on) => n[on]);
+  const keyOf = (n) => (n.nodeType === 1 ? n.getAttribute('data-key') ?? n.id ?? '' : '');
+  // Two nodes of the same place are the same kind when they are the same tag and neither names itself, or they name themselves the same.
+  const sameNode = (old, fresh) => old.nodeType === fresh.nodeType && (old.nodeType !== 1 || (old.localName === fresh.localName && old.id === fresh.id));
+  // A node with a handler, or with a child that has one, is drawn fresh: its handler closes over the nodes and the card the board had when it was drawn,
+  // so a group of elements that act on each other (a player and its play button, an option and the answer bar) is never half carried over.
+  const wiredNear = (n) => n.nodeType === 1 && (wired(n) || [...n.children].some(wired));
+  // A node is kept only where carrying it over changes nothing but its place: no handler to lose, no field to reset, and an embedded page or a player
+  // only when it shows the same thing already.
+  const keepable = (old, fresh) => !wiredNear(old) && !wiredNear(fresh) && !KEEP_FRESH.has(old.localName)
+    && (!KEEP_WHOLE.has(old.localName) || ['src', 'data-mock', 'data-src'].every((a) => old.getAttribute(a) === fresh.getAttribute(a)));
+  function patchNode(old, fresh) {
+    if (old.nodeType !== 1) { if (old.nodeValue !== fresh.nodeValue) old.nodeValue = fresh.nodeValue; return old; }
+    // A kept element's own inline styles (a width the board set from a measurement, a scroll a page settled at) stay: the fresh tree never carried them.
+    // A gesture's leftovers do not: a row flown off its side by a swipe or a spring-back in flight is drawn where the board now puts it.
+    for (const at of [...old.attributes]) if (at.name !== 'style' && !fresh.hasAttribute(at.name)) old.removeAttribute(at.name);
+    for (const p of ['transform', 'transition']) if (!fresh.style.getPropertyValue(p)) old.style.removeProperty(p);
+    for (const at of [...fresh.attributes]) if (old.getAttribute(at.name) !== at.value) old.setAttribute(at.name, at.value);
+    const kids = [...old.childNodes];
+    old.replaceChildren(...reuse(kids, [...fresh.childNodes]));
+    return old;
+  }
+  /** A new element takes over the parts of the one it replaces that can be kept, so a row whose one button changed keeps its title, its tile and its picture.
+   *  A node with a handler keeps its own children: its handler closes over them, so carrying the old ones over would leave it naming nodes off the page. */
+  function freshNode(fresh, old) {
+    if (fresh.nodeType !== 1 || wired(fresh) || !old || !old.childNodes.length) return fresh;
+    const kids = [...fresh.childNodes];
+    if (kids.length) fresh.replaceChildren(...reuse([...old.childNodes], kids));
+    return fresh;
+  }
+  /** The nodes to draw for a list of new children, matched against the ones the page already has: a row is matched by its data-key, so a new ask at the
+   *  top of the list leaves the rows under it where they are, and everything else keeps its place. */
+  function reuse(olds, nodes) {
+    const keyed = new Map();
+    for (const o of olds) { const k = keyOf(o); if (k && !keyed.has(k)) keyed.set(k, o); }
+    const taken = new Set();
+    return nodes.map((n, i) => {
+      const k = keyOf(n), old = k ? keyed.get(k) : olds[i];
+      if (!old || taken.has(old) || !(k ? old.nodeType === n.nodeType && old.localName === n.localName : sameNode(old, n))) return freshNode(n, null);
+      taken.add(old);
+      return keepable(old, n) ? patchNode(old, n) : freshNode(n, old);
+    });
+  }
+  function patchChildren(parent, nodes) {
+    const next = reuse([...parent.childNodes], nodes);
+    for (let i = 0; i < next.length; i++) if (parent.childNodes[i] !== next[i]) parent.insertBefore(next[i], parent.childNodes[i] ?? null);
+    while (parent.childNodes.length > next.length) parent.lastChild.remove();
+  }
+  const drawInto = (parent, nodes) => patchChildren(parent, nodes.flatMap((n) => (n instanceof Node ? [n] : [document.createTextNode(String(n))])));
   /** Today's small title shows in its bar once the large one has scrolled under it. */
 
   function render() {
@@ -2734,12 +2802,15 @@
     // The report shown on a desk stays in place under a new list and bar while it is the same report, so its frame is not loaded again.
     const keptRead = document.querySelector('#board .split-detail > .read'), newRead = content[0]?.querySelector?.('.split-detail > .read');
     if (keptRead && newRead && keptRead.dataset.sig === newRead.dataset.sig) {
-      // The page stays; the head, the list, the report's head line and its parts beside it are drawn again.
-      for (const part of ['.ui-dhead', '.split-list', '.split-detail > .split-bar', '.split-detail > .pside']) document.querySelector(`#board ${part}`).replaceWith(content[0].querySelector(part));
+      // The page stays; the head, the list, the report's head line and its parts beside it are drawn again, in place.
+      for (const part of ['.ui-dhead', '.split-list', '.split-detail > .split-bar', '.split-detail > .pside']) {
+        const at = board.querySelector(part), fresh = content[0].querySelector(part);
+        if (at && fresh && at !== fresh) drawInto(at, [...fresh.childNodes]);
+      }
     } else {
       const kept = swapDir && keepSheet(content);
       if (kept) { for (const n of [...board.children]) if (n !== kept) n.remove(); kept.before(...content); }
-      else board.replaceChildren(...content);
+      else drawInto(board, content);
     }
     // A redraw keeps the desk list where it was scrolled, with the selected row in view.
     const listEl = document.querySelector('.split-list');
@@ -2855,6 +2926,7 @@
 
   const banner = document.getElementById('banner');
   const failed = (e) => {
+    busy(false);
     banner.textContent = `Can't read the board file: ${e.message}`;
     banner.hidden = false;
   };
@@ -2862,6 +2934,7 @@
   // first screen's own page, tagged as last read: an unchanged board is a 304 with no body and no redraw, and a changed one is 15 KB, not five.
   let seenTag = '';
   async function refresh() {
+    busy(true);
     try {
       const open = /^#(?:waiting|decide|designs|evidence|reports|ticket|inbox)\/([\w.-]+)(?:\/open)?$/.exec(location.hash)?.[1];
       const heard = moreReady && heardReplies();
@@ -2882,11 +2955,11 @@
       }
       if (/^#(?:tickets?|activity)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
       if (!changed) return;
+      // One redraw for what the poll read: the lists come in with the page, and the rest of the board draws once when its own pages land.
       await readLists();
-      renderKeepingFocus();
       if (heard) noticeNew(heard);
       rest();
-    } catch (e) { failed(e); }
+    } catch (e) { failed(e); } finally { busy(false); }
   }
   /** The first screen: one page of the asks waiting on the person, painted before the rest of the board is read. The shell starts that read itself,
    * so it arrives beside the script instead of a round trip behind it. */
@@ -2898,9 +2971,10 @@
     mergeView(body);
     loadDrafts();
     renderKeepingFocus();
+    busy(false);
   });
   // An exported copy's app-more.js is the next inline script, so the first draw waits for it: a desk's first screen calls its functions.
-  if (FROZEN) (state = FROZEN), document.addEventListener('DOMContentLoaded', render);
+  if (FROZEN) (state = FROZEN), busy(false), document.addEventListener('DOMContentLoaded', render);
   else first().then(() => {
     banner.hidden = true;
     setInterval(refresh, 20_000);
