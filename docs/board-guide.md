@@ -38,12 +38,15 @@ While Channels is open, it checks every three seconds. **Live** means the source
 The `config.yaml` beside the board configures read-only sources and the complete home roster:
 
 ```yaml
+comms_state: ~/fleet/state
 comms_ledger: ~/fleet/state/fleet-ledger.jsonl
 comms_feed: ~/fleet/data/comms.jsonl
 comms_homes: Main, alpha, beta
 ```
 
-`SIGN_OFF_COMMS_LEDGER`, `SIGN_OFF_COMMS_FEED` and `SIGN_OFF_COMMS_HOMES` override those values. With neither ledger nor feed configured, an existing `fleet_home:` supplies `state/fleet-ledger.jsonl`. The roster should name every current home, including inactive homes; without one the fallback can discover only sources in the recent page. No source path is accepted from HTTP. The communications route uses the board's existing authentication, redacts before sending text or metadata, and never caches the response on disk or writes fleet state.
+`comms_state` reads the fleet as files, which is what makes every home visible before any feed exists. Every `*.status` in that folder becomes a channel; every task in a home's own `state` folder becomes one of its threads, and each task's status log and steering inbox supply the messages. A home's `.meta` names its `harness` and `model`, which show beside its senders, and its `home` or `worktree` says where its state folder is. A home that records neither path shows its own status log and no worker history, and the board says how many channels that covers rather than leaving them out. A moved inbox file marks an order read, never handled.
+
+`SIGN_OFF_COMMS_STATE`, `SIGN_OFF_COMMS_LEDGER`, `SIGN_OFF_COMMS_FEED` and `SIGN_OFF_COMMS_HOMES` override those values. With neither ledger nor feed configured, an existing `fleet_home:` supplies `state/fleet-ledger.jsonl`. The roster should name every current home, including inactive homes; without one the fallback can discover only sources in the recent page. No source path is accepted from HTTP. The communications route uses the board's existing authentication, redacts before sending text or metadata, and never caches the response on disk or writes fleet state.
 
 The official JSONL feed replaces the ledger when its configured file appears. Each line carries `id`, `at` (UTC epoch seconds or ISO time), `home`, optional `thread`, `from` and `to` (names or objects with `name` and `model`/`runtime`), `kind`, `text`, and source-backed `read_at`/`handled_at` or explicit `read_state`/`handled_state`. A top-level `model` or `runtime` is also accepted. Missing lifecycle values remain unknown. The temporary ledger adapter reads its existing `ts`, `task`, `state` and `text` fields. Reads and earlier pages are bounded to 512 KiB of complete lines; the source is not loaded whole. Official stable message IDs remain deep-linkable after leaving that recent page.
 

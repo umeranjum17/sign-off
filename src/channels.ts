@@ -49,7 +49,7 @@ function meta(path: string): Record<string, string> {
   try {
     const text = readFileSync(path, 'utf8');
     return Object.fromEntries(text.split(/\r?\n/).flatMap((line) => {
-      const m = /^(home|harness|model|from|sender|to|receiver|kind|at)\s*[=:]\s*(.*)$/.exec(line);
+      const m = /^(home|worktree|harness|model|from|sender|to|receiver|kind|at)\s*[=:]\s*(.*)$/.exec(line);
       return m ? [[m[1]!, m[2]!.trim()]] : [];
     }));
   } catch { return {}; }
@@ -100,8 +100,10 @@ function fleetSources(config: Config): { homes: string[]; threads: ChannelThread
     if (!homes.includes(channel)) homes.push(channel);
     const runtime = [rec.harness, rec.model].filter(Boolean).map((s) => words(s)).join(' · ') || channel;
     messages.push(...sourceMessages(join(config.state, status), channel, undefined, runtime));
-    if (!rec.home) { unavailable++; continue; }
-    const state = join(homeOf(rec.home)!, 'state');
+    // A lead's recorded worktree is its home; a home naming neither leaves its worker history not recorded.
+    const pointer = rec.home || rec.worktree;
+    if (!pointer) { unavailable++; continue; }
+    const state = join(homeOf(pointer)!, 'state');
     if (!existsSync(state)) { unavailable++; continue; }
     const names = entries(state), tasks = [...new Set(names.flatMap((s) => s.endsWith('.status') ? [s.slice(0, -7)] : s.endsWith('.inbox') ? [s.slice(0, -6)] : []))];
     for (const task of tasks) {
