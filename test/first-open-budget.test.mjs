@@ -13,9 +13,10 @@ const scratch = mkdtempSync(join(tmpdir(), 'so-budget-')), temp = join(scratch, 
 mkdirSync(temp);
 after(() => rmSync(scratch, { recursive: true, force: true }));
 
-// Recorded 27 October 2026 on 0.8.0: a board of 2,147 cards (3.4 MB: 7 open asks, 1,000 answered, 900 dismissed, 240 guided plans), cold, 390 px at DPR 2,
-// slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x; the whole open re-recorded on 28 October 2026 in the change that added the Activity tab (+2,952 B, all after the first paint) and again on 29 October 2026 in the change that threads replies under what they answer (+1,687 B of screen code and rules, all after the first paint) and again on 29 October 2026 in the change that keeps the inbox to the threads the person took part in (+1,306 B of thread code, all after the first paint) and again on 30 October 2026 in the change that opens each option's own prototype from its card (+1,300 B measured, of which +213 B is that change's own brotli'd link code in app.js, app-more.js and app.css; the first paint's bytes stay under their own baseline). docs/pwa-performance-plan.md ("First open budgets") holds the same numbers and how they were taken.
-const baseline = { bytesBeforePaint: 94_796, requestsBeforePaint: 5, bytesWhole: 300_208, paintMs: 900 };
+// Re-recorded 30 October 2026 (this change: the board draws into the page it already has instead of building the main region again on every poll,
+// +3,386 B before the first paint of render code in app.js and the loader hairline, over main's 94,796 B). Before it: recorded 27 October 2026 on 0.8.0: a board of 2,147 cards (3.4 MB: 7 open asks, 1,000 answered, 900 dismissed, 240 guided plans), cold, 390 px at DPR 2,
+// slow 4G (1.6 Mbps down, 750 kbps up, 150 ms RTT), CPU 4x; the whole open re-recorded on 28 October 2026 in the change that added the Activity tab (+2,952 B, all after the first paint) and again on 29 October 2026 in the change that threads replies under what they answer (+1,687 B of screen code and rules, all after the first paint) and again on 29 October 2026 in the change that keeps the inbox to the threads the person took part in (+1,306 B of thread code, all after the first paint). docs/pwa-performance-plan.md ("First open budgets") holds the same numbers and how they were taken.
+const baseline = { bytesBeforePaint: 98_182, requestsBeforePaint: 5, bytesWhole: 303_041, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

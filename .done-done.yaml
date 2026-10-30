@@ -229,6 +229,12 @@ journeys:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-demo-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
+  # loader on screen), a poll that brings a new ask, and answering a card, with the main region read on every frame. It fails on a blank region, on a
+  # region or row rebuilt under the person (the flash: every picture re-decoded and every entry animation played again), or on a read with no loader.
+  # FLASH_REPO=<a built base checkout> drives that build for the before.
+  board-flash:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/flash-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${FLASH_THEME:-light}" "${FLASH_WIDTH:-390}" ${FLASH_REPO:+--repo "$FLASH_REPO"}'
   attach:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/attach-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   evidence-guard:

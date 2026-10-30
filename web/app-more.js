@@ -474,9 +474,12 @@
       s.value = acFilter[k]; s.onchange = () => { acFilter[k] = s.value; paint(); };
       return s;
     });
+    // The count and the feed are read from the page at the moment they change: a redraw keeps the parts it can, so the ones a filter writes to are
+    // found on the page rather than held from the draw that made them.
     const paint = () => {
       const shown = all.filter((e) => (!acFilter.project || actProject(e) === acFilter.project) && (!acFilter.priority || e.priority === acFilter.priority) && (!acFilter.kind || burst(e).some((c) => c.kind === acFilter.kind)));
-      count.textContent = !all.length ? 'Nothing yet' : shown.length === all.length ? `${all.length} events` : `${shown.length} of ${all.length} events`;
+      const live = document.querySelector('.tk-count') ?? count;
+      live.textContent = !all.length ? 'Nothing yet' : shown.length === all.length ? `${all.length} events` : `${shown.length} of ${all.length} events`;
       if (!all.length) return out.replaceChildren(tkNote('activity', 'clock', 'No activity yet', 'Moves, stage changes and merges on tickets show here as they happen.'));
       if (!shown.length) return out.replaceChildren(emptyState('empty', { mark: 'list', title: 'No activity matches', text: 'Nothing matches these filters right now.',
         act: ['Clear filters', () => { acFilter = { project: '', priority: '', kind: '' }; sels.forEach((s) => (s.value = '')); paint(); }] }));
@@ -584,7 +587,7 @@
     const full = n ? el('ol', { class: 'steps' }, ...d.steps.map((t, i) => el('li', {}, el('span', { class: 'num' }, String(i + 1)), el('span', { dir: 'auto' }, t.title), marks(t)))) : row(d, { x: false });
     full.removeAttribute('id');
     const box = el('details', { class: 'done', id: `item-${d.key}`, ...(opened.has(d.key) && { open: '' }) }, el('summary', { class: 'dl-face ui-row' }, ...face), full, decided(d), xBtn(d, 'Discard'));
-    box.ontoggle = () => (box.open ? opened.add(d.key) : opened.delete(d.key));
+    box.addEventListener('toggle', () => (box.open ? opened.add(d.key) : opened.delete(d.key)));
     return li(box);
   }
   /** Reports' More, under the list as Today's is: one quiet line naming what it holds, opening a sheet with Mark all as read (while one is new), then Select and Archive all,
@@ -764,7 +767,7 @@
       if (d.missing?.includes(path) && path !== d.preview) return boxed(fallback());
       if (/\.html?$/i.test(path)) return deviceFit(guardFrame(el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }), `design ${d.title}`), form, cls);
       const img = el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
-      if (path !== d.preview) img.onerror = () => img.replaceWith(fallback());
+      if (path !== d.preview) img.addEventListener('error', () => img.replaceWith(fallback()));
       return boxed(img);
     };
     const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
@@ -778,11 +781,11 @@
         const img = el('img', { src: src(designUrl(d, path)), alt: `${names[n]}: ${target().screen.title}` });
         const pic = el('a', { class: 'dzf-pic', href: fullHref(path), target: '_blank', rel: 'noopener noreferrer', style: view.startsWith('phone') ? '--aw: 390; --ah: 844' : '--aw: 1280; --ah: 800' }, img,
           f.area ? el('span', { class: 'dzf-area', 'aria-hidden': 'true', style: `left: ${f.area.x * 100}%; top: ${f.area.y * 100}%; width: ${f.area.w * 100}%; height: ${f.area.h * 100}%` }) : '');
-        img.onload = () => { pic.style.setProperty('--aw', img.naturalWidth); pic.style.setProperty('--ah', img.naturalHeight); };
+        img.addEventListener('load', () => { pic.style.setProperty('--aw', img.naturalWidth); pic.style.setProperty('--ah', img.naturalHeight); });
         return el('figure', { class: 'dzf', ...(f.role === d.accepts && { 'data-yes': '' }) }, el('p', { class: 'dzf-l' }, f.role === d.accepts ? glyph('check') : '', names[n]),
           el('div', { class: 'dzf-box' }, pic), f.caption ? el('figcaption', { dir: 'auto' }, f.caption) : '');
       };
-      const step = (delta) => () => { session.at = i + delta; const next = frameView(); preview.replaceWith(next); preview = next; };
+      const step = (delta) => () => { session.at = i + delta; const next = frameView(), live = document.querySelector('.design-preview-window, .dzf-wrap'); if (live) live.replaceWith(next), (preview = next); };
       const move = (label, delta, icon) => Object.assign(el('button', { class: 'ui-rb', 'aria-label': label }, glyph(icon)), { disabled: !screens[i + delta], onclick: step(delta) });
       const head = el('div', { class: 'dzf-head' }, el('p', { class: 'dzf-t', dir: 'auto' }, screens.length > 1 ? el('span', { class: 'n' }, `${i + 1} of ${screens.length}`) : '', target().screen.title),
         ...(screens.length > 1 ? [move('Previous screen', -1, 'left'), move('Next screen', 1, 'right')] : []));
@@ -792,9 +795,15 @@
     };
     let preview = asked ? frameView() : previewPath() ? previewElement(previewView(), 'design-preview-window') : '';
     const fullPreview = previewPath() && !asked ? el('a', { class: 'design-preview-full', href: fullHref(previewPath()), target: '_blank', rel: 'noopener noreferrer' }, 'Open full preview') : '';
+    // The preview on screen is found on the page, not held from the draw that made it: a redraw keeps the box it already has, so a held node can be off the page.
+    const swapPreview = () => {
+      const next = previewElement(previewView(), 'design-preview-window'), live = document.querySelector('.design-preview-window');
+      if (live) live.replaceWith(next), (preview = next);
+      return next;
+    };
     if (screenSelect) screenSelect.onchange = () => {
       const path = previewPath();
-      if (preview) { const next = previewElement(previewView(), 'design-preview-window'); preview.replaceWith(next); preview = next; }
+      if (preview) swapPreview();
       if (fullPreview) fullPreview.href = fullHref(path);
       session.selected = screenKey(target());
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
