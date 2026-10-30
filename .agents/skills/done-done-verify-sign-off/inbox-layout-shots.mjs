@@ -15,12 +15,15 @@ mkdirSync(dest, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-layout-'));
 const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, '.c'), XDG_DATA_HOME: join(dir, '.d'), XDG_STATE_HOME: join(dir, '.s'), XDG_CACHE_HOME: join(dir, '.k') };
 const OPTIONS = [['a', 'A: List with the open thread beside it'], ['b', 'B: One feed of the messages'], ['c', 'C: One conversation, the list as a rail']];
+// B remains a captured report artifact; Main approved only A and C as choices.
+const choices = OPTIONS.filter(([value]) => value !== 'b');
 const board = join(dir, 'board.json');
 mkdirSync(join(dir, 'mocks/inbox-layout'), { recursive: true });
 for (const [v] of OPTIONS) copyFileSync(join(pages, `option-${v}.html`), join(dir, `mocks/inbox-layout/option-${v}.html`));
-writeFileSync(board, JSON.stringify({ schema: 2, items: [{ filed: new Date().toISOString(), key: 'inbox-layout', title: 'Which layout should the Inbox use?', about: 'Three ways to hold your threads.',
-  options: OPTIONS.map(([value, label]) => ({ value, label })), recommend_value: 'a', type: 'design', tradeoff: 'A keeps the list beside the thread; B answers in the feed; C reads as one conversation.',
-  mocks: OPTIONS.map(([value]) => ({ value, path: `mocks/inbox-layout/option-${value}.html` })), filer: 'sign-off' }] }));
+writeFileSync(board, JSON.stringify({ schema: 2, items: [{ filed: new Date().toISOString(), key: 'inbox-layout', title: 'Which layout should the Inbox use?', about: 'static preview, live demo coming',
+  options: choices.map(([value, label]) => ({ value, label })), recommend_value: 'c', type: 'design', tradeoff: 'C focuses on one conversation; A keeps a wider list beside the thread.',
+  mocks: choices.map(([value]) => ({ value, path: `mocks/inbox-layout/option-${value}.html` })), filer: 'sign-off' },
+  { filed: new Date().toISOString(), key: 'inbox-feed-report', type: 'interactive', title: 'B: report artifact only', view: 'mocks/inbox-layout/option-b.html', filer: 'sign-off' }] }));
 const sh = (bin, args, options = {}) => spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let server;
@@ -45,7 +48,7 @@ try {
   };
   const shoot = async (file) => browser(['screenshot', join(dest, file)]);
   if (!before) for (const [v, label] of OPTIONS) for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
-    await open(width, theme, `${url}mock/local/inbox-layout~${v}/option-${v}.html`);
+    await open(width, theme, `${url}mock/local/${v === 'b' ? 'inbox-feed-report~' : `inbox-layout~${v}`}/option-${v}.html`);
     await wait(600);
     const file = `option-${v}.${width}.${theme}.png`;
     await shoot(file);
@@ -71,7 +74,9 @@ try {
     await evalIn(`(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); return 0; })()`); await wait(1500);
     await evalIn(`(async () => { for (let i = 0; i < 40 && !document.querySelector('.full-open'); i++) await new Promise((r) => setTimeout(r, 100));
       document.querySelector('.full-open').click(); for (let i = 0; i < 40 && !${full}; i++) await new Promise((r) => setTimeout(r, 100));
+      ${full}.querySelector('.pf-pick').value = 'a'; ${full}.querySelector('.pf-pick').dispatchEvent(new Event('change'));
       ${full}.querySelector('[data-size=desktop]').click(); })()`);
+    assert.deepEqual(await evalIn(`[...${full}.querySelector('.pf-pick').options].map((o) => o.value)`), ['c', 'a'], 'Only Main-approved choices, C recommended');
     await wait(1800);
     const name = before ? 'viewer-desktop' : 'viewer-actual';
     await shoot(`${name}.390.${theme}.png`);
@@ -90,7 +95,7 @@ try {
   }
   writeFileSync(join(dest, 'checks.json'), JSON.stringify(records, null, 2));
   writeFileSync(join(dest, 'steps.json'), JSON.stringify({ commit: sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).stdout.trim(), before, target: { version: sh(process.execPath, [join(repo, 'dist/cli.js'), '--version']).stdout.trim() },
-    start: 'A throwaway board holding one design pick of three Inbox layouts, each option a page that runs.',
+    start: 'A throwaway board holding A and C as static design choices, C recommended; B retained only as a report artifact.',
     steps: [...(before ? [] : ['Open each option page on its own at 390 and 1280, light and dark']), 'Open the pick in Decide on a phone (390 by 844)', 'Open full screen and tap Desktop', ...(before ? [] : ['Tap Fit']), 'Capture light and dark'],
     result: `${before ? 'before' : 'after'} frames and checks.json` }, null, 2));
 } catch (error) {
