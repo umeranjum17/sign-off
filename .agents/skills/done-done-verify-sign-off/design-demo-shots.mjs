@@ -1,6 +1,6 @@
 // A design card whose options carry a demo recording (post --video and --score): the card plays it muted in place on a tap, opens it full screen with the option's
 // round score, and the Designs row shows the recording's own first frame. The recording is fixtures/demo-video/board-tour.webm, a short synthetic clip of this board's own UI.
-// Frames at 390 (phone) and 1280 (desk), light and dark: the card with the demo playing, and the demo full screen; at 390 light also the Designs row, and the desk's Designs screen at 1440 in dark.
+// Frames at 390 (phone) and 1280 (desk), light and dark: the card with the demo playing, and the demo full screen; at 390 light also the Designs row, and the desk's Designs screen at 1440 in dark with that row at 3 times its size.
 // Usage: node design-demo-shots.mjs <output>
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -82,6 +82,9 @@ try {
   await until(`document.querySelector('#board video.design-thumb')?.videoWidth > 0`, 'the desk Designs list draws the recording\'s first frame');
   assert.match(await evalIn(`document.querySelector('#board').innerText`), /Which sign-in flow reads best\?/);
   await frame('designs.1440.dark.png');
+  // The same row drawn at 3 times its size, so the recording's frame in its small picture can be read.
+  const box = await evalIn(`(() => { const r = document.querySelector('#board .dz-list li').getBoundingClientRect(); return { x: r.x, y: r.y, width: Math.min(r.width, 420), height: r.height }; })()`);
+  writeFileSync(join(out, 'designs-row.zoom.png'), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', clip: { ...box, scale: 3 } })).data, 'base64'));
   const refused = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--type', 'design', '--key', 'not-a-recording', '--title', 'Which sign-in flow reads clearest?', '--option', 'calm=Calm', '--option', 'bold=Bold', '--mock', 'calm=mocks/sign-in/calm.html', '--video', 'calm=mocks/sign-in/calm.html'], { env, encoding: 'utf8' });
   assert.notEqual(refused.status, 0);
   writeFileSync(join(out, 'checks.json'), JSON.stringify(records, null, 2));
