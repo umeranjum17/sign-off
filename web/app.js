@@ -2011,10 +2011,17 @@
   }
   /** A design as a row: its tile (a thumbnail of its first screen), the title, its state and day (or its ticket's bar); it opens the design's review. */
   const designHref = (d) => (isPick(d) ? `#decide/${d.key}` : `#designs/${d.key}`);
+  /** A pick's thumbnail: its first option's mock as it first looks, the running page scaled down in its own frame (it takes no tap, the row opens the card) or the picture itself. */
+  function pickThumb(d) {
+    const [m] = (d.options ?? []).map((o) => d.mocks?.find((x) => x.value === o.value)).filter((x) => x && x.hash !== null);
+    if (!m) return '';
+    const [path, query] = m.path.split('?'), url = src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
+    return el('span', { class: 'pk-thumb', 'aria-hidden': 'true' }, /\.html?$/i.test(path) ? el('iframe', { src: url, title: '', sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }) : el('img', { src: url, alt: '', loading: 'lazy', decoding: 'async' }));
+  }
   function designRow(d) {
     const t = ticketOf(d);
     return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: designHref(d) },
-      ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key)));
+      ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), isPick(d) ? pickThumb(d) : '', selMark(d.key)));
   }
 
   /** Archived: what was discarded or dismissed from a screen, and the evidence and reports archived a day after they were filed. One quiet line at the list's end opens them
@@ -2137,7 +2144,7 @@
   /** On a phone Decide holds two lists, as Tickets holds Your asks and System: Asks (what waits on you) and Designs (the reviews still open), each with its count.
    *  A desk keeps Designs in the sidebar. */
   let decideCounts = { asks: 0, designs: 0 };
-  const dzOpen = (d) => ['In review', 'Draft'].includes(designStatus(d));
+  const dzOpen = (d) => ['In review', 'Draft', 'Waiting on you'].includes(designStatus(d));
   function decideSeg(on) {
     const b = (v, href, name, n) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name, el('small', {}, String(n))); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = href; }; return x; };
     return el('div', { class: 'ui-seg dl-seg', role: 'group', 'aria-label': 'Decide' }, b('asks', '#waiting', 'Asks', decideCounts.asks), b('designs', '#designs', 'Designs', decideCounts.designs));
