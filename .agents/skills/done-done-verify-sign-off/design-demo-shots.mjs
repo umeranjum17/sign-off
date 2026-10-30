@@ -7,6 +7,8 @@ import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+// The pick's question: a change can name its own (DESIGN_DEMO_TITLE), so its Designs frame is its own and not another change's.
+const TITLE = process.env.DESIGN_DEMO_TITLE || 'Which sign-in flow reads best?';
 const repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
 mkdirSync(out, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-demo-')), prof = mkdtempSync(join(tmpdir(), 'so-demo-chrome-'));
@@ -20,7 +22,7 @@ try {
   for (const [v, name] of [['calm', 'Calm'], ['bold', 'Bold']]) writeFileSync(join(dir, `mocks/sign-in/${v}.html`), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${name}</title><body style="margin:0;font:16px system-ui;background:#f4f2ef"><header style="padding:16px;font-weight:600">${name} sign-in</header><button style="margin:16px;padding:12px 16px;font:inherit">Send me a code</button>`);
   copyFileSync(join(repo, 'fixtures/demo-video/board-tour.webm'), join(dir, 'calm-demo.webm'));
   copyFileSync(join(repo, 'fixtures/demo-video/board-tour.mp4'), join(dir, 'bold-demo.mp4'));
-  const post = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--type', 'design', '--key', 'sign-in-demo', '--title', 'Which sign-in flow reads best?', '--option', 'calm=Calm', '--option', 'bold=Bold',
+  const post = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), 'post', board, '--type', 'design', '--key', 'sign-in-demo', '--title', TITLE, '--option', 'calm=Calm', '--option', 'bold=Bold',
     '--mock', 'calm=mocks/sign-in/calm.html', '--mock', 'bold=mocks/sign-in/bold.html', '--video', 'calm=calm-demo.webm', '--score', 'calm=8.5', '--video', 'bold=bold-demo.mp4', '--score', 'bold=7.2', '--recommend', 'calm'], { env, encoding: 'utf8' });
   assert.equal(post.status, 0, post.stdout + post.stderr);
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -73,14 +75,14 @@ try {
     await open(width, 'light', '#designs');
     await until(`document.querySelector('#board video.design-thumb')?.videoWidth > 0`, 'the row draws the recording\'s first frame');
     const row = await evalIn(`(() => ({ row: document.querySelector('#board .dz-list li')?.innerText.replace(/\\s+/g, ' '), pictures: document.querySelectorAll('#board .dz-list img').length, videos: document.querySelectorAll('#board .dz-list video.design-thumb').length, frame: document.querySelector('#board video.design-thumb').videoWidth }))()`);
-    assert.equal(row.pictures, 0); assert.equal(row.videos, 1); assert.match(row.row, /Which sign-in flow reads best\?/);
+    assert.equal(row.pictures, 0); assert.equal(row.videos, 1); assert.ok(row.row.includes(TITLE), `the row names ${TITLE}`);
     if (width === 390) await frame(`designs-row.${width}.light.png`);
     records.push({ file: `designs-row.${width}.light`, ...row });
   }
   // The desk's Designs screen in dark, where the pick is listed with the recording's frame: the capture the approved design-pick-listing spec names.
   await open(1440, 'dark', '#designs');
   await until(`document.querySelector('#board video.design-thumb')?.videoWidth > 0`, 'the desk Designs list draws the recording\'s first frame');
-  assert.match(await evalIn(`document.querySelector('#board').innerText`), /Which sign-in flow reads best\?/);
+  assert.ok((await evalIn(`document.querySelector('#board').innerText`)).includes(TITLE), `Designs lists ${TITLE}`);
   await frame('designs.1440.dark.png');
   // The same row drawn at 3 times its size, so the recording's frame in its small picture can be read.
   const box = await evalIn(`(() => { const r = document.querySelector('#board .dz-list li').getBoundingClientRect(); return { x: r.x, y: r.y, width: Math.min(r.width, 420), height: r.height }; })()`);

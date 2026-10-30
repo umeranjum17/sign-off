@@ -123,7 +123,7 @@ const PAGES = [
     await h.press('Close Search', document.querySelector('#t-search .x'), () => !document.getElementById('t-search').open);
   } }] },
   // The Inbox, one more menu: a Decide row opens its thread; the thread's own link opens the item (beside the list on a desk, over the thread on a phone). The kind chips
-  // filter the list and the archived fold opens.
+  // filter the list, the two unread filters switch on and off, and the Done entry opens the finished threads.
   { name: 'inbox', hash: '#inbox', ready: '.ib-row', stages: [{ run: async (h) => {
     const row = h.need('Decide row', h.board().querySelector('.ib-sec[aria-label="Decide"] a.ib-row'));
     if (row) { row.click(); await h.until('the Decide row thread', () => /^#inbox\/[\w.~-]+$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-open')); h.did.push('Inbox Decide row'); }
@@ -133,13 +133,20 @@ const PAGES = [
     const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
     await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
     await h.press('All chip', chip('All'), on('All'));
-    // The answered digest question was acted on, so its thread is archived: the fold opens. A report the person wrote on is read from its thread.
+    // The answered digest question was acted on, so its thread is Done: the Done entry opens it. A report the person wrote on is read from its thread.
     location.hash = '#inbox/new-sign-in/open';
     await h.until('the report read', () => /\/open$/.test(location.hash) && h.reader()?.textContent.trim());
     location.hash = '#inbox';
     await h.until('the inbox list again', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
-    const fold = await h.until('the archived fold', () => h.find(/^Show \d+ archived$/, h.board(), 'button'));
-    await h.press('Show archived', fold, () => h.board().querySelector('.ib-sec[aria-label="Archived"]'));
+    // The rail's two unread filters, each on and off again; Agents leads to the read-only Channels room; the Done entry opens the finished threads.
+    const flt = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), fltOn = (name) => () => h.board().querySelector('.ib-flt[aria-pressed="true"]')?.textContent.startsWith(name), fltOff = () => !h.board().querySelector('.ib-flt[aria-pressed="true"]');
+    for (const name of ['Unread from agents', 'Not read by agents']) {
+      await h.press(`${name} filter`, flt(name), fltOn(name));
+      await h.press(`${name} filter off`, flt(name), fltOff);
+    }
+    h.need('Agents entry', h.board().querySelector('.ib-agents[href="#channels"]'));
+    const done = await h.until('the Done entry', () => h.board().querySelector('.ib-done'));
+    await h.press('Done entry', done, () => h.board().querySelector('.ib-sec[aria-label="Done"]'));
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {

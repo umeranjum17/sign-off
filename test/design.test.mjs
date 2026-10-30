@@ -5764,7 +5764,7 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
     // New replies first and unread, newest first; then what waits on the person; then what waits on an agent; archived folded.
     assert.deepEqual(await list(), [['New', '* Ship the settings page Friday?', '* Open the beta to every team?'], ['Waiting on agents', 'Turn on the CSV export?']]);
-    assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 1 archived');
+    assert.equal(await evaluate('document.querySelector(".ib-done").textContent'), 'Done1');
     assert.equal(await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Turn on the CSV")).querySelector(".l2").textContent'), 'You: Yes · Read');
     // Every place stays, the inbox one more and Channels beside Designs.
     assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#', '#inbox', '#waiting', '#evidence', '#reports', '#designs', '#tickets', '#channels']);
@@ -5777,8 +5777,8 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = "beta"; b.dispatchEvent(new Event("input")); }');
     await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Open the beta to every team?']]));
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = ""; b.dispatchEvent(new Event("input")); }');
-    await evaluate('document.querySelector(".ib-fold").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
+    await evaluate('document.querySelector(".ib-done").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Done');
     // A row opens its thread: the action and what was done with its link, then the item it reaches.
     await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Open the beta")).click()');
     await until(() => evaluate('!!document.querySelector(".ib-thread") && location.hash === "#inbox/built"'));
@@ -5817,6 +5817,54 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
   } finally { await close(); }
 });
 
+test('the inbox rail: a row counts the replies not opened and says when the agent has not read what was sent; two filters count and narrow the threads; Agents leads to the read-only Channels and Done folds the finished ones', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'inbox-rail'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
+  mkdirSync(dir);
+  for (const [key, title] of [['sent', 'Keep the weekly digest?'], ['replied', 'Ship the settings page Friday?'], ['quiet', 'Turn on the CSV export?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'rail-agent').code, 0);
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // sent: the person wrote on it, and no agent has read it. replied: answered, the agent's wait took it, and it replied. quiet: answered and read, no reply.
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'sent', text: 'Can you hold it until Monday?' })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'replied', answer: 'text', note: 'What does Friday need?' })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'quiet', answer: 'yes' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'rail-agent', '--timeout', '5').code, 0);
+  await pause();
+  assert.equal(run('feedback', 'replied', file, '--reply', 'QA signs off Thursday.', '--filer', 'rail-agent').code, 0);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    const rows = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-row")].map((r) => [r.querySelector(".t").textContent, r.querySelector(".ib-n")?.textContent ?? "", r.querySelector(".ib-nr")?.textContent ?? ""]))').then(JSON.parse);
+    const flts = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-flt")].map((b) => [b.textContent, b.getAttribute("aria-pressed")]))').then(JSON.parse);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
+    await until(() => evaluate('!!document.querySelector(".ib-row")'));
+    // The two sides of unread sit on the rows: the reply not opened (a count), and what the agent has not read (a quiet mark).
+    await until(async () => (await rows()).some((r) => r[0] === 'Ship the settings page Friday?' && r[1] === '1'));
+    const all = await rows();
+    assert.deepEqual(all.find((r) => r[0] === 'Keep the weekly digest?'), ['Keep the weekly digest?', '', 'Not read']);
+    assert.deepEqual(all.find((r) => r[0] === 'Ship the settings page Friday?'), ['Ship the settings page Friday?', '1', '']);
+    assert.deepEqual(all.find((r) => r[0] === 'Turn on the CSV export?'), ['Turn on the CSV export?', '', '']);
+    // Each filter counts the threads it lists, and a second tap lets it go.
+    assert.deepEqual(await flts(), [['Unread from agents1', 'false'], ['Not read by agents1', 'false']]);
+    await evaluate('document.querySelectorAll(".ib-flt")[1].click()');
+    await until(async () => (await flts())[1][1] === 'true');
+    assert.deepEqual((await rows()).map((r) => r[0]), ['Keep the weekly digest?']);
+    await evaluate('document.querySelectorAll(".ib-flt")[0].click()');
+    await until(async () => (await flts())[0][1] === 'true');
+    assert.deepEqual((await rows()).map((r) => r[0]), ['Ship the settings page Friday?']);
+    await evaluate('document.querySelectorAll(".ib-flt")[0].click()');
+    await until(async () => (await rows()).length === 3);
+    // The rail ends on Agents (the read-only Channels room) and Done, which holds none of these.
+    assert.equal(await evaluate('document.querySelector(".ib-agents").getAttribute("href")'), '#channels');
+    assert.equal(await evaluate('document.querySelector(".ib-done").textContent'), 'Done0');
+    // Opening the reply's thread marks it seen: the count leaves its row and the filter.
+    await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Ship the settings")).click()');
+    await until(() => evaluate('!!document.querySelector(".ib-thread")'));
+    await evaluate('location.hash = "#inbox"');
+    await until(async () => (await flts())[0][0] === 'Unread from agents0');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  } finally { await close(); }
+});
+
 test('the inbox: a thread whose question is answered and whose card is marked acted leaves New for the archived fold, stays searchable, and returns when a new message lands', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-acted'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
@@ -5841,15 +5889,15 @@ test('the inbox: a thread whose question is answered and whose card is marked ac
     // Answered and acted is archived, though its reply was never opened; answered and worded back, or not yet answered back, is not.
     await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Keep the weekly digest?'], ['Waiting on agents', 'Turn on the CSV export?']]))
       .catch(async (e) => assert.fail(`${e.message}: ${JSON.stringify(await list())}`));
-    assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 3 archived');
+    assert.equal(await evaluate('document.querySelector(".ib-done").textContent'), 'Done3');
     // Every chip counts the rows it lists, and the archived ones are not among them.
     assert.deepEqual(await chips(), ['All2', 'Decisions2', 'Tickets']);
     // Search finds an archived thread without opening the fold; the fold lists them with the same rows.
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = "digest on mondays"; b.dispatchEvent(new Event("input")); }');
-    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Archived', 'Send the digest on Mondays?']]));
+    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Done', 'Send the digest on Mondays?']]));
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = ""; b.dispatchEvent(new Event("input")); }');
-    await evaluate('document.querySelector(".ib-fold").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
+    await evaluate('document.querySelector(".ib-done").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Done');
     assert.deepEqual((await list()).at(-1).slice(1).sort(), ['Open the beta to every team?', 'Send the digest on Mondays?', 'Ship the settings page Friday?']);
     // A new message brings a thread back: the agent writes again (New), the person writes (waiting on the agent).
     await pause();
@@ -5857,9 +5905,9 @@ test('the inbox: a thread whose question is answered and whose card is marked ac
     assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'again', text: 'Can you also post the link in the channel?' })).status, 200);
     await evaluate('location.hash = "#inbox"; location.reload()');
     await until(async () => (await list()).some((s) => s[0] === 'New' && s.includes('* Open the beta to every team?')));
-    await evaluate('document.querySelector(".ib-fold").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Archived');
-    assert.deepEqual(await list(), [['New', '* Open the beta to every team?', '* Keep the weekly digest?'], ['Waiting on agents', 'Ship the settings page Friday?', 'Turn on the CSV export?'], ['Archived', 'Send the digest on Mondays?']]);
+    await evaluate('document.querySelector(".ib-done").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Done');
+    assert.deepEqual(await list(), [['New', '* Open the beta to every team?', '* Keep the weekly digest?'], ['Waiting on agents', 'Ship the settings page Friday?', 'Turn on the CSV export?'], ['Done', 'Send the digest on Mondays?']]);
     assert.deepEqual(await chips(), ['All4', 'Decisions4', 'Tickets']);
   } finally { await close(); }
 });
@@ -5889,7 +5937,7 @@ test('the inbox holds only the threads the person took part in: an ask they neve
     const badge = () => evaluate('document.querySelector("#tabs a[href=\\"#inbox\\"] .bd")?.textContent ?? ""');
     await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
-    await evaluate('document.querySelector(".ib-fold")?.click()');
+    await evaluate('document.querySelector(".ib-done")?.click()');
     // Present: the one answered and the one commented on. Absent: the ask, the unread report and the other ask nobody touched.
     assert.deepEqual(await rows(), ['Open the beta to every team?', 'Send the digest on Mondays?']);
     assert.equal(await badge(), '');
