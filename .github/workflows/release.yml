@@ -47,7 +47,7 @@ jobs:
             npm install -g npm@latest
           fi
           npm --version
-      - run: npm install -g done-done-axi@0.3.0
+      - run: npm install -g done-done-axi@0.6.22
       - run: done-done run install
       - run: done-done run test
       - run: done-done run skill
