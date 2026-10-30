@@ -21,9 +21,12 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Re-recorded on 30 October 2026 in the change that adds Channels, measured on main after #341, #342 and #344 landed:
 // +129 B before the first paint (its route in app.js) and +6,096 B of the whole open (the screen's code and rules in
 // app-more.js and app.css, after the first paint).
+// The Tickets type system, readable keys and formatted descriptions re-recorded the whole open on 30 October 2026 in that change over main's 311,292 B:
+// +4,550 B for the Epics view, the sheet's Hold row, the six type marks (one SVG sprite) and the description renderer in app.css and app-more.js, all
+// after the first paint; the first paint falls 6 B, because the row, its owner line, the hold's words and the list heads now draw with the screens file.
 // Re-recorded on 30 October 2026 in the change that turns the Inbox into a rail of threads: +1,062 B of the whole open over main's 310,230 B (rows' counts, two filters and two entries
 // in app-more.js and app.css, all after the first paint).
-const baseline = { bytesBeforePaint: 98_311, requestsBeforePaint: 5, bytesWhole: 311_292, paintMs: 900 };
+const baseline = { bytesBeforePaint: 98_305, requestsBeforePaint: 5, bytesWhole: 315_842, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

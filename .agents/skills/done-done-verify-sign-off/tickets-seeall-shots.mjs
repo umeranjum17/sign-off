@@ -24,7 +24,7 @@ let server, chrome, ws;
 try {
   cli('raise', board, '--key', 'seed', '--title', 'Ship the page?', '--why', 'Seeds the board.', '--outcome', 'yes=Ships', '--outcome', 'no=Waits', '--recommend', 'yes', '--default', 'no', '--ask-ref', 'seed', '--recommend-reason', 'It is ready.');
   const T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--title', title, '--asked', 'yes', ...flags);
-  const lists = [['mv', 'In progress', 7, ['--progress', '30']], ['hold', 'On hold', 8, ['--hold', 'yes']], ['todo', 'To do', 6, []], ['done', 'Done', 7, ['--progress', '100']]];
+  const lists = [['mv', 'In progress', 7, ['--progress', '30']], ['hold', 'On hold', 8, ['--hold', 'yes', '--hold-reason', 'waiting on the pricing copy']], ['todo', 'To do', 6, []], ['done', 'Done', 7, ['--progress', '100']]];
   for (const [key, label, n, flags] of lists) for (let i = 0; i < n; i++) T(`${key}${i}`, `${label} ticket ${i + 1}`, '--priority', ['P1', 'P2', 'P3'][i % 3], ...flags);
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   const url = await new Promise((ok, no) => { server.stdout.on('data', (d) => { const m = /url: "(\S+)"/.exec(String(d)); if (m) ok(m[1]); }); server.on('exit', () => no(new Error('serve exited'))); });

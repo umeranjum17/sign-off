@@ -154,7 +154,7 @@
   const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
   /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
-  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox|channels)(?:\/|$)/;
+  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|epics|inbox|channels)(?:\/|$)/;
   // A response can arrive after the person has started typing on the next card.
   // Keep the active editor and its selection across that redraw, just as a poll does.
   // The screens beyond the first screen's own (the guide, the plan and design reviews, the tickets, the evidence and decide desks, the report and
@@ -868,7 +868,7 @@
       .filter(([d]) => d && !gone.has(d.key)).sort(([, x], [, y]) => Date.parse(y.reply.at) - Date.parse(x.reply.at));
     if (!rows.length) return '';
     return el('section', { class: 't-wait t-replies', 'aria-label': 'Replies' }, el('h2', { class: 'ui-sec' }, 'Replies', el('span', { class: 'n' }, String(rows.length))),
-      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTile(k) : cardTile(d), title: k ? k.title : title(d),
+      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTypeTile(k) : cardTile(d), title: k ? k.title : title(d),
         meta: [trailWhen(t.reply.at), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')].join(' · ') })); a.onclick = () => (jump = d.key); return el('li', {}, a); })));
   }
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
@@ -1422,7 +1422,8 @@
       const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []), hit = (...s) => s.join(' ').toLowerCase().includes(q);
       const cards = q ? state.decisions.filter((d) => !gone.has(d.key) && hit(title(d), d.about ?? '', projectName(d) ?? '')).reverse() : [];
       const group = (name, ...as) => [name, cards.filter((d) => as.includes(area(d))).slice(0, 4).map(cardRow)];
-      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id)).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: tkTile(t), title: t.title, progress: progressOf(t.progress), meta: 'Not started' })))) : [];
+      // A ticket is found by its readable name or its slug as well as its title, and names itself the way its rows do.
+      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id, t.key ?? '')).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: tkTypeTile(t), title: t.title, after: t.key ? tkKey(t.key) : '', progress: progressOf(t.progress), meta: t.key || 'Not started' })))) : [];
       const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
       out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
         : [typeof emptyState === 'function' ? emptyState('empty', { mark: 'list', title: `Nothing matches “${query.trim()}”`, text: 'Try another word, or a shorter one.', small: true }) : el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
@@ -1445,10 +1446,11 @@
   const TK_WORDS = { done: 'Done', hold: 'On hold', moving: 'In progress', todo: 'To do' };
   // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
   const TK_MARKS = { chip: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21"/>', flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
-    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>' };
+    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>',
+    'no-person': '<circle cx="12" cy="8" r="3.2"/><path d="M5.5 19.5c0-3.3 2.9-5.5 6.5-5.5M4 4l16 16"/>',
+    pause: '<path d="M9 6v12M15 6v12"/>' };
   const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
-  let tkWhose = '', tkProj = '', tkShown = '';
-  const tkMore = new Set();
+  let tkWhose = '', tkProj = '';
   const tkAll = () => state.tickets ?? [];
   const tkById = (id) => tkAll().find((t) => t.id === id);
   const tkStateOf = (t) => ({ queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' }[t.state] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo'));
@@ -1469,29 +1471,14 @@
   const tkWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
   /** Under an epic its tickets; under a ticket its sub-tasks. */
   const tkKids = (t) => (tkAbove(t).length ? 'sub-task' : 'ticket');
-  /** A ticket uses the same project tile as every card list. */
-  const tkTile = (t) => projectTile(tkProject(t), () => icon('pick'));
+  const tkKey = (k) => el('span', { class: 'tk-key', dir: 'ltr' }, k);
+  const tkType = (t) => ({ epic: 1, ticket: 1, bug: 1, decision: 1, evidence: 1, merge: 1 }[t.type] ? t.type : tkUnder(t).length ? 'epic' : 'ticket');
+  const tkTypeTile = (t) => { const k = tkType(t), s = el('span', { class: `ui-icon tk-tile t-${k}`, role: 'img', 'aria-label': k });
+    s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#tk-${k[0]}"/></svg>`; return s; };
   /** A mark from web/logos, drawn as a mask in the text colour. */
   const logoMark = (src, name) => el('span', { class: 'tk-logo', role: 'img', 'aria-label': name, style: `--logo: url("${/^\/logos\/[\w-]+\.svg$/.test(src ?? '') ? src : '/logos/generic.svg'}")` });
-  /** Who works on a ticket: model and tool marks, model, lead and Live. */
-  function tkWho(t) {
-    const a = t.assignee;
-    if (!a) return el('span', { class: 'tk-as none' }, 'Unassigned');
-    return el('span', { class: `tk-as${a.live ? ' live' : ''}` }, a.model ? logoMark(a.model_logo, a.model) : '', a.tool ? logoMark(a.tool_logo, a.tool) : '', el('span', { class: 'tk-aw', dir: 'auto' }, [a.model ?? a.tool, a.lead].filter(Boolean).join(' · ')),
-      a.live ? el('span', { class: 'tk-live' }, el('i', { 'aria-hidden': 'true' }), 'Live') : '');
-  }
-  /** A ticket's row: its tile, its title and priority, then a bar with its percent once it has progress (a full bar when done), or else where it stands and when it last moved,
-   * with how many of what sits under it are done. On a desk the open ticket is marked. */
-  function tkRow(t) {
-    const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), progress = t.stage && !kids.length ? t.progress : progressOf(t.progress);
-    const meta = [TK_WORDS[s], kids.length ? `${done} of ${plural(kids.length, tkKids(kids[0]))} done` : tkWhen(t.at)].join(' · ');
-    // The name leads with the words the row shows (title, priority, release, then the percent or the line), as the label rule reads them in that order.
-    const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': `${[t.title, t.priority, t.release].filter(Boolean).join(' ')}, ${progress === undefined ? meta : `${progress}% done, ${TK_WORDS[s].toLowerCase()}`}, ${t.assignee ? [t.assignee.model ?? t.assignee.tool, t.assignee.lead, t.assignee.live && 'live'].filter(Boolean).join(' ') : 'unassigned'}` },
-      ...uiRow({ tile: tkTile(t), title: t.title, priority: t.priority, progress, lead: el('span', { class: 'tk-status' }, ...tkStatus(t)), meta }));
-    if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
-    link.querySelector('.rm').append(tkWho(t));
-    return el('li', {}, link);
-  }
+  // Filled by app-more.js when the screens file lands: the owner line and a short reason are drawn after the first paint.
+  let tkOwnerLine = () => '', tkShort = (t) => t;
   /** The tickets the lists hold (those under no ticket on the board), of the kind and project picked. The kinds show only while the board has both. */
   function tkLists() {
     const roots = tkAll().filter((t) => !tkById(t.parent)), asked = roots.filter((t) => t.asked), both = asked.length > 0 && asked.length < roots.length;
@@ -1514,10 +1501,10 @@
     return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Tickets done'), week ? el('span', { class: 'chip' }, el('i', { class: 'up', 'aria-hidden': 'true' }), `${week} this week`) : ''),
       el('div', { class: 'hv' }, el('span', { class: 'big' }, String(L.done.length), el('small', {}, ` of ${L.shown.length}`)), L.moving.length ? el('span', { class: 'vs' }, el('i', { 'aria-hidden': 'true' }), `${L.moving.length} moving`) : ''), tkDots(L));
   }
-  /** The two tabs at the top of Tickets: every ticket, and Activity, the timeline of what moved on them. */
+  /** The tabs at the top of Tickets: every ticket, the epics with their children, and Activity, the timeline of what moved on them. */
   function tkTabs(on) {
     const b = (v, name) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = `#${v}`; }; return x; };
-    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('tickets', 'All tickets'), b('activity', 'Activity'));
+    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('tickets', 'All tickets'), b('epics', 'Epics'), b('activity', 'Activity'));
   }
   /** Who asked for a ticket: the ones the board's owner asked for, and the fleet's own upkeep. */
   const TK_WHO = { asks: 'From you', system: 'Fleet upkeep' };
@@ -1541,15 +1528,6 @@
       tkFilterSheet.querySelector('h2').focus();
     };
     return b;
-  }
-  /** One list of tickets under its head: on a phone the first three with See all, on a desk a card whose rows scroll inside it. */
-  function tkGroup(key, name, list, desk, cls = '') {
-    if (desk) return el('section', { class: `ui-card tk-card ${cls}`, 'aria-label': name }, el('h2', { class: 'tk-ch' }, name, el('small', {}, String(list.length))),
-      list.length ? el('ul', { class: 'ui-list tk-rows' }, ...list.map(tkRow)) : emptyState('empty', { mark: 'list', title: `Nothing ${name.toLowerCase()}`, small: true }));
-    if (!list.length) return '';
-    const all = tkMore.has(key), see = el('button', { class: 'see' }, all ? 'Show fewer' : 'See all');
-    see.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); };
-    return el('section', { 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('small', {}, String(list.length)), list.length > 3 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? list : list.slice(0, 3)).map(tkRow)));
   }
   // A tap is aimed where the finger went down. When the list moves under it before the tap lands (a redraw, an image, the page settling), the tap lands on the row that slid under
   // the finger and opens a ticket; a tap that began on a section's See all or Show fewer does that button's work instead.
@@ -2723,9 +2701,9 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox|channels)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
+    const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|epics|inbox|channels)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
     const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.needs).length;
-    const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity';
+    const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity' || at === 'epics';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
     // The asks Decide steps through, in the list's order, Later last.
@@ -2760,7 +2738,7 @@
     whole(opened);
     for (const k of changing) if (k !== shownAsk?.key) changing.delete(k);
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
-    const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
+    const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' || at === 'epics' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? waitingTotal() : a && a !== 'tickets' && a !== 'channels' ? by[a].length : undefined);
     // Ask/inbox badges are red, unread reports ink, evidence plain; Channels carries no count.
@@ -2805,7 +2783,7 @@
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const th = inboxAt && all.find((t) => t.id === key), inboxRead = th?.d && opening && !inPlace(th.d) && (phone() || th.d.type !== 'evidence') ? th.d : undefined;
-    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', at === 'activity') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
+    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', ['activity', 'epics'].includes(at) ? at : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.asks, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.asks, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
@@ -2964,7 +2942,7 @@
         const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
         if (card?.card) mergeView(card), (changed = true);
       }
-      if (/^#(?:tickets?|activity)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
+      if (/^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
       if (!changed) return;
       // One redraw for what the poll read: the lists come in with the page, and the rest of the board draws once when its own pages land.
       await readLists();

@@ -1998,9 +1998,35 @@
   .tk-stage { display: inline-flex; width: auto; height: 1rem; padding: 0 4px; white-space: nowrap; line-height: 1rem; background: var(--tk-inset); }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr:has(.tk-stage) .v { flex-wrap: wrap; gap: 6px; padding: 8px 0; }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:is(.tk-stage, .tk-stuck) { white-space: nowrap; overflow: visible; }
+  /* The type system: one glyph and one colour per type, taken from the board's own tokens. An epic's tile is filled ink, so it reads as different at arm's length; a bug is red,
+     because red already means something is wrong; a decision, a merge and a proof keep the amber, green and quiet grey the board already owns. */
+  .tk-tile { color: var(--tk-text-secondary); }
+  /* The type's mark is an SVG symbol the tile <use>s, so it is sized here and takes the type's colour. An epic's tile is filled ink, its mark knocked out in the card colour.
+     One glyph and one colour per type, from the board's own tokens: ink, secondary text, critical, warn, up and tertiary. No two share either. */
+  .tk-tile svg { width: 1.25rem; height: 1.25rem; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .tk-tile.t-epic { background: var(--tk-ink); color: var(--tk-card); box-shadow: none; }
+  .tk-tile.t-ticket { color: var(--tk-text-secondary); }
+  .tk-tile.t-bug { color: var(--tk-critical); }
+  .tk-tile.t-decision { color: var(--tk-warn); }
+  .tk-tile.t-evidence { color: var(--tk-text-tertiary); }
+  .tk-tile.t-merge { color: var(--tk-up); }
+  /* An epic's roll-up, on its row: one segment per child, in that child's state, so the shape of the work shows before any number is read. */
+  .tk-roll { display: flex; flex: none; gap: 2px; width: 5rem; height: 6px; }
+  .tk-roll i { flex: 1 1 0; border-radius: 3px; background: var(--tk-track); }
+  .tk-roll i.d { background: var(--tk-fill); } .tk-roll i.m { background: var(--tk-mid); } .tk-roll i.h { background: var(--tk-warn); }
+  .tk-row .l2 > .meta { flex: 1; min-width: 0; }
+  .tk-row.is-epic .l2 > .meta { flex: none; }
+  /* Who works on a ticket is its own quiet line under the title, at every width: the title keeps the row's whole width and nothing overlaps it. */
   /* Who works on a ticket: a line under a row and the Assigned block. */
   .tk-logo { flex: none; display: inline-block; width: 0.875rem; height: 0.875rem; background: currentColor; -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat; }
   .tk-as { display: flex; align-items: center; gap: 6px; min-width: 0; height: 1rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); white-space: nowrap; }
+  .tk-as.missing { gap: 5px; color: var(--tk-warn); font-weight: 500; }
+  .tk-as.missing .tk-k, .tk-as.missing .tk-k svg { width: 0.875rem; height: 0.875rem; }
+  .tk-as.missing .tk-k svg { stroke-width: 1.5; }
+  /* The slug shares the owner line: it keeps to under half of it and ellipsises, so the person's own model and lead always read. */
+  .tk-row-slug { flex: none; min-width: 0; max-width: 45%; margin-right: 0.375rem; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; text-overflow: ellipsis; }
+  /* A ticket's priority chip ends its quiet line, so the title line is the title's. */
+  .tk-as > .ui-pc { margin-left: auto; }
   .tk-aw { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .tk-live { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--tk-text-secondary); }
   .tk-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--tk-up); }
@@ -2011,6 +2037,7 @@
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; }
   .tk-shd p { display: flex; flex: 1; align-items: center; gap: 0.5rem; min-width: 0; margin: 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
+  .tk-shd p > span:last-child:not(.tk-key) { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .tk-shd .x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; min-height: 0; padding: 0; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
   .tk-shd .x::after { content: ""; position: absolute; inset: -0.375rem; } .tk-shd .x .glyph { width: 1rem; height: 1rem; }
   .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
@@ -2019,6 +2046,36 @@
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-props { margin-top: 0.5rem; }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
   .tk-in { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); } .tk-in .ui-icon { box-shadow: none; }
+  /* The Epics view: each epic a group, its children under it one step in (44px), so an epic reads as a group and never as one more ticket. */
+  .tk-epic + .tk-epic { margin-top: 0.75rem; }
+  /* A child is one step in, and only one: on a phone the step is small so its title keeps most of the row, and on a desk it is wider. */
+  .tk-epic .ui-list > li.tk-kid .ui-row { padding-left: 1.25rem; }
+  .tk-epic-list { margin: 0.25rem 0 0; padding: 0.25rem 0.75rem; }
+  /* On a desk the epics share one card, whose own padding is the row's inset. */
+  .tk-desk .tk-card > .tk-epic > .tk-epic-list { margin: 0; padding: 0; }
+  .tk-desk .tk-epic + .tk-epic { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tk-line); }
+  .tk-desk .tk-epic .ui-list > li.tk-kid .ui-row { padding-left: 3.5rem; }
+  /* A ticket's readable name (JG-101) leads its row's title line in the title's own type, not as a chip beside it; the slug it replaced is the row's small second line. */
+  .tk-key { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em; white-space: nowrap; }
+  .tk-shd .tk-key { height: 1.125rem; padding: 0 0.375rem; border-radius: 0.375rem; background: var(--tk-inset); font-size: var(--tk-fs-small); line-height: 1.125rem; }
+  .tk-slug { margin: 0.125rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); overflow-wrap: anywhere; }
+  /* A description as the sheet draws it: the summary a step larger, then headings, lists, links and quoted words, each with its own spacing. */
+  .tk-desc { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); padding: 0.75rem 1rem; }
+  .tk-desc > * + * { margin-top: 0.5rem; }
+  .tk-dp { margin: 0; color: var(--tk-text); font-size: var(--tk-fs-meta); line-height: 1.5rem; }
+  .tk-desc .tk-sum { color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: 1.5rem; }
+  .tk-dh { margin: 0.75rem 0 0; color: var(--tk-ink); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); font-weight: 600; }
+  .tk-dh:first-child { margin-top: 0; }
+  .tk-dl { margin: 0; padding-left: 1.125rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.5rem; }
+  .tk-dl li + li { margin-top: 0.125rem; }
+  .tk-dq { margin: 0; padding: 0.125rem 0 0.125rem 0.75rem; border-left: 2px solid var(--tk-mid); }
+  .tk-dq p { margin: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1.5rem; }
+  .tk-dq p + p { margin-top: 0.375rem; }
+  .tk-desc a { color: var(--tk-ink); text-underline-offset: 2px; }
+  /* The reason a ticket is on hold, on its page: the hold's words under its row, in full. */
+  :is(.tk-sheet, .tk-pane) .ui-pr:has(.tk-why) { flex-wrap: wrap; }
+  :is(.tk-sheet, .tk-pane) .ui-pr .tk-why { flex: 1 0 100%; margin-top: 0.25rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); white-space: normal; }
   /* A desk: one filled screen with no page scroll. The head across (where you are, the 32px title, one line of what it holds, the controls at its right), then three columns:
      the hero over In progress, On hold over To do, and the open ticket. A list scrolls inside its card with no scrollbar and comes to rest on whole rows; 88px rows, titles on two lines. */
   @media (min-width: 64rem) {
@@ -2036,6 +2093,7 @@
     .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }
     .tk-desk .ui-row .l1 .t { display: -webkit-box; font-size: 0.9375rem; line-height: 1.25rem; white-space: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .tk-desk .ui-row:hover:not([aria-current]) { opacity: 0.85; }
+
     .tk-row[aria-current]::after { content: ""; position: absolute; z-index: -1; inset: 0.25rem -0.5rem; border-radius: 0.875rem; background: var(--tk-inset); }
     .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
     .tk-pane > * { flex-shrink: 0; }
