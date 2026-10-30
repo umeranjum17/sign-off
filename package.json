@@ -1,6 +1,6 @@
 {
   "name": "sign-off-axi",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "Answer your coding agents’ questions and review their work from one board.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },

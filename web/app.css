@@ -555,6 +555,7 @@
   .note label { display: block; color: var(--muted); font-size: 0.875rem; margin-top: 0.5rem; }
   .tradeoff { margin: 0; max-width: 70ch; }
   .option-link { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: 0.9375rem; color: var(--accent); }
+  .live-links { display: flex; flex-wrap: wrap; gap: 0 0.75rem; margin: 0; }
   .fd-links { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 1rem; font-size: 0.9375rem; color: var(--muted); } .fd-links a { min-height: 2.75rem; display: inline-flex; align-items: center; color: var(--accent); }
   /* Discard: a quiet round x at the corner of a card or the end of a row. */
   .x { flex: none; display: grid; place-items: center; width: 2.75rem; min-height: 2.75rem; padding: 0; margin: -0.5rem 0 -0.5rem auto; border: 0; border-radius: 50%;

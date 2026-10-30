@@ -189,8 +189,9 @@ New guided defaults use plan schema 3 / report schema 5, contract 1, with a requ
   mock frames; the text before it stays the trade-off.
 - `mocks`: optional on design items, up to 6 entries of an option `value`, a
   `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, 5 MB or less), relative to the board file's folder, and an optional `link` (http or
-  https, no spaces, 500 characters or fewer) drawn as an Open live link under that option's mock,
-  outside its sandboxed frame, and an optional `video` (`path`, `sha256`, `bytes` and an optional `score` from 0 to 100, the option's round score;
+  https, no spaces, 500 characters or fewer): that option's reference, drawn as a Reference link under its mock,
+  outside its sandboxed frame. Open live never uses it: it opens that option's own mock page, so a reference
+  can never stand in for the prototype, and an optional `video` (`path`, `sha256`, `bytes` and an optional `score` from 0 to 100, the option's round score;
   `post --video <value>=<file>` and `--score <value>=<number>` write it): a demo recording, `.mp4` or `.webm` and 50 MB or less, which `post` checks is a real recording and
   copies byte for byte (never converted) to `evidence/video/<hash>.<ext>` beside the board. The card plays it muted in place on a tap and opens it full screen with the score, the Designs row
   uses its first frame, and the board serves only that file while it still has its hash. A card without `video` works as it did. Each value must

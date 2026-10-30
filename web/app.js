@@ -1021,6 +1021,11 @@
   }
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
+  /** A mock is a prototype when it is a page that can be tapped, not a picture of one. */
+  const prototype = (m) => !!m && /\.html?$/i.test(m.path.split('?')[0]);
+  /** One place decides where a live link goes: that option's own prototype page, this card's key and this option's value, with the variant its mock reads.
+   *  Never the option's `--link`, which is a reference beside it (see `mockCards` and `fullPages`). */
+  const liveUrl = (d, m) => { const [path, query] = m.path.split('?'); return src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : '')); };
   /** A screen's views: its own (design 1), or on design 2 those of the frame Yes approves. */
   const viewsOf = (d, screen) => screen?.views ?? screen?.frames?.find((f) => f.role === d.accepts)?.views ?? {};
   const designFrame = (d) => Object.values(viewsOf(d, d.journeys?.[0]?.screens?.[0])).find(p => /\.(png|jpe?g|webp|svg)$/i.test(p)) || d.preview;
@@ -1066,18 +1071,19 @@
     const rec = (i) => d.options[i].value === d.recommend_value, order = d.options.map((_, i) => i).sort((a, b) => rec(b) - rec(a));
     return el('div', { class: 'mocks', role: 'group', 'aria-label': d.title }, ...order.map((i) => {
       const o = d.options[i], m = d.mocks?.find((x) => x.value === o.value);
-      // A `page.html?variant=b` mock keeps its variant in the frame's query, where the page reads it.
-      const [path, query] = m?.path.split('?') ?? [];
-      const url = m && src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
-      const view = m && (/\.html?$/i.test(path) ? guardFrame(el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy', 'data-mock': `${d.key}~${m.value}` }), `option ${o.label}`)
+      const url = m && liveUrl(d, m), live = !!(m && prototype(m) && m.hash !== null && !FROZEN);
+      const view = m && (prototype(m) ? guardFrame(el('iframe', { src: url, title: `Mock ${o.label}`, sandbox: 'allow-scripts', tabindex: '-1', 'aria-hidden': 'true', loading: 'lazy', 'data-mock': `${d.key}~${m.value}` }), `option ${o.label}`)
         : el('img', { src: url, alt: `Mock: ${o.label}` }));
       return el('figure', { class: 'mock' },
         el('figcaption', {}, el('span', { class: 'label', dir: 'auto' }, o.label), rec(i) ? el('span', { class: 'badge' }, 'Recommended') : ''),
         // A mock file that is gone has a null hash: the option says so in place of an empty frame.
         m && m.hash !== null ? fullShot(d, m.value, el('a', { class: 'shot', href: url, target: '_blank', rel: 'noopener', 'aria-label': `Open mock ${o.label} full screen` }, view))
           : el('p', { class: 'shot none' }, 'No mock for this option'),
-        // The option's own link sits on the card, where a tap opens a tab: a link inside the sandboxed frame cannot.
-        m?.link ? el('div', { class: 'under' }, el('a', { class: 'option-link', href: m.link, target: '_blank', rel: 'noopener', 'aria-label': `Open ${o.label} live` }, 'Open live'), buttons[i] ?? '') : buttons[i] ?? '');
+        // The links sit on the card, where a tap opens a tab: a link inside the sandboxed frame cannot. Open live is that option's own prototype,
+        // from liveUrl; its --link is the reference beside it and is drawn as one, never as the live prototype.
+        live || m?.link ? el('div', { class: 'under' }, el('p', { class: 'live-links' },
+          live ? el('a', { class: 'option-link', href: url, target: '_blank', rel: 'noopener', 'data-live': `${d.key}~${m.value}`, 'aria-label': `Open ${o.label} live, its own prototype full size` }, 'Open live') : '',
+          m?.link ? el('a', { class: 'option-link ref-link', href: m.link, target: '_blank', rel: 'noopener', 'aria-label': `Open the reference for ${o.label}` }, 'Reference') : ''), buttons[i] ?? '') : buttons[i] ?? '');
     }));
   }
 
@@ -1087,8 +1093,8 @@
   let fullSize, protoFull;
   const fullPages = (d) => d.view ? [{ value: '', label: d.title, page: true, url: src(mockUrl(d.key, '', d.view)) }]
     : [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).map((o) => {
-      const m = d.mocks?.find((x) => x.value === o.value), [path, query] = m?.path.split('?') ?? [];
-      return m && m.hash !== null && { value: m.value, label: o.label, link: m.link, page: /\.html?$/i.test(path), url: src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : '')) };
+      const m = d.mocks?.find((x) => x.value === o.value);
+      return m && m.hash !== null && { value: m.value, label: o.label, page: prototype(m), url: liveUrl(d, m) };
     }).filter(Boolean);
   function fullButton(d) {
     if (!fullPages(d).length) return '';
