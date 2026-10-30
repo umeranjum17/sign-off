@@ -403,7 +403,12 @@ try {
     problems.push(`the description is not drawn as formatted text: ${JSON.stringify(facts.keySheet)}`);
   await capture('key-sheet');
   await pair('key-sheet', tree, 'tickets/T-9');
-  // The hold, in its own list, with the reason on the row (the lists are open from the type check above).
+  // The hold, in its own list, with the reason on the row: back to the list, with every section open as the type check left it.
+  await go('about:blank');
+  await go(url + '#tickets');
+  await until(`!!document.querySelector('.tk-hero')`, 'the lists drawn again for the hold');
+  await js(`[...document.querySelectorAll('main button.see')].filter((b) => b.textContent === 'See all').forEach((b) => b.click())`);
+  await until(`!!document.querySelector('${rowOf('digest-monday')}')`, 'the hold listed');
   await js(`document.querySelector('${rowOf('digest-monday')}').scrollIntoView({ block: 'center', behavior: 'instant' })`);
   await capture('holds');
   // The Epics view: every epic with its children under it, a figure and the states they are in.
