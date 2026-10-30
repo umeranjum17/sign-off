@@ -2343,9 +2343,10 @@
         el('span', { class: 'ch-row-text' }, el('strong', {}, name), el('span', {}, last ? `${last.from} → ${last.to}: ${commsText(last.text)}` : 'No messages in the loaded history')),
         last ? el('time', { datetime: new Date(last.at * 1000).toISOString() }, new Date(last.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '');
     };
+    const threadCatalog = [...new Map([...(comms.threads || []).map((t) => [`${t.channel}/${t.id}`, { channel: t.channel, thread: t.id }]), ...comms.messages.filter((m) => m.thread).map((m) => [`${m.channel}/${m.thread}`, m])]).values()];
     const list = el('aside', { class: 'ch-list', 'aria-label': 'Fleet channels' }, el('h2', {}, `Teams · ${comms.homes.length}`),
       el('div', { class: 'ch-card' }, ...comms.homes.map((h) => row(h, commsHref(h), comms.messages.filter((m) => m.channel === h), h === home && !selected.thread))),
-      el('h2', {}, 'Worker threads'), el('div', { class: 'ch-card' }, ...[...new Map(comms.messages.filter((m) => m.thread && (!home || m.channel === home)).map((m) => [`${m.channel}/${m.thread}`, m])).values()].map((m) => row(m.thread, commsHref(m.channel, m.thread), comms.messages.filter((e) => e.channel === m.channel && e.thread === m.thread), m.thread === selected.thread))));
+      el('h2', {}, 'Worker threads'), el('div', { class: 'ch-card' }, ...threadCatalog.filter((m) => !home || m.channel === home).map((m) => row(m.thread, commsHref(m.channel, m.thread), comms.messages.filter((e) => e.channel === m.channel && e.thread === m.thread), m.thread === selected.thread))));
     const older = visible.length > commsVisible ? commsButton('Show earlier loaded messages', () => { const box = commsRoot.querySelector('.ch-history'), height = box.scrollHeight; commsVisible += 60; commsDraw(); const next = commsRoot.querySelector('.ch-history'); next.scrollTop += next.scrollHeight - height; }, 'ch-earlier')
       : commsBefore > 0 ? commsButton('Earlier messages', () => commsRead(true), 'ch-earlier') : '';
     const history = el('div', { class: 'ch-history', 'aria-label': 'Messages in time order' }, older,
@@ -2355,8 +2356,8 @@
       !shown.length ? el('p', { class: 'ch-empty' }, commsReady ? query || commsKind || commsState ? 'No matching messages in the loaded history.' : 'No messages in this channel yet.' : 'Reading communications…') : '');
     const stream = el('section', { class: 'ch-stream ch-card', 'aria-label': home || 'Messages' }, el('header', { class: 'ch-stream-head' },
       el('a', { href: '#channels', class: 'ch-back' }, '‹ Channels'), el('div', {}, el('h2', {}, selected.thread || home || 'Messages'), el('p', {}, `${all.length} loaded messages · oldest first`))),
-      history, commsPending.length ? commsButton(`${commsPending.length} new ${commsPending.length === 1 ? 'message' : 'messages'} ↓`, commsJump, 'ch-new') : '');
-    const note = commsError ? el('p', { class: 'ch-error', role: 'alert' }, commsError, ' ', commsButton('Retry', () => commsRead())) : comms.partial ? el('p', { class: 'ch-source' }, 'Status messages only. Steering and replies are not connected yet.') : '';
+      history, all.some((m) => pending.has(m.id)) ? commsButton(`${all.filter((m) => pending.has(m.id)).length} new messages ↓`, commsJump, 'ch-new') : '');
+    const note = commsError ? el('p', { class: 'ch-error', role: 'alert' }, commsError, ' ', commsButton('Retry', () => commsRead())) : comms.partial ? el('p', { class: 'ch-source' }, 'Recent status and steering messages. Board questions and answers: not recorded.', comms.unavailable_homes ? ` Worker history unavailable for ${comms.unavailable_homes} channels.` : '') : '';
     commsRoot.replaceChildren(top, toggle, filters, note, el('div', { class: `ch-columns${phone() && home ? ' thread-open' : ''}` }, list, stream));
     if (selected.message) {
       const m = selected.message;

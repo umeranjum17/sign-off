@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -73,5 +73,54 @@ test('communications redaction covers metadata-shaped credentials and URLs', () 
   const secret = 'AbCd0123456789'.repeat(4);
   for (const text of [`password="${secret}"`, `NPM_TOKEN=${secret}`, `https://example.test/?token=${secret}`, `Bearer ${secret}`, `github_pat_${secret}`]) {
     assert.ok(!redactComms(text).includes(secret));
+  }
+});
+
+test('Channels discovers the whole file roster and empty worker threads, recorded runtime and inbox acknowledgement over HTTP', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'channels-fleet-'));
+  let proc;
+  try {
+    const board = join(dir, 'board.json'), state = join(dir, 'main/state'), worker = join(dir, 'team/state');
+    mkdirSync(state, { recursive: true }); mkdirSync(worker, { recursive: true });
+    copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), board);
+    writeFileSync(join(dir, 'config.yaml'), `comms_state: ${state}\n`);
+    for (let i = 0; i < 54; i++) writeFileSync(join(state, `home-${i}.status`), 'working [at=1700000000]: A real status\n');
+    writeFileSync(join(state, '.private.status'), 'ignored');
+    writeFileSync(join(state, 'home-0.meta'), `home=${join(dir, 'team')}\nharness=codex\nmodel=gpt-6.1-sol\nendpoint=DO_NOT_READ\n`);
+    writeFileSync(join(worker, 'task-a.status'), 'working [at=1700000001]: Worker update\n');
+    writeFileSync(join(worker, 'task-a.meta'), 'harness=pi\nmodel=deepseek-v4.1-flash\n');
+    writeFileSync(join(worker, 'empty.status'), '');
+    mkdirSync(join(worker, 'task-a.inbox/handled'), { recursive: true });
+    const secret = ['sk', 'AbCd0123456789AbCd0123456789'].join('-');
+    writeFileSync(join(worker, 'task-a.inbox/001.msg'), `schema=jg-task-inbox.v1\nat=2023-11-14T22:13:22Z\n--\nAn actual correction with TOKEN=${secret}\n`);
+    proc = spawn('node', [cli, 'serve', board, '--port', '0'], { cwd: dir, env: { ...process.env, SIGN_OFF_COMMS_STATE: '', SIGN_OFF_FLEET_HOME: '', SIGN_OFF_COMMS_LEDGER: '', SIGN_OFF_COMMS_FEED: '', SIGN_OFF_COMMS_HOMES: '' } });
+    const url = await new Promise((ok, no) => {
+      let said = ''; proc.stdout.on('data', (b) => { said += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(said); if (m) ok(m[0]); });
+      proc.once('exit', (code) => no(new Error(`server exited ${code}`)));
+    });
+    const get = async () => (await fetch(`${url}api/channels`)).json();
+    const first = await get();
+    assert.equal(first.available, true);
+    assert.equal(first.homes.length, 55); // Main plus every non-hidden status file.
+    assert.ok(first.threads.some((t) => t.channel === 'home-0' && t.id === 'empty'));
+    assert.equal(first.messages.find((m) => m.text === 'Worker update').runtime, 'pi · deepseek-v4.1-flash');
+    assert.equal(first.messages.find((m) => m.channel === 'home-1').runtime, 'home-1');
+    assert.equal(first.messages.find((m) => m.channel === 'home-0' && !m.thread).runtime, 'codex · gpt-6.1-sol');
+    const order = first.messages.find((m) => m.source === 'Steering inbox');
+    assert.equal(order.to, 'task-a'); assert.equal(order.from, 'Sender not recorded');
+    assert.equal(order.read, 'Not read'); assert.equal(order.handled, 'Handled not recorded');
+    assert.ok(!JSON.stringify(first).includes(secret)); assert.ok(!JSON.stringify(first).includes(dir));
+    renameSync(join(worker, 'task-a.inbox/001.msg'), join(worker, 'task-a.inbox/handled/001.msg'));
+    writeFileSync(join(state, 'new-home.status'), 'working [at=1700000003]: Arrived without restart\n');
+    appendFileSync(join(worker, 'task-a.status'), 'resolved [at=1700000004]: Another event\n');
+    const next = await get();
+    assert.equal(next.homes.length, 56);
+    assert.equal(next.messages.find((m) => m.id === order.id).read, 'Read');
+    assert.equal(next.messages.find((m) => m.id === order.id).handled, 'Handled not recorded');
+    assert.ok(next.messages.some((m) => m.text === 'Another event' && m.kind === 'answer'));
+    assert.ok(next.messages.every((m, i, all) => !i || all[i - 1].at <= m.at));
+  } finally {
+    if (proc && proc.exitCode === null) { proc.kill(); await new Promise((ok) => proc.once('exit', ok)); }
+    rmSync(dir, { recursive: true, force: true });
   }
 });
