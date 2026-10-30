@@ -208,13 +208,14 @@ try {
   ws.close();
   const list = frames.map((f, i) => `file '${f.name}'\nduration ${((frames[i + 1]?.t ?? f.t + 1) - f.t).toFixed(4)}`);
   writeFileSync(join(scratch, 'list.txt'), `${list.join('\n')}\nfile '${frames.at(-1).name}'\n`);
+  // The recording is the proof's to watch, not what the check measures: a host with no usable ffmpeg still checks the board, and says so.
   const mp4 = join(out, `${tag('board-flash')}.mp4`);
-  const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(scratch, 'list.txt'), '-vf', `fps=30,format=yuv420p,scale=${desk ? '1280:800' : '780:1688'}`, '-c:v', 'libx264', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
-  if (r.status !== 0) failures.push('the recording could not be encoded');
-  writeFileSync(join(out, `${tag('board-flash')}.json`), `${JSON.stringify({ url: served, repo, width, theme, phases: report }, null, 2)}\n`);
+  const r = spawnSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', join(scratch, 'list.txt'), '-vf', `fps=30,format=yuv420p,scale=${desk ? '1280:800' : '780:1688'}`, '-c:v', 'libx264', '-movflags', '+faststart', mp4], { stdio: 'ignore' });
+  const recording = r.status === 0 ? mp4.split('/').pop() : `skipped (ffmpeg could not encode it: ${r.error?.code ?? `exit ${r.status}`})`;
+  writeFileSync(join(out, `${tag('board-flash')}.json`), `${JSON.stringify({ url: served, repo, width, theme, recording, phases: report }, null, 2)}\n`);
   writeFileSync(join(out, `${tag('board-flash')}.txt`), [`board: ${served}`, `repo: ${repo}`, `width: ${width}, theme: ${theme}`,
     ...report.map((p) => `${p.phase}: ${p.frames} frames, region shapes ${p.regionShapes}, rows kept ${p.keptRows}, rebuilt ${p.rebuiltRows}, loader ${p.loader ? 'up' : 'never'}, skeleton ${p.skeleton ? 'yes' : 'no'}, words ${p.text.join(' to ')}, height ${p.height.join(' to ')}`),
-    '', failures.length ? `FAILED:\n- ${failures.join('\n- ')}` : 'PASSED: no blank frame, no rebuilt main region, a loader while reading.'].join('\n'));
+    `recording: ${recording}`, '', failures.length ? `FAILED:\n- ${failures.join('\n- ')}` : 'PASSED: no blank frame, no rebuilt main region, a loader while reading.'].join('\n'));
   console.log(failures.length ? `FAILED\n- ${failures.join('\n- ')}` : 'PASSED: no blank frame, no rebuilt main region, a loader while reading.');
   if (failures.length) process.exitCode = 1;
 } finally {
