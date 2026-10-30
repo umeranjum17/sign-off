@@ -5,7 +5,7 @@
 // Usage: node inbox-layout-shots.mjs <output>
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 const here = resolve('.'), repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
@@ -23,34 +23,23 @@ writeFileSync(board, JSON.stringify({ schema: 2, items: [{ filed: new Date().toI
   mocks: OPTIONS.map(([value]) => ({ value, path: `mocks/inbox-layout/option-${value}.html` })), filer: 'sign-off' }] }));
 const sh = (bin, args, options = {}) => spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-let server, chrome, ws;
-const prof = mkdtempSync(join(tmpdir(), 'so-layout-chrome-'));
+let server;
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `inbox-layout-${process.pid}`, CHROME_DEVTOOLS_AXI_USER_DATA_DIR: join(dir, 'chrome') };
+const browser = (args, options = {}) => { const r = sh('chrome-devtools-axi', args, { env: browserEnv, maxBuffer: 4 * 1024 * 1024, ...options }); assert.equal(r.status, 0, r.stderr || r.stdout); return r.stdout; };
+const evalIn = async (expression) => JSON.parse(browser(['run'], { input: `console.log(JSON.stringify((await page.eval(${JSON.stringify(expression)})) ?? null));` }).trim());
 try {
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const url = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127.0.0.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', () => no(Error('server exited'))); });
-  chrome = spawn('/usr/lib/chromium/chromium', ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', 'about:blank'], { stdio: 'ignore' });
-  let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); if (existsSync(join(prof, 'DevToolsActivePort'))) port = readFileSync(join(prof, 'DevToolsActivePort'), 'utf8').split('\n')[0]; }
-  const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
-  ws = new WebSocket(target.webSocketDebuggerUrl); await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
-  let id = 0; const pending = new Map(), errors = [];
-  ws.onmessage = (m) => { const x = JSON.parse(m.data); if (x.id && pending.has(x.id)) { pending.get(x.id)(x); pending.delete(x.id); }
-    if (x.method === 'Runtime.exceptionThrown') errors.push(x.params.exceptionDetails.exception?.description ?? x.params.exceptionDetails.text);
-    if (x.method === 'Runtime.consoleAPICalled' && x.params.type === 'error') errors.push(x.params.args.map((a) => a.value ?? a.description).join(' ')); };
-  const cdp = (method, params = {}) => new Promise((r, j) => { const n = ++id; pending.set(n, (x) => (x.error ? j(new Error(`${method}: ${x.error.message}`)) : r(x.result))); ws.send(JSON.stringify({ id: n, method, params })); });
-  const evalIn = async (expression) => { const r = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); assert.ok(!r.exceptionDetails, r.exceptionDetails?.exception?.description); return r.result.value; };
-  await cdp('Page.enable'); await cdp('Runtime.enable');
+  browser(['newpage', 'about:blank']);
   const HEIGHT = { 390: 844, 1280: 800 }, records = [];
   const open = async (width, theme, address) => {
     const phone = width < 1024;
-    await cdp('Emulation.setDeviceMetricsOverride', { width, height: HEIGHT[width], deviceScaleFactor: 2, mobile: phone });
-    await cdp('Emulation.setTouchEmulationEnabled', phone ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
-    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
-    await cdp('Page.navigate', { url: 'about:blank' }); await wait(150);
-    await cdp('Page.navigate', { url: address }); await wait(1500);
+    browser(['open', 'about:blank']);
+    browser(['emulate', '--viewport', `${width}x${HEIGHT[width]}x2${phone ? ',mobile,touch' : ''}`, '--color-scheme', theme]);
+    browser(['open', address]); await wait(600);
   };
-  const shoot = async (file) => writeFileSync(join(dest, file), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+  const shoot = async (file) => browser(['screenshot', join(dest, file)]);
   if (!before) for (const [v, label] of OPTIONS) for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
-    errors.length = 0;
     await open(width, theme, `${url}mock/local/inbox-layout~${v}/option-${v}.html`);
     await wait(600);
     const file = `option-${v}.${width}.${theme}.png`;
@@ -60,7 +49,9 @@ try {
         .filter((e) => { const b = e.getBoundingClientRect(); return b.width && b.height && b.bottom > 0 && b.top < innerHeight && b.right > 0 && b.left < innerWidth; }).map((e) => parseFloat(getComputedStyle(e).fontSize));
       return { width: innerWidth, overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth, smallest: Math.min(...sizes), background: getComputedStyle(document.body).backgroundColor,
         text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 200) }; })()`);
-    records.push({ file, option: label, theme, ...r, console_errors: [...errors] });
+    const log = browser(['console', '--type', 'error', '--limit', '100']);
+    const errors = /no console messages/i.test(log) ? [] : [log];
+    records.push({ file, option: label, theme, ...r, console_errors: errors });
     assert.equal(r.overflowX, false, `${file}: no sideways scroll`);
     assert.match(r.text, /Ship the new settings page Friday\?/, `${file}: the page shows the inbox's threads`);
     assert.deepEqual(errors, [], `${file}: no console error`);
@@ -73,7 +64,7 @@ try {
       scrolls_sideways: ${stage}.scrollWidth > ${stage}.clientWidth, page_overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth }; })()`;
   for (const theme of ['light', 'dark']) {
     await open(390, theme, `${url}#decide/inbox-layout`);
-    await evalIn(`localStorage.setItem('so-theme', '${theme}'); 0`); await cdp('Page.reload'); await wait(1500);
+    await evalIn(`(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); return 0; })()`); await wait(1500);
     await evalIn(`(async () => { for (let i = 0; i < 40 && !document.querySelector('.full-open'); i++) await new Promise((r) => setTimeout(r, 100));
       document.querySelector('.full-open').click(); for (let i = 0; i < 40 && !${full}; i++) await new Promise((r) => setTimeout(r, 100));
       ${full}.querySelector('[data-size=desktop]').click(); })()`);
@@ -98,7 +89,10 @@ try {
     start: 'A throwaway board holding one design pick of three Inbox layouts, each option a page that runs.',
     steps: [...(before ? [] : ['Open each option page on its own at 390 and 1280, light and dark']), 'Open the pick in Decide on a phone (390 by 844)', 'Open full screen and tap Desktop', ...(before ? [] : ['Tap Fit']), 'Capture light and dark'],
     result: `${before ? 'before' : 'after'} frames and checks.json` }, null, 2));
+} catch (error) {
+  console.error(error); throw error;
 } finally {
-  try { ws?.close(); chrome?.kill(); server?.kill(); } catch {}
-  await wait(400); rmSync(dir, { recursive: true, force: true }); rmSync(prof, { recursive: true, force: true });
+  browser(['stop']);
+  if (server) await new Promise((ok, no) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', no); stop.once('exit', (code) => code === 0 ? ok() : no(Error(log))); });
+  await wait(400); rmSync(dir, { recursive: true, force: true });
 }
