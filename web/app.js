@@ -1375,7 +1375,7 @@
     // A first screen does not hold the answered cards or the proofs yet, so today's two numbers come with the page that painted it.
     const cleared = state.counts?.cleared_today ?? by.answered.filter((d) => isToday(state.answers[d.key].at)).length, proofs = state.counts?.proofs_today ?? state.decisions.filter((d) => d.type === 'evidence' && d.filed && isToday(d.filed) && !(state.dismissed ?? []).includes(d.key)).length;
     const stat = (href, mark, lab, n, of) => el('a', { class: 'ui-card ui-stat', href, 'aria-label': `${lab}: ${n}${of === undefined ? '' : ` of ${of}`}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n), of === undefined ? '' : el('small', {}, ` of ${of}`)));
-    return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.waiting.length),
+    return el('div', { class: 'ui-tiles t-tiles' }, stat('#answered', 'M10 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm3.4 5.1-4.3 4.4-2-2-1.2 1.2 3.2 3.2 5.5-5.6z', 'Cleared today', cleared, cleared + by.asks.length),
       stat('#evidence', 'M10 1.8l6.8 2.7v5c0 4.4-2.9 7.4-6.8 8.9-3.9-1.5-6.8-4.5-6.8-8.9v-5zm3.6 5.6-1.1-1.1-3.4 3.5-1.6-1.6-1.1 1.1 2.7 2.7z', 'Proofs today', proofs));
   }
   /** Waiting on you: the next three asks after Up next, with See all into Decide. */
@@ -1630,9 +1630,9 @@
     b.onclick = () => { fillMore(by); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
     return b;
   }
-  /** Today itself. A redraw keeps an open More current; the address #find opens Search over it. */
+  /** Today keeps More current and opens Search at #find. */
   function today(by) {
-    const queue = [...by.waiting].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
+    const queue = [...by.asks].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
     if (todayMore.open) fillMore(by);
     if (location.hash === '#find' && !searchSheet.open) openSearch();
     const open = by.designs.filter(dzOpen), designs = open.length ? el('section', { class: 't-wait', 'aria-label': 'Designs to review' }, el('h2', { class: 'ui-sec' }, 'Designs to review', el('a', { class: 'see', href: '#designs' }, 'See all')),
@@ -2452,11 +2452,11 @@
   const askHead = (d, sink) => el('div', { class: 'ui-shd split-bar' }, cardTile(d), sink.crumb, sink.more ?? '');
   /** An open item on a desk that is not an ask's own pane: one card with its head line over it. */
   const pane = (head, ...body) => el('section', { class: 'ui-card ui-pane s8 split-detail' }, head, ...body);
-  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked). Answering folds the row away and selects the next. */
+  /** Desk: list beside the selected ask; answering folds its row and selects the next. */
   function decideDesk(top, items, hidden, queue, key, done, today) {
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const list = [decideList(items, hidden, done, today)], sub = [`${plural(queue.length, 'ask')} ${queue.length === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
+    const asks = queue.filter((d) => !isPick(d)).length, list = [decideList(items, hidden, done, today)], sub = [`${plural(asks, 'ask')} ${asks === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
     if (!d) return split(top, sub, list, pane('', items.length ? emptyState('empty', { mark: 'waiting', title: 'No review open', text: 'Pick one from the list to answer it here.', small: true }) : allClear(true)));
     const bar = {}, page = decidePage(d, next, true, bar);
     return split(top, sub, list, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
@@ -2630,11 +2630,12 @@
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => !gone.has(d.key) && (d.kind === 'design' || (isPick(d) && !merged.has(d.key))));
-    // Waiting on you reads newest first. A sign-in blocks someone now, so sign-ins come first.
+    // Newest asks first, with sign-ins ahead.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
     const asked = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d).reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
+    by.asks = by.waiting.filter((d) => !isPick(d));
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
@@ -2649,7 +2650,7 @@
     const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
     // On a phone an ask opens as a sheet over Decide's list, so the page under it keeps the list's head.
-    decideCounts = { asks: by.waiting.filter((d) => sideOf(d) === 'now').length, designs: by.designs.length };
+    decideCounts = { asks: by.asks.filter((d) => sideOf(d) === 'now').length, designs: by.designs.length };
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence' || inboxAt), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
@@ -2677,8 +2678,8 @@
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
-    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a && a !== 'tickets' ? by[a].length : undefined);
-    // Decide's and the inbox's count is a red badge and new Reports' an ink one, in the sidebar and the tab bar alike; Evidence's is a plain number.
+    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? by.asks.length : a && a !== 'tickets' ? by[a].length : undefined);
+    // Ask/inbox badges are red, unread reports ink, evidence plain.
     const badge = (a) => (a === 'waiting' || a === 'inbox' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
@@ -2694,7 +2695,7 @@
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
     document.body.classList.toggle('tickets', showingTickets);
-    const bulk = { waiting: by.waiting, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
+    const bulk = { waiting: by.asks, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
     const sel = selecting && canDismiss() && bulk.length && ['waiting', 'designs'].includes(head) && selectHead(bulk);
@@ -2720,7 +2721,7 @@
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const th = inboxAt && all.find((t) => t.id === key), inboxRead = th?.d && opening && !inPlace(th.d) && (phone() || th.d.type !== 'evidence') ? th.d : undefined;
     const content = inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', at === 'activity') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
-      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.waiting, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.waiting, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
+      : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.asks, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.asks, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
     if (!(at === 'decide' && shownAsk && !deskSplit) && !(inboxAt && opening && phone())) sheetUp = '';

@@ -143,9 +143,10 @@ const PAGES = [
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
-      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest', look: '#decide/look' };
-      // Every row is the link to its ask; Decide lists them in one card under Asks, with every answer given under Answered. A design review is Main's until promoted, so it is under Designs only.
+      const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest' };
+      // Asks hold questions and plans; design picks and reviews stay in Designs.
       for (const [key, href] of Object.entries(links)) await h.nav(`open ${key}`, h.card(key), new RegExp(`^${href}$`));
+      h.has('no design pick in Asks', !h.card('look') && h.board());
       h.has('no design review in Decide', !h.card('chat-journeys') && h.board());
       const heads = () => [...h.board().querySelectorAll('.decide-list .ui-sec')].map((e) => e.firstChild.textContent).join('|');
       h.has('Asks, then Answered', heads() === 'Asks|Answered' && h.board().querySelector('.decide-list .ui-sec'));
@@ -197,6 +198,7 @@ const PAGES = [
     await h.nav('Back to Waiting on you', h.find(/Waiting on you$/, r, 'a'), /^#waiting$/);
   } }] },
   { name: 'designs', hash: '#designs', ready: '[id="item-chat-journeys"]', stages: [{ run: async (h) => {
+    await h.nav('Open design pick', h.card('look')?.querySelector('a') ?? h.card('look'), /^#decide\/look$/);
     await h.nav('Open design', h.find(/^(Open design, )?Approve the chat app journeys\?/), /^#designs\/chat-journeys$/);
     // Select and Discard all are in the title row's More; Discard is on the design's own page too. Each Discard asks for a reason and is taken back with Undo.
     const sheet = () => document.getElementById('dz-sheet'), bar = () => h.board().querySelector('.sel-bar');
