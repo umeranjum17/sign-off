@@ -2346,7 +2346,13 @@
     const threadCatalog = [...new Map([...(comms.threads || []).map((t) => [`${t.channel}/${t.id}`, { channel: t.channel, thread: t.id }]), ...comms.messages.filter((m) => m.thread).map((m) => [`${m.channel}/${m.thread}`, m])]).values()];
     const list = el('aside', { class: 'ch-list', 'aria-label': 'Fleet channels' }, el('h2', {}, `Teams · ${comms.homes.length}`),
       el('div', { class: 'ch-card' }, ...comms.homes.map((h) => row(h, commsHref(h), comms.messages.filter((m) => m.channel === h), h === home && !selected.thread))),
-      el('h2', {}, 'Worker threads'), el('div', { class: 'ch-card' }, ...threadCatalog.filter((m) => !home || m.channel === home).map((m) => row(m.thread, commsHref(m.channel, m.thread), comms.messages.filter((e) => e.channel === m.channel && e.thread === m.thread), m.thread === selected.thread))));
+      el('h2', {}, 'Worker threads'), el('div', { class: 'ch-card' }, ...(() => {
+        // On a desk the list is the whole fleet's catalogue, so opening one channel never hides the other homes' threads;
+        // a phone is inside one home and lists only that home's, saying so when it has none.
+        const listed = phone() && home ? threadCatalog.filter((m) => m.channel === home) : threadCatalog;
+        if (!listed.length) return [el('p', { class: 'ch-empty' }, phone() && home ? 'No worker threads in this home yet.' : 'No worker threads yet.')];
+        return listed.map((m) => row(phone() && home ? m.thread : `${m.channel} · ${m.thread}`, commsHref(m.channel, m.thread), comms.messages.filter((e) => e.channel === m.channel && e.thread === m.thread), m.thread === selected.thread));
+      })()));
     const older = visible.length > commsVisible ? commsButton('Show earlier loaded messages', () => { const box = commsRoot.querySelector('.ch-history'), height = box.scrollHeight; commsVisible += 60; commsDraw(); const next = commsRoot.querySelector('.ch-history'); next.scrollTop += next.scrollHeight - height; }, 'ch-earlier')
       : commsBefore > 0 ? commsButton('Earlier messages', () => commsRead(true), 'ch-earlier') : '';
     const history = el('div', { class: 'ch-history', 'aria-label': 'Messages in time order' }, older,

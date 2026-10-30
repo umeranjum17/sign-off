@@ -126,7 +126,13 @@ try {
   // The list: every home from the files, the threads under it, and on a desk the newest channel's own messages.
   await go('#channels');
   if (!phone) await until('!!document.querySelector(".ch-message")');
-  await capture('channels', (m) => { everyHome(m); liveMarker(m); if (!phone) assert.ok(m.messages.length >= 1, 'the channel on a desk shows its messages'); });
+  await capture('channels', (m) => {
+    everyHome(m); liveMarker(m);
+    if (phone) return;
+    assert.ok(m.messages.length >= 1, 'the channel on a desk shows its messages');
+    // The desk's list is the whole fleet's catalogue: opening one channel must never empty it.
+    assert.ok(m.rows.filter((r) => r.includes(' · ')).length > 0, 'the desk lists every worker thread, not just the open channel\'s');
+  });
 
   // A worker thread: its own task's status log and the steering order still waiting in its inbox.
   await go('#channels');
