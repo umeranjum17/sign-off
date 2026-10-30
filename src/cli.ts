@@ -1049,6 +1049,8 @@ async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another
 
 /** A mock path without its optional `?variant=<name>` suffix, which picks one variant of a single .html page. */
 const mockFile = (path: string) => path.split('?')[0];
+/** A mock page of embedded screenshots (img with a data: image) and nothing a person can press: no script, link, button, field, form, menu, disclosure or inline drawing. */
+const pictureSheet = (html: string) => /<img\b[^>]*\bsrc\s*=\s*["']?data:image\//i.test(html) && !/<(script|a|button|input|select|textarea|form|details|svg|canvas|iframe|video|audio)\b|\son[a-z]+\s*=|:target/i.test(html);
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
@@ -1115,6 +1117,10 @@ function post(args: string[], cmd = 'post') {
     // A mock that is not there posts on purpose (the card says so); one the board could never serve is refused here, as --view is.
     if (info && (!info.isFile() || info.size > MOCK_BYTES)) {
       throw fail(`--mock ${path} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the mock, or point --mock at the screenshot of the variant');
+    }
+    // A page that is only pictures (no script, link, button or field) opens full screen as a sheet of frames, not as the prototype the card promises.
+    if (info?.isFile() && /\.html?$/i.test(name) && pictureSheet(readFileSync(resolve(root, name), 'utf8'))) {
+      throw fail(`--mock ${path} is a sheet of pictures: nothing in it can be tapped`, 'VALIDATION_ERROR', 'Point --mock at the running prototype page (links, buttons or script that move between its screens), or at one screenshot as an image mock');
     }
     const value = m.slice(0, at), link = optionLinks.find((l) => l.startsWith(`${value}=`));
     return { value, path, ...(link && { link: link.slice(value.length + 1) }) };

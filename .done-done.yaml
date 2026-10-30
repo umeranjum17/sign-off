@@ -218,6 +218,9 @@ journeys:
   # Concern cards on a throwaway board of three cards (Fixed and In progress with before and after captions, one with its frame pending): the list at 390 in light and dark, the Fixed card opened at 390, and the list beside it at 1280.
   concern-cards:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/concern-cards-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # A design pick of three Inbox layouts on a throwaway board: listed under Designs, and each option open full screen as a page that runs, at 360, 390, 445, 1280 and 1440 in light and dark.
+  design-pick:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-pick-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:
@@ -266,3 +269,8 @@ journeys:
   upgrade:
     command: node .agents/skills/done-done-verify-sign-off/core-journey.mjs "$DONE_DONE_EVIDENCE_ROOT" --upgrade
     upgrade: true
+approved_requirements:
+  - kind: spec
+    name: design-pick-listing
+    requirement: A design pick is listed under Designs.
+    capture: designs.1440.dark.png

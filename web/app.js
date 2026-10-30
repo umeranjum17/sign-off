@@ -1187,6 +1187,8 @@
   const isAnswered = (d) => Object.hasOwn(state.answers, d.key) && !(d.type === 'design' && state.answers[d.key].answer === 'screens') && !exchanging(d);
   /** A design review a lead posts is Main's to pass first: it lives under Designs, never in Decide, Answered or any count of asks, until Main promotes it (sign-off-axi promote). */
   const promoted = (d) => (state.promoted ?? []).includes(d.key);
+  /** A design pick: a choice between mocks (post --type design). It waits in Decide to be answered, and Designs lists it as well, answered or not, so it can be found again. */
+  const isPick = (d) => d.type === 'design' && d.kind !== 'design';
   /** Each item lives in one area: a design review Main has not promoted under Designs, then answered items, then the area the item names, then evidence updates (never an ask, whatever their result),
    *  then what is only to read (explainers, pages with nothing to answer), then the open asks.
    *  A plan has no options but waits for its send-back, unless it is guided with no decisions: that one is for reading. */
@@ -1982,16 +1984,18 @@
 
   /* ---- Designs in the new look. A phone lists them as Reports does: the title row, To review, then the designs as rows in one card, each opening its review over the board.
      A desk fills the window as the approved prototype's desk draws it: the designs as picture cards across the top, the open one large beside where it stands. ---- */
-  const designStatus = (d) => { const a = state.answers[d.key]?.answer; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
+  const designStatus = (d) => { const a = state.answers[d.key]?.answer; if (isPick(d)) return a && a !== 'screens' ? 'Picked' : 'Waiting on you'; return a === 'approve' ? 'Approved' : a === 'change' ? 'Changes requested' : d.status === 'draft' ? 'Draft' : 'In review'; };
   const dzSheet = sheetOf('dz-sheet');
   /** The title row: the title with More (Select, Discard all and, on a desk, Archived) and the round light-or-dark button; on a desk where it is over a 32px title and what is on the board.
    *  While selecting, the title counts the picks with Select all, and Cancel and Discard N sit where the dock is (phone) or at the row's right (desk). */
   function designGroups(items, top, key, gone = []) {
     const head = designsHead(items, top, gone);
     if (!items.length) return phone() ? [...head, screenEmpty('designs'), archived(gone)] : [...head, screenEmpty('designs')];
-    if (!phone()) {
-      const cur = items.find((d) => d.key === key) ?? items[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
-      const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: `#designs/${d.key}`, 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
+    // A pick opens its own card in Decide, where its options run full screen: only a design review has a review screen to show beside the list.
+    const reviews = items.filter((d) => !isPick(d));
+    if (!phone() && reviews.length) {
+      const cur = reviews.find((d) => d.key === key) ?? reviews[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
+      const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: designHref(d), 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
         el('span', { class: 'dz-shot' }, pic(d) ? el('img', { src: src(pic(d)), alt: '', loading: 'lazy' }) : ''), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
         el('span', { class: 'dz-cm' }, [d.group, d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
       // Where it stands fades out at its foot while it holds more than it shows.
@@ -1999,16 +2003,17 @@
       ib.onscroll = fade; new ResizeObserver(fade).observe(ib);
       return [el('div', { class: 'ui-desk' }, top, ...head, el('div', { class: 'ui-dgrid dz-grid design-review' }, el('div', { class: 'dz-strip' }, ...items.map(card)), open, info))];
     }
-    const toReview = items.filter((d) => ['In review', 'Draft'].includes(designStatus(d))).length, approved = items.filter((d) => designStatus(d) === 'Approved').length;
-    return [...head, el('section', { class: 'ui-card ui-hero dz-hero', 'aria-label': 'To review' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'To review')),
-      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(toReview), el('small', {}, ` of ${items.length}`)), approved ? el('span', { class: 'vs' }, `${approved} approved`) : '')),
+    const toReview = reviews.filter((d) => ['In review', 'Draft'].includes(designStatus(d))).length, approved = reviews.filter((d) => designStatus(d) === 'Approved').length;
+    return [...head, reviews.length ? el('section', { class: 'ui-card ui-hero dz-hero', 'aria-label': 'To review' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'To review')),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(toReview), el('small', {}, ` of ${reviews.length}`)), approved ? el('span', { class: 'vs' }, `${approved} approved`) : '')) : '',
       el('h2', { class: 'ui-sec' }, 'Newest', el('span', { class: 'n' }, String(items.length))),
       el('ul', { class: 'ui-card ui-list dz-list' }, ...items.map(designRow)), archived(gone)];
   }
   /** A design as a row: its tile (a thumbnail of its first screen), the title, its state and day (or its ticket's bar); it opens the design's review. */
+  const designHref = (d) => (isPick(d) ? `#decide/${d.key}` : `#designs/${d.key}`);
   function designRow(d) {
     const t = ticketOf(d);
-    return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: `#designs/${d.key}` },
+    return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: designHref(d) },
       ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), selMark(d.key)));
   }
 
@@ -2585,7 +2590,7 @@
     const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
-    by.designs = [...state.decisions].reverse().filter((d) => d.kind === 'design' && !gone.has(d.key));
+    by.designs = [...state.decisions].reverse().filter((d) => !gone.has(d.key) && (d.kind === 'design' || (isPick(d) && !merged.has(d.key))));
     // Waiting on you reads newest first. A sign-in blocks someone now, so sign-ins come first.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
