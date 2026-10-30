@@ -274,11 +274,13 @@
     const sizes = Object.entries(SIZES).map(([k, [w]]) => el('button', { 'aria-pressed': String(k === fullSize), 'aria-label': `${k === 'phone' ? 'Phone' : 'Desktop'}, ${w} wide`, title: `${w} px wide`, 'data-size': k },
       glyph(k), el('span', { class: 'pf-name', 'aria-hidden': 'true' }, k === 'phone' ? 'Phone' : 'Desktop', el('span', { class: 'pf-w' }, String(w)))));
     const refBtn = pages.length > 1 ? el('button', { class: 'pf-ref', 'aria-pressed': 'false' }, glyph('layers'), 'Reference') : '';
+    // A page wider than the screen, Desktop on a phone, is shown at its own size and the stage scrolls sideways; Fit takes it to the screen's width instead.
+    const fitBtn = el('button', { class: 'pf-fit', 'aria-pressed': String(fullFit), title: 'Fit the page to the screen width' }, 'Fit');
     const live = el('a', { class: 'pf-live', target: '_blank', rel: 'noopener' }, 'Open live');
     const stage = el('div', { class: 'pf-stage' }, main.fig, back.fig);
     const dialog = el('dialog', { class: 'proto-full', 'aria-labelledby': title.id },
       el('header', { class: 'pf-bar' }, el('div', { class: 'pf-top' }, close, title, live),
-        el('div', { class: 'pf-tools' }, pick, el('div', { class: 'seg pf-size', role: 'group', 'aria-label': 'Size' }, ...sizes), refBtn)), stage);
+        el('div', { class: 'pf-tools' }, pick, el('div', { class: 'seg pf-size', role: 'group', 'aria-label': 'Size' }, ...sizes), fitBtn, refBtn)), stage);
     // The frame shown is made again only for another option, so a size change or the reference never resets the prototype halfway through.
     const showMain = () => {
       main.port.replaceChildren(view(shown, `Prototype: ${shown.label}`));
@@ -303,15 +305,19 @@
       stage.dataset.mode = !refOn ? 'one' : beside ? 'beside' : 'over';
       const room = beside ? (box.width - gap * 3) / 2 : box.width, tall = box.height - (refOn ? 32 : 0);
       const fit = (pad) => Math.min(1, (room - pad * 2) / w, (tall - (beside ? gap : pad) * 2) / h);
-      const pad = w * fit(0) <= room - gap * 2 ? gap : 0, scale = fit(pad);
-      stage.style.setProperty('--pad', `${beside ? gap : pad}px`);
+      const pad = w * fit(0) <= room - gap * 2 ? gap : 0;
+      // Below half its size a page is a strip nobody can read: it keeps its own size, or with Fit the screen's width, and fills the stage's height either way.
+      const wide = fit(pad) < 0.5, scale = wide ? (fullFit ? Math.min(1, room / w) : 1) : fit(pad), vh = wide ? tall / scale : h;
+      fitBtn.hidden = !wide; stage.toggleAttribute('data-pan', wide && !fullFit);
+      stage.style.setProperty('--pad', `${beside ? gap : wide ? 0 : pad}px`);
       for (const f of [main, back]) {
-        f.fig.classList.toggle('framed', pad > 0);
-        Object.entries({ '--w': w * scale, '--h': h * scale, '--vw': w, '--vh': h, '--s': scale }).forEach(([k, v]) => f.port.style.setProperty(k, k === '--s' ? v : `${v}px`));
+        f.fig.classList.toggle('framed', !wide && pad > 0);
+        Object.entries({ '--w': w * scale, '--h': vh * scale, '--vw': w, '--vh': vh, '--s': scale }).forEach(([k, v]) => f.port.style.setProperty(k, k === '--s' ? v : `${v}px`));
       }
     };
     sizes.forEach((b) => (b.onclick = () => { fullSize = b.dataset.size; sizes.forEach((x) => x.setAttribute('aria-pressed', String(x === b))); lay(); }));
     if (pick) pick.onchange = () => { shown = pages.find((p) => p.value === pick.value); showMain(); showRef(); };
+    fitBtn.onclick = () => { fullFit = !fullFit; fitBtn.setAttribute('aria-pressed', String(fullFit)); lay(); };
     if (refBtn) refBtn.onclick = () => { refOn = !refOn; refBtn.setAttribute('aria-pressed', String(refOn)); showRef(); };
     const fit = new ResizeObserver(lay);
     // Closed by its button or Escape, it goes at once, and the focus goes back to what opened it; the close event comes a moment later.

@@ -1090,7 +1090,7 @@
   /** Open full screen: a design's mocks or an interactive page over the whole viewport, in the same sandboxed frame, which here takes every tap, so the prototype's own links and buttons work.
    *  Its bar holds the way back, the option shown, Phone (390) or Desktop (1280) framed and centred, and Reference: another option's mock beside it, or over it where the two do not fit side by side. */
   const SIZES = { phone: VIEWPORTS.phone, desktop: VIEWPORTS.computer };
-  let fullSize, protoFull;
+  let fullSize, fullFit = false, protoFull;
   const fullPages = (d) => d.view ? [{ value: '', label: d.title, page: true, url: src(mockUrl(d.key, '', d.view)) }]
     : [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).map((o) => {
       const m = d.mocks?.find((x) => x.value === o.value);

@@ -2553,7 +2553,7 @@ test('Decide on a design pick with an HTML mock: Comment on the mocks is there b
   proc.kill();
 });
 
-test('Open full screen: a design pick\'s prototype over the whole screen takes real taps on its own links (scaled to Desktop too), loads the files beside it, switches option and size, shows the other option over it on a phone and beside it on a desk, and Close goes back; an interactive page has no Reference; while pointing, a tap on a mock does not open it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Open full screen: a design pick\'s prototype over the whole screen takes real taps on its own links (Desktop on a phone too, at its own size or fitted to the width), loads the files beside it, switches option and size, shows the other option over it on a phone and beside it on a desk, and Close goes back; an interactive page has no Reference; while pointing, a tap on a mock does not open it', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'full'), file = join(dir, 'board.json'), a = join(dir, 'mocks', 'fleet', 'a'), b = join(dir, 'mocks', 'fleet', 'b');
   mkdirSync(a, { recursive: true }); mkdirSync(b, { recursive: true });
   // Each page is one link that fills its frame, to the other page beside it, and says which page it is and the colour its stylesheet gave it.
@@ -2602,14 +2602,21 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     // (Headless Chrome puts the sandboxed frame in a process of its own and misplaces the click it makes from an emulated tap there; a phone keeps the frame in-process, and a mouse click lands.)
     await click(await evaluate(centre(port())));
     await until(() => evaluate(`${pages}.includes('lanes.html')`));
-    // Desktop draws the same page in a desk's own 1280 by 800 scaled to the screen, without loading it again, and a tap there still reaches the prototype's link.
+    // Desktop on a phone draws the same page a desk's own 1280 wide at its own size, as tall as the stage, without loading it again, and the stage scrolls sideways:
+    // never a strip a third of its size. A tap there still reaches the prototype's link.
     await tap(await evaluate(centre(`${full}.querySelector('[data-size=desktop]')`)));
     await until(async () => (await evaluate(`getComputedStyle(${port()}.firstChild).width`)) === '1280px');
-    assert.deepEqual(await evaluate(viewport()), ['1280px', '800px']);
-    assert.deepEqual(await evaluate(`[${box(port())}.slice(2), ${pages}.length]`), [[390, 244], 2]);
-    assert.ok(Math.abs((await evaluate(`+${port()}.style.getPropertyValue('--s')`)) - 390 / 1280) < 0.001);
-    await click(await evaluate(centre(port())));
+    const stage = `${full}.querySelector('.pf-stage')`, tall = await evaluate(`${stage}.getBoundingClientRect().height`);
+    assert.ok(Math.abs(parseFloat((await evaluate(viewport()))[1]) - tall) < 1, 'the desk page is as tall as the stage');
+    assert.deepEqual(await evaluate(`[${box(port())}.slice(2), +${port()}.style.getPropertyValue('--s'), ${stage}.scrollWidth > ${stage}.clientWidth, ${full}.querySelector('.pf-fit').hidden, ${pages}.length]`),
+      [[1280, Math.round(tall)], 1, true, false, 2]);
+    await click(await evaluate(centre(stage)));
     await until(() => evaluate(`${pages}.length === 3 && ${pages}.at(-1) === 'index.html'`));
+    // Fit takes it to the screen's width and the stage's whole height, and the stage no longer scrolls.
+    await tap(await evaluate(centre(`${full}.querySelector('.pf-fit')`)));
+    await until(() => evaluate(`${full}.querySelector('.pf-fit').getAttribute('aria-pressed') === 'true'`));
+    assert.deepEqual(await evaluate(`[${box(port())}.slice(2), ${stage}.scrollWidth > ${stage}.clientWidth, getComputedStyle(${port()}.firstChild).width]`), [[390, Math.round(tall)], false, '1280px']);
+    assert.ok(Math.abs((await evaluate(`+${port()}.style.getPropertyValue('--s')`)) - 390 / 1280) < 0.001);
     // Reference on a phone covers the prototype with the other option, labelled; off again, the prototype is as it was.
     await tap(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
     await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'over'`));
@@ -2642,7 +2649,7 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     await until(() => evaluate("!!document.querySelector('.decide .full-open')"));
     await click(await evaluate(centre("document.querySelector('.decide .full-open')")));
     await until(() => evaluate(`!!${full}`));
-    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ...${viewport()}, ${fits()}]`), ['desktop', '1280px', '800px', true]);
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ...${viewport()}, ${fits()}, ${full}.querySelector('.pf-fit').hidden]`), ['desktop', '1280px', '800px', true, true]);
     // A real click lands where the scaled page draws a control: B's small corner button, at its place times the scale.
     await evaluate(`window.corner = 0, addEventListener('message', (e) => e.data?.corner && corner++), (s => { s.value = 'b'; s.dispatchEvent(new Event('change')); })(${full}.querySelector('.pf-pick'))`);
     const corner = await evaluate(`(({ left, top }, s) => s < 1 && [left + 1140 * s, top + 720 * s])(${port()}.getBoundingClientRect(), +${port()}.style.getPropertyValue('--s'))`);

@@ -696,10 +696,14 @@
   .pf-name { display: none; gap: 0.3125rem; } .pf-size .pf-w { color: var(--muted); font-size: var(--t-xxs); font-weight: var(--tk-fw-regular); font-variant-numeric: tabular-nums; }
   .pf-ref { display: inline-flex; flex: none; align-items: center; gap: 0.375rem; margin-left: auto; padding: 0 0.75rem; border: 1px solid var(--line); background: none; color: var(--text); font-size: var(--t-xs); }
   .pf-ref .glyph { width: 1rem; height: 1rem; }
+  .pf-fit { flex: none; padding: 0 0.75rem; border: 1px solid var(--line); background: none; color: var(--text); font-size: var(--t-xs); } .pf-fit[hidden] { display: none; }
+  .proto-full .pf-fit[aria-pressed="true"] { border-color: var(--accent); background: var(--tk-inset); color: var(--accent); font-weight: var(--tk-fw-semibold); }
+  .proto-full .pf-fit[aria-pressed="true"]::before { content: none; }
   .proto-full .pf-ref[aria-pressed="true"] { border-color: var(--accent); background: var(--tk-inset); color: var(--accent); font-weight: var(--tk-fw-semibold); }
   .proto-full .pf-ref[aria-pressed="true"]::before { content: none; }
   .pf-stage { display: grid; flex: 1; min-height: 0; justify-content: center; align-content: center; gap: 1rem; padding: var(--pad, 0); overflow: hidden; }
   .pf-stage[data-mode="beside"] { grid-template-columns: auto auto; }
+  .pf-stage[data-pan] { justify-content: start; overflow-x: auto; overscroll-behavior-x: contain; }
   .pf-stage[data-mode="over"] .pf-frame { grid-area: 1 / 1; }
   .pf-frame { display: grid; justify-items: center; margin: 0; min-width: 0; }
   .pf-frame[hidden] { display: none; }
