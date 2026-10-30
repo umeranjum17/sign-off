@@ -2236,3 +2236,129 @@
 
   const heardReplies = () => new Set(replies().map((t) => t.id + t.reply.at));
   const noticeNew = (heard) => { const landed = replies().filter((t) => !heard.has(t.id + t.reply.at)).at(-1); if (landed) notice(landed); };
+  // Channels owns its polling and scroll position: a board refresh reuses the same mounted screen.
+  let comms = { homes: [], messages: [], available: false }, commsRoot, commsTimer, commsBusy = false, commsReady = false;
+  let commsKey = '', commsQuery = '', commsKind = '', commsState = '', commsPending = [], commsBefore = 0, commsError = '';
+  let commsTag = '', commsVisible = 60, commsWho = '', commsFrom = '', commsUntil = '', commsFiltersOpen = false;
+  let commsSearchOpen = false;
+  const commsToken = (s) => btoa(unescape(encodeURIComponent(s))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const commsUntoken = (s) => { try { return decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))); } catch { return ''; } };
+  const commsHref = (home, thread) => `#channels/${thread ? `t-${commsToken(home)}.${commsToken(thread)}` : `h-${commsToken(home)}`}`;
+  const commsAt = (at) => new Date(at * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const commsButton = (label, act, cls = '') => { const b = el('button', { type: 'button', class: cls }, label); b.onclick = act; return b; };
+  // Defence in depth for a future source adapter: text nodes prevent markup execution, and likely key forms never reach previews or copy text.
+  const commsText = (text) => String(text ?? '').replace(/\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{16,}|github_pat_[\w]{16,}|AKIA[A-Z0-9]{16})\b/g, '[key hidden]')
+    .replace(/\bBearer\s+[\w.+/=-]{12,}/gi, 'Bearer [key hidden]')
+    .replace(/\b([\w.-]*(?:token|secret|password|api[_-]?key|access[_-]?key)[\w.-]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[key hidden]');
+  function commsSelection() {
+    const key = commsKey;
+    if (key.startsWith('m-')) {
+      const message = comms.messages.find((m) => m.id === commsUntoken(key.slice(2)));
+      return { home: message?.channel, thread: message?.thread, message };
+    }
+    if (key.startsWith('t-')) { const [home, thread] = key.slice(2).split('.'); return { home: commsUntoken(home), thread: commsUntoken(thread) }; }
+    return { home: key.startsWith('h-') ? commsUntoken(key.slice(2)) : undefined };
+  }
+  function commsJump() {
+    commsPending = [];
+    commsDraw();
+    requestAnimationFrame(() => { const box = commsRoot?.querySelector('.ch-history'); if (box) box.scrollTop = box.scrollHeight; });
+  }
+  async function commsRead(older = false) {
+    if (commsBusy || FROZEN || !location.hash.startsWith('#channels')) return;
+    commsBusy = true;
+    try {
+      const id = commsKey.startsWith('m-') && commsUntoken(commsKey.slice(2));
+      const extra = id && !comms.messages.some((m) => m.id === id) ? `?message=${encodeURIComponent(id)}` : '';
+      const res = await fetch(`/api/channels${older ? `?before=${commsBefore}` : extra}`, { cache: 'no-store', signal: AbortSignal.timeout(12000), headers: !older && !extra && commsTag ? { 'if-none-match': commsTag } : {} });
+      if (res.status === 304) { if (commsError && comms.available) commsError = '', commsDraw(); return; }
+      if (!res.ok) throw new Error('Could not read communications.');
+      if (!older) commsTag = res.headers.get('etag') || '';
+      const body = await res.json();
+      const previous = new Map(comms.messages.map((m) => [m.id, m])), wasReady = commsReady;
+      if (body.available) {
+        // A replaced/rotated file starts a fresh history rather than joining unrelated byte IDs.
+        if (comms.generation && (body.generation !== comms.generation || body.source_size < comms.source_size)) previous.clear(), (commsPending = []), (commsBefore = body.before);
+        const landed = body.messages.filter((m) => !previous.has(m.id));
+        for (const m of body.messages) previous.set(m.id, { ...m, text: commsText(m.text) });
+        comms = { ...body, messages: [...previous.values()].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id)) };
+        if (!wasReady || older) commsBefore = body.before;
+        if (wasReady && !older) commsPending.push(...landed.map((m) => m.id));
+      } else comms = { ...comms, ...body, messages: comms.messages };
+      commsReady = true; commsError = body.error || '';
+      commsDraw();
+      if (!wasReady) requestAnimationFrame(() => { const box = commsRoot.querySelector('.ch-history'); if (box) box.scrollTop = box.scrollHeight; });
+    } catch { commsError = 'Connection lost. Showing the last messages.'; commsDraw(); }
+    finally { commsBusy = false; }
+  }
+  function channelsScreen(key = '') {
+    if (!commsRoot) commsRoot = el('div', { class: 'ch-workspace' });
+    if (FROZEN) commsReady = true, commsError = 'Communications are available on the live board.';
+    if (key !== commsKey || !commsRoot.childNodes.length) { commsKey = key; commsPending = []; commsVisible = 60; commsSearchOpen = false; commsDraw(); if (key.startsWith('m-')) commsRead(); requestAnimationFrame(() => { const box = commsRoot.querySelector('.ch-history'); if (box) box.scrollTop = box.scrollHeight; }); }
+    if (!commsTimer && !FROZEN) { commsRead(); commsTimer = setInterval(commsRead, 3000); }
+    return commsRoot;
+  }
+  function commsDraw() {
+    if (!commsRoot) return;
+    const saved = commsRoot.querySelector('.ch-history')?.scrollTop ?? 0, listSaved = commsRoot.querySelector('.ch-list')?.scrollTop ?? 0;
+    const focused = document.activeElement?.id === 'ch-query', caret = focused && document.activeElement.selectionStart;
+    const selected = commsSelection(), home = selected.home || (!phone() ? comms.homes.find((h) => comms.messages.some((m) => m.channel === h)) : undefined);
+    const query = commsQuery.trim().toLowerCase(), pending = new Set(commsPending);
+    const matches = (m) => (!home || m.channel === home) && (!selected.thread || m.thread === selected.thread)
+      && (!commsKind || m.kind === commsKind) && (!commsState || (commsState === 'unknown' ? /not recorded/i.test(m.read + m.handled) : commsState === 'blocker' ? m.kind === 'blocker' : commsState === 'handled' ? m.handled === 'Handled' : commsState === 'read' ? m.read === 'Read' : commsState === 'unread' ? /^(not read|unread)$/i.test(m.read) : /^(not handled|unhandled)$/i.test(m.handled)))
+      && (!commsWho || m.from === commsWho || m.to === commsWho)
+      && (!commsFrom || m.at >= Date.parse(`${commsFrom}T00:00:00`) / 1000) && (!commsUntil || m.at < Date.parse(`${commsUntil}T00:00:00`) / 1000 + 86400)
+      && (!query || [m.text, m.from, m.to, m.runtime].some((s) => s.toLowerCase().includes(query)));
+    const all = comms.messages.filter(matches), visible = all.filter((m) => !pending.has(m.id)), shown = visible.slice(-commsVisible);
+    const live = el('span', { class: `ch-live${commsError || !comms.available ? ' stale' : ''}`, role: 'status' }, commsError || !comms.available ? 'Not live' : 'Live · updates every 3s');
+    const top = el('header', { class: 'ch-top' }, el('a', { href: phone() && home ? '#channels' : '#', class: 'ch-back' }, phone() && home ? '‹ Channels' : '‹ Today'), el('div', {}, el('h1', { tabindex: '-1' }, phone() && home ? selected.thread || home : 'Channels'), live), themeButton());
+    const search = el('input', { id: 'ch-query', type: 'search', placeholder: 'Search messages', 'aria-label': 'Search loaded messages', value: commsQuery });
+    search.oninput = () => { commsQuery = search.value; commsDraw(); };
+    const choice = (label, pairs, value, act) => {
+      const select = el('select', { 'aria-label': label }, ...pairs.map(([v, name]) => el('option', { value: v, ...(v === value && { selected: '' }) }, name)));
+      select.onchange = () => act(select.value);
+      return select;
+    };
+    const filters = el('div', { class: 'ch-filters' }, search,
+      choice('Message kind', [['', 'All kinds'], ...['order', 'answer', 'correction', 'blocker', 'status'].map((k) => [k, k[0].toUpperCase() + k.slice(1)])], commsKind, (v) => { commsKind = v; commsDraw(); }),
+      choice('Handling state', [['', 'All states'], ['blocker', 'Blockers'], ['read', 'Read'], ['unread', 'Not read'], ['handled', 'Handled'], ['unhandled', 'Not handled'], ['unknown', 'Receipt unknown']], commsState, (v) => { commsState = v; commsDraw(); }));
+    const date = (label, value, act) => { const field = el('input', { type: 'date', 'aria-label': label, value }); field.onchange = () => { act(field.value); commsDraw(); }; return el('label', {}, label, field); };
+    const extra = el('details', { class: 'ch-extra', ...(commsFiltersOpen && { open: '' }) }, el('summary', {}, 'More filters'),
+      el('div', {}, choice('Participant', [['', 'Anyone'], ...[...new Set(comms.messages.flatMap((m) => [m.from, m.to]))].sort().map((s) => [s, s])], commsWho, (v) => { commsWho = v; commsDraw(); }),
+        date('From', commsFrom, (v) => commsFrom = v), date('Through', commsUntil, (v) => commsUntil = v), commsButton('Clear filters', () => { commsQuery = commsKind = commsState = commsWho = commsFrom = commsUntil = ''; commsDraw(); })));
+    extra.ontoggle = () => commsFiltersOpen = extra.open;
+    filters.append(extra);
+    if (phone() && home && !commsSearchOpen) filters.hidden = true;
+    const toggle = phone() && home ? commsButton(commsSearchOpen ? 'Hide search and filters' : 'Search and filters', () => { commsSearchOpen = !commsSearchOpen; commsDraw(); }, 'ch-filter-toggle') : '';
+    const row = (name, href, events, on) => {
+      const last = events.at(-1);
+      return el('a', { class: `ch-row${on ? ' selected' : ''}`, href, ...(on && { 'aria-current': 'page' }) },
+        el('span', { class: 'ch-avatar', 'aria-hidden': 'true' }, name.slice(0, 1).toUpperCase()),
+        el('span', { class: 'ch-row-text' }, el('strong', {}, name), el('span', {}, last ? `${last.from} → ${last.to}: ${commsText(last.text)}` : 'No messages in the loaded history')),
+        last ? el('time', { datetime: new Date(last.at * 1000).toISOString() }, new Date(last.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })) : '');
+    };
+    const list = el('aside', { class: 'ch-list', 'aria-label': 'Fleet channels' }, el('h2', {}, `Teams · ${comms.homes.length}`),
+      el('div', { class: 'ch-card' }, ...comms.homes.map((h) => row(h, commsHref(h), comms.messages.filter((m) => m.channel === h), h === home && !selected.thread))),
+      el('h2', {}, 'Worker threads'), el('div', { class: 'ch-card' }, ...[...new Map(comms.messages.filter((m) => m.thread && (!home || m.channel === home)).map((m) => [`${m.channel}/${m.thread}`, m])).values()].map((m) => row(m.thread, commsHref(m.channel, m.thread), comms.messages.filter((e) => e.channel === m.channel && e.thread === m.thread), m.thread === selected.thread))));
+    const older = visible.length > commsVisible ? commsButton('Show earlier loaded messages', () => { const box = commsRoot.querySelector('.ch-history'), height = box.scrollHeight; commsVisible += 60; commsDraw(); const next = commsRoot.querySelector('.ch-history'); next.scrollTop += next.scrollHeight - height; }, 'ch-earlier')
+      : commsBefore > 0 ? commsButton('Earlier messages', () => commsRead(true), 'ch-earlier') : '';
+    const history = el('div', { class: 'ch-history', 'aria-label': 'Messages in time order' }, older,
+      ...shown.map((m) => el('article', { class: 'ch-message', 'data-message': m.id }, el('span', { class: 'ch-avatar', 'aria-hidden': 'true' }, m.from.slice(0, 1).toUpperCase()),
+        el('div', { class: 'ch-message-body' }, el('div', { class: 'ch-message-meta' }, el('strong', {}, m.from), el('span', { class: 'ch-runtime' }, m.runtime), el('span', {}, `→ ${m.to}`), el('span', { class: `ch-kind ${m.kind}` }, m.kind), el('time', {}, commsAt(m.at))),
+          el('p', { class: 'ch-preview' }, commsText(m.text)), el('a', { class: 'ch-open', href: `#channels/m-${commsToken(m.id)}` }, 'Open full text'), el('p', { class: 'ch-receipt' }, `${m.read} · ${m.handled}`)))),
+      !shown.length ? el('p', { class: 'ch-empty' }, commsReady ? query || commsKind || commsState ? 'No matching messages in the loaded history.' : 'No messages in this channel yet.' : 'Reading communications…') : '');
+    const stream = el('section', { class: 'ch-stream ch-card', 'aria-label': home || 'Messages' }, el('header', { class: 'ch-stream-head' },
+      el('a', { href: '#channels', class: 'ch-back' }, '‹ Channels'), el('div', {}, el('h2', {}, selected.thread || home || 'Messages'), el('p', {}, `${all.length} loaded messages · oldest first`))),
+      history, commsPending.length ? commsButton(`${commsPending.length} new messages ↓`, commsJump, 'ch-new') : '');
+    const note = commsError ? el('p', { class: 'ch-error', role: 'alert' }, commsError, ' ', commsButton('Retry', () => commsRead())) : comms.partial ? el('p', { class: 'ch-source' }, 'Status messages only. Steering and replies are not connected yet.') : '';
+    commsRoot.replaceChildren(top, toggle, filters, note, el('div', { class: `ch-columns${phone() && home ? ' thread-open' : ''}` }, list, stream));
+    if (selected.message) {
+      const m = selected.message, full = el('section', { class: 'ch-full ch-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Full message' },
+        el('a', { href: commsHref(m.channel, m.thread), class: 'ch-close' }, 'Close'), el('span', { class: `ch-kind ${m.kind}` }, m.kind), el('h2', {}, `${m.from} → ${m.to}`),
+        el('p', { class: 'ch-runtime' }, m.runtime), el('time', {}, commsAt(m.at)), el('p', { class: 'ch-full-text' }, commsText(m.text)), el('p', { class: 'ch-receipt' }, `${m.read} · ${m.handled}`), el('p', { class: 'ch-source' }, `${m.source} · Keys are hidden.`));
+      commsRoot.append(el('div', { class: 'ch-scrim' }, full));
+    }
+    commsRoot.querySelector('.ch-history').scrollTop = saved;
+    commsRoot.querySelector('.ch-list').scrollTop = listSaved;
+    if (focused) { const field = commsRoot.querySelector('#ch-query'); field.focus({ preventScroll: true }); field.setSelectionRange?.(caret, caret); }
+  }

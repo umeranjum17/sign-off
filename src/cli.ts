@@ -21,6 +21,7 @@ import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
 import { homeOf, readAssignee, type Assignee } from './fleet.js';
+import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
 /** The version this copy runs, read from package.json once: a pre-release version says so, and a git checkout whose HEAD carries no tag
@@ -3617,6 +3618,21 @@ const server = createServer(async (req, res) => {
     if (unchanged(req, pageTag)) return res.writeHead(304, headers).end();
     const takes = String(req.headers['accept-encoding'] ?? ''), encoding = /\bbr\b/.test(takes) ? 'br' : /\bgzip\b/.test(takes) ? 'gzip' : undefined, bytes = encoding ? pageAs(encoding) : served;
     return res.writeHead(200, { ...headers, ...(encoding && { 'content-encoding': encoding }), 'content-length': bytes.length }).end(bytes);
+  }
+  if (req.method === 'GET' && (req.url ?? '').split('?')[0] === '/api/channels') {
+    const raw = new URL(req.url!, 'http://board').searchParams.get('before');
+    if (raw !== null && (!/^\d+$/.test(raw) || !Number.isSafeInteger(Number(raw)))) return res.writeHead(400).end();
+    const config = commsConfig(file, fleetHomeOf(file)), body = readChannels(config, raw === null ? undefined : Number(raw));
+    const id = new URL(req.url!, 'http://board').searchParams.get('message');
+    if (id && !body.messages.some((m) => m.id === id)) {
+      const found = await findChannelMessage(config, id);
+      if (found) body.messages.push(found), body.messages.sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
+    }
+    const bytes = Buffer.from(JSON.stringify(body)), etag = `"${createHash('sha256').update(bytes).digest('hex')}"`;
+    const headers = { 'content-type': 'application/json', 'cache-control': 'no-store', etag, vary: 'accept-encoding' };
+    if (unchanged(req, etag)) return res.writeHead(304, headers).end();
+    const sent = squeeze(req, bytes);
+    return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
   }
   // The board's read is kept as one body: a poll of an unchanged board is a 304 that rebuilds and re-encodes nothing, and a phone's 20-second
   // check costs a few stats. It waits for the warm pass at most GUARD_WAIT, as every board read always has. A `view` answers part of the board
