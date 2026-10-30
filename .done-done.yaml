@@ -97,6 +97,9 @@ journeys:
   # an action and what was done with its link, a follow-up tap moving the card from Decide to Answered, a reply landing as a notice, and on a desk an ask opened beside its thread.
   inbox:
     command: 'npm run build > /dev/null && for w in 360 390 445 1280 1440; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/inbox-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+  # A relayed answer's receipts at 390 and 1280: the lead reads the answer with `answers` (no wait, no feedback line) and the thread shows Sent and Read, never Sent only.
+  answer-receipts:
+    command: 'npm run build > /dev/null && for w in 390 1280; do RECEIPTS_ONLY=1 node .agents/skills/done-done-verify-sign-off/inbox-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" ${RECEIPTS_THEME:-dark} $w || exit 1; done'
   # Reopen at 360, 390, 445, 1280 and 1440, light and dark: an answered ask taken back with sign-off-axi reopen waits in Decide again with its choices, Your earlier answer shows the answer and note, its Activity lists the answer then the reopen,
   # reopening an open card is refused, and the next answer names the one it replaces.
   reopen:

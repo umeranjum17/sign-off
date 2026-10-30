@@ -1,7 +1,7 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadDecisions, readTrail } from '../dist/store.js';
@@ -10,6 +10,7 @@ import { asked } from './support/ask.mjs';
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'so-receipts-'));
 mkdirSync(join(scratch, 'home'));
+after(() => rmSync(scratch, { recursive: true, force: true }));
 const env = { ...process.env, HOME: join(scratch, 'home') };
 delete env.SIGN_OFF_FILER;
 delete env.CLAUDE_CODE_SESSION_ID;

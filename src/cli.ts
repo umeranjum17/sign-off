@@ -158,6 +158,7 @@ Prints the latest saved answer per decision and counts the ones still waiting.
   --full  adds the button label, close and title
   --json  {"<key>":{"answer","label","close","at","note"?}} for the answered decisions; note only when the user wrote one
 A note column appears when any shown answer has a note.
+Reading an answer here is the agent taking it: its thread shows Read at that time (once per answer).
 examples:
   sign-off-axi answers --key keep-the-weekly-digest
   sign-off-axi answers ./decisions.json --json

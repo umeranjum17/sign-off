@@ -30,6 +30,7 @@ ask('release-agent', 'digest', 'Keep the weekly digest?', 'The paid plan renews 
 ask('release-agent', 'export', 'Turn on the CSV export?', 'Two teams asked for it this month.', 'It ships Friday.', 'It waits a release.');
 ask('settings-agent', 'ship', 'Ship the new settings page Friday?', 'No new bug reports for three weeks.', 'The page ships Friday.', 'It waits a week.');
 ask('settings-agent', 'beta', 'Open the beta to every team?', 'The first ten teams found no blockers.', 'Every team gets it Monday.', 'It stays with ten teams.');
+ask('main', 'name-tool', 'What should the public tool be named?', 'The launch page needs a name.', 'The name is used.', 'We keep looking.');
 ask('release-agent', 'old', 'Send the digest on Mondays?', 'Choose the weekly digest schedule.', 'It goes out Mondays.', 'It is paused.');
 writeFileSync(join(dir, 'plan.json'), readFileSync(join(repo, 'fixtures/contract/plan.v1/valid-full.json'), 'utf8').replace('"page/index.html"', '"page/plan.html"'));
 mkdirSync(join(dir, 'page'));
@@ -57,6 +58,9 @@ cli('feedback', 'beta', board, '--reply', 'Kept it to the ten teams. The import 
 await api('/api/answers', { key: 'ship', answer: 'text', note: 'What does Friday need from QA?' });
 cli('wait', board, '--filer', 'settings-agent', '--timeout', '5');
 cli('feedback', 'ship', board, '--reply', 'QA signs off Thursday, so Friday holds. Ship it Friday?', '--option', 'yes=Ship Friday', '--option', 'no=Wait a week');
+// Answered, then relayed: the lead reads the answer through `answers`, with no wait of its own and no feedback line, and the thread shows Read from that.
+await api('/api/answers', { key: 'name-tool', answer: 'yes', note: '' });
+cli('answers', board, '--json');
 // Answered and acted on: it archives itself.
 await api('/api/answers', { key: 'old', answer: 'yes', note: '' });
 cli('wait', board, '--filer', 'release-agent', '--timeout', '5');
@@ -94,6 +98,7 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const chips = [...document.querySelectorAll('.ib-chip')].filter(vis).map((c) => (c.getAttribute('aria-pressed') === 'true' ? '[' + c.textContent + ']' : c.textContent));
   const thread = document.querySelector('.ib-thread');
   const pairs = thread ? [...thread.querySelectorAll('.ib-pair')].filter(vis).map((p) => [...p.querySelectorAll('.ib-lab, .tr-lab')].map((l) => l.textContent.trim()).join(' > ')) : [];
+  const steps = thread ? [...thread.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent) : [];
   const follow = [...document.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.textContent);
   const notice = [...document.querySelectorAll('.ib-note')].filter(vis).map((n) => n.innerText.replace(/\\n+/g, ' / '));
   const thread_answers = thread ? thread.querySelectorAll('.tr-opt, .tr-opts, [role=radio], input[type=radio], .pick-option, .answer').length : 0;
@@ -102,9 +107,11 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, steps, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
 const results = [];
+// RECEIPTS_ONLY=1 captures just the relayed answer's thread (journey `answer-receipts`).
 const capture = async (state, hash, before, check) => {
+  if (process.env.RECEIPTS_ONLY && state !== 'relayed') return;
   errors.length = 0;
   if (hash !== null) await go(hash);
   if (before) { await evaluate(before); await wait(700); }
@@ -144,6 +151,10 @@ try {
     assert.deepEqual(m.follow, ['Ship Friday', 'Wait a week']);
     assert.ok(m.pairs.some((p) => /Your question > .*Reply/.test(p)), 'a question then its reply: ' + m.pairs.join(' | '));
   });
+  // A relayed answer: the thread's track reads Sent and Read, and no Acted or Result, because only the relay's read was recorded.
+  await capture('relayed', '#inbox/name-tool', `document.querySelector('.ui-trail')?.scrollIntoView({ block: 'center' })`, (m) => {
+    assert.deepEqual(m.steps, ['Sent', 'Read'], 'card name-tool: the relayed answer shows ' + m.steps.join(', ') + ', not Sent and Read');
+  });
   await capture('action', '#inbox/beta', `document.querySelector('.tr-said a')?.scrollIntoView({ block: 'center' })`, (m) => {
     assert.ok(m.pairs.some((p) => /Your (answer|action)[\d:]* > .*What was done/.test(p)), 'an action then what was done: ' + m.pairs.join(' | '));
   });
@@ -153,7 +164,7 @@ try {
   });
   // The card is answered: the board's own asks page no longer lists it as open.
   const asks = await (await fetch(base + 'api/decisions?view=asks&limit=50')).json();
-  if ((asks.decisions ?? asks.asks ?? []).some((d) => d.key === 'ship')) results.at(-1).fail.push('ship is still an open ask');
+  if (!process.env.RECEIPTS_ONLY && (asks.decisions ?? asks.asks ?? []).some((d) => d.key === 'ship')) results.at(-1).fail.push('ship is still an open ask');
   await go('#inbox');
   // A reply lands while the board is open: the page reads the board every 20 seconds, so the notice is waited for, then captured while it shows.
   cli('feedback', 'export', board, '--reply', 'The export is on for admins only; it ships Friday.', '--link', 'https://github.com/example/settings/pull/250');
@@ -174,13 +185,16 @@ try {
 }
 // The step record: each cell adds its steps to the run's steps.json, so one run over several cells keeps all of them.
 const prior = existsSync(join(out, 'steps.json')) ? JSON.parse(readFileSync(join(out, 'steps.json'), 'utf8')) : null, cell = `On a ${phone ? `${width} px phone` : `${width} px desk`} in ${theme}`;
+const receipts = process.env.RECEIPTS_ONLY ? {
+  steps: ['The person answers an ask from the lead; the lead reads the answer with sign-off-axi answers, with no wait and no feedback line', 'The person opens the ask\u2019s thread in the Inbox'],
+  result: 'the thread\u2019s track reads Sent and Read, each with its time, and Acted and Result stay empty because nothing more was recorded' } : null;
 writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
   start: 'A new board with five asks from two agents, a plan, a guided report and a ticket, served by sign-off-axi serve',
-  steps: [...(prior?.steps ?? []), ...[
+  steps: [...(prior?.steps ?? []), ...(receipts?.steps ?? [
     'The person answers three asks and writes back on a fourth; the agents own waits take them; one agent replies with what was done and a pull request link, the other replies with two follow-up choices',
     'The person opens the inbox, the thread with the follow-ups, and the thread with what was done',
     'The person taps the first follow-up; the inbox stays open while an agent replies on another ask',
-    ...(phone ? [] : ['The person opens an ask from its thread'])].map((x) => `${cell}: ${x}`)],
-  result: [prior?.result, `${cell}: the inbox lists New (unread) above Decide above Waiting on agents with kind chips; a thread shows each question or action with its reply or what was done, its link, and the follow-up buttons; one tap moves the card to Answered; a reply that lands shows a notice that opens its thread${phone ? '' : '; an ask opened from the inbox sits beside its thread'}.`].filter(Boolean).join(' ') }, null, 2) + '\n');
+    ...(phone ? [] : ['The person opens an ask from its thread'])]).map((x) => `${cell}: ${x}`)],
+  result: [prior?.result, receipts ? `${cell}: ${receipts.result}.` : `${cell}: the inbox lists New (unread) above Decide above Waiting on agents with kind chips; a thread shows each question or action with its reply or what was done, its link, and the follow-up buttons; one tap moves the card to Answered; a reply that lands shows a notice that opens its thread${phone ? '' : '; an ask opened from the inbox sits beside its thread'}.`].filter(Boolean).join(' ') }, null, 2) + '\n');
 const failed = results.filter((r) => r.fail.length || r.console_errors.length);
 if (failed.length) { console.error(JSON.stringify(failed.map(({ state, fail, console_errors }) => ({ state, fail, console_errors })), null, 2)); process.exit(1); }
