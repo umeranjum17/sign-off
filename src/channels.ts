@@ -8,7 +8,7 @@ export function redactComms(text: string): string {
   return text
     .replace(/\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{16,}|github_pat_[\w]{16,}|AKIA[A-Z0-9]{16})\b/g, '[key hidden]')
     .replace(/\bBearer\s+[\w.+/=-]{12,}/gi, 'Bearer [key hidden]')
-    .replace(/\b([\w.-]*(?:token|secret|password|api[_-]?key|access[_-]?key)[\w.-]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[key hidden]')
+    .replace(/\b([\w.-]*(?:token|secret|password|api[_-]?key|access[_-]?key)[\w.-]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|(?!\[key hidden\])[^\s,;]+)/gi, '$1[key hidden]')
     .replace(/([?&](?:token|key|secret|password)=)[^\s&#]+/gi, '$1[key hidden]')
     .replace(/\beyJ[\w-]+\.[\w-]+\.[\w-]+\b/g, '[key hidden]')
     .replace(/\b[a-f0-9]{32,}\b/gi, '[key hidden]')
@@ -74,7 +74,7 @@ function sourceMessages(path: string, channel: string, thread: string | undefine
       const fields = Object.fromEntries(header.split(/\r?\n/).flatMap((line) => { const m = /^(at|from|sender|to|receiver|kind)=(.*)$/.exec(line); return m ? [[m[1]!, m[2]!]] : []; }));
       const at = timeOf(fields.at);
       // A file move is an acknowledgement, never evidence that the instruction was completed.
-      if (at && body.trim()) messages = [{ id, at, channel, ...(thread && { thread }), from: words(fields.from || fields.sender, 'Sender not recorded'), to: words(fields.to || fields.receiver, thread || channel), runtime: channel, kind: words(fields.kind, 'order'), text: redactComms(body.trim()), read: path.includes('/handled/') ? 'Read' : 'Not read', handled: 'Handled not recorded', source: 'Steering inbox' }];
+      if (at && body.trim()) messages = [{ id, at, channel, ...(thread && { thread }), from: words(fields.from || fields.sender, 'Sender not recorded'), to: words(fields.to || fields.receiver, thread || channel), runtime: `${words(fields.from || fields.sender, 'Sender not recorded')} · runtime not recorded`, kind: words(fields.kind, 'order'), text: redactComms(body.trim()), read: path.includes('/handled/') ? 'Read' : 'Not read', handled: 'Handled not recorded', source: 'Steering inbox' }];
     } else {
       let offset = start;
       for (const line of text.split('\n')) {
@@ -98,7 +98,7 @@ function fleetSources(config: Config): { homes: string[]; threads: ChannelThread
   for (const status of entries(config.state).filter((s) => s.endsWith('.status'))) {
     const channel = words(status.slice(0, -7)), rec = meta(join(config.state, `${status.slice(0, -7)}.meta`));
     if (!homes.includes(channel)) homes.push(channel);
-    const runtime = [rec.harness, rec.model].filter(Boolean).map((s) => words(s)).join(' · ') || channel;
+    const runtime = [rec.harness, rec.model].filter(Boolean).map((s) => words(s)).join(' · ') || `${channel} · runtime not recorded`;
     messages.push(...sourceMessages(join(config.state, status), channel, undefined, runtime));
     // A lead's recorded worktree is its home; a home naming neither leaves its worker history not recorded.
     const pointer = rec.home || rec.worktree;
@@ -109,7 +109,7 @@ function fleetSources(config: Config): { homes: string[]; threads: ChannelThread
     for (const task of tasks) {
       const thread = words(task), details = meta(join(state, `${task}.meta`));
       threads.push({ channel, id: thread });
-      const model = [details.harness, details.model].filter(Boolean).map((s) => words(s)).join(' · ') || channel;
+      const model = [details.harness, details.model].filter(Boolean).map((s) => words(s)).join(' · ') || `${channel} · runtime not recorded`;
       messages.push(...sourceMessages(join(state, `${task}.status`), channel, thread, model));
       const inbox = join(state, `${task}.inbox`);
       for (const dir of [inbox, join(inbox, 'handled')]) for (const file of entries(dir).filter((s) => /^\d+\.msg$/.test(s))) {
@@ -151,7 +151,7 @@ function message(value: unknown, id: string, homes: string[], official: boolean)
   return {
     id: official ? words(r.id, id) : id, at, channel: home,
     ...((r.thread || (!homes.includes(task) && task)) && { thread: words(r.thread, task) }),
-    from, to, runtime: words(r.model ?? r.runtime ?? participant.model ?? participant.runtime, 'Runtime not recorded'),
+    from, to, runtime: words(r.model ?? r.runtime ?? participant.model ?? participant.runtime, `${home} · runtime not recorded`),
     kind, ...(state && { state }), text,
     read: r.read_at ? 'Read' : words(r.read_state, 'Read not recorded'),
     handled: r.handled_at ? 'Handled' : words(r.handled_state, 'Handled not recorded'),

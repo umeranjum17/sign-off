@@ -104,10 +104,11 @@ test('Channels discovers the whole file roster and empty worker threads, recorde
     assert.equal(first.homes.length, 55); // Main plus every non-hidden status file.
     assert.ok(first.threads.some((t) => t.channel === 'home-0' && t.id === 'empty'));
     assert.equal(first.messages.find((m) => m.text === 'Worker update').runtime, 'pi · deepseek-v4.1-flash');
-    assert.equal(first.messages.find((m) => m.channel === 'home-1').runtime, 'home-1');
+    assert.equal(first.messages.find((m) => m.channel === 'home-1').runtime, 'home-1 · runtime not recorded');
     assert.equal(first.messages.find((m) => m.channel === 'home-0' && !m.thread).runtime, 'codex · gpt-6.1-sol');
     const order = first.messages.find((m) => m.source === 'Steering inbox');
     assert.equal(order.to, 'task-a'); assert.equal(order.from, 'Sender not recorded');
+    assert.equal(order.runtime, 'Sender not recorded · runtime not recorded');
     assert.equal(order.read, 'Not read'); assert.equal(order.handled, 'Handled not recorded');
     assert.ok(!JSON.stringify(first).includes(secret)); assert.ok(!JSON.stringify(first).includes(dir));
     renameSync(join(worker, 'task-a.inbox/001.msg'), join(worker, 'task-a.inbox/handled/001.msg'));

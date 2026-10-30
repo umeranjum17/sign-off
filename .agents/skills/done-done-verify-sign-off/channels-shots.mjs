@@ -146,8 +146,13 @@ try {
     assert.ok(order, 'the steering order is in the thread');
     assert.equal(order.receipt, 'Not read · Handled not recorded', 'a moved file is read, never handled');
     assert.match(order.preview, /\[key hidden\]/, 'the key is redacted before it reaches the screen');
+    // Masking is idempotent: a second pass must never append another "hidden" tail.
+    assert.doesNotMatch(order.preview, /\[key hidden\]\s+hidden/, 'the mask does not repeat its own tail');
     assert.ok(m.messages.some((x) => x.kind === 'correction' && /Read/.test(x.receipt)), 'a handled correction reads as read');
     assert.equal(m.messages.find((x) => x.kind === 'blocker')?.receipt, 'Read not recorded · Handled not recorded', 'an absent receipt says so');
+    // Every row carries a runtime: the recorded one, or the sender's home and an honest gap. None may be blank.
+    for (const x of m.messages) assert.ok(x.runtime && x.runtime.trim(), `no runtime on the ${x.kind} message from ${x.from}`);
+    assert.ok(m.messages.some((x) => x.runtime === 'Main · runtime not recorded'), 'a sender with no recorded model still names its home and the gap');
     assert.ok(m.messages.some((x) => x.runtime === 'pi · openai-codex/gpt-6.1-sol'), 'the sender carries its recorded runtime');
   });
 

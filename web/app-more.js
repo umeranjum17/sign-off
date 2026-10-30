@@ -2255,7 +2255,7 @@
   // Defence in depth for a future source adapter: text nodes prevent markup execution, and likely key forms never reach previews or copy text.
   const commsText = (text) => String(text ?? '').replace(/\b(?:sk-[\w-]{12,}|gh[pousr]_[\w]{16,}|github_pat_[\w]{16,}|AKIA[A-Z0-9]{16})\b/g, '[key hidden]')
     .replace(/\bBearer\s+[\w.+/=-]{12,}/gi, 'Bearer [key hidden]')
-    .replace(/\b([\w.-]*(?:token|secret|password|api[_-]?key|access[_-]?key)[\w.-]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi, '$1[key hidden]');
+    .replace(/\b([\w.-]*(?:token|secret|password|api[_-]?key|access[_-]?key)[\w.-]*\s*[:=]\s*)(?:"[^"]*"|'[^']*'|(?!\[key hidden\])[^\s,;]+)/gi, '$1[key hidden]');
   function commsSelection() {
     const key = commsKey;
     if (key.startsWith('m-')) {
@@ -2357,7 +2357,7 @@
       : commsBefore > 0 ? commsButton('Earlier messages', () => commsRead(true), 'ch-earlier') : '';
     const history = el('div', { class: 'ch-history', 'aria-label': 'Messages in time order' }, older,
       ...shown.map((m) => el('article', { class: 'ch-message', 'data-message': m.id }, el('span', { class: 'ch-avatar', 'aria-hidden': 'true' }, m.from.slice(0, 1).toUpperCase()),
-        el('div', { class: 'ch-message-body' }, el('div', { class: 'ch-message-meta' }, el('strong', {}, m.from), el('span', { class: 'ch-runtime' }, m.runtime), el('span', {}, `→ ${m.to}`), el('span', { class: `ch-kind ${m.kind}` }, m.kind), el('time', {}, commsAt(m.at))),
+        el('div', { class: 'ch-message-body' }, el('div', { class: 'ch-message-meta' }, el('strong', {}, m.from), el('span', { class: 'ch-runtime' }, m.runtime || 'runtime not recorded'), el('span', {}, `→ ${m.to}`), el('span', { class: `ch-kind ${m.kind}` }, m.kind), el('time', {}, commsAt(m.at))),
           el('p', { class: 'ch-preview' }, commsText(m.text)), el('a', { class: 'ch-open', href: `#channels/m-${commsToken(m.id)}` }, 'Open full text'), el('p', { class: 'ch-receipt' }, `${m.read} · ${m.handled}`)))),
       !shown.length ? el('p', { class: 'ch-empty' }, commsReady ? query || commsKind || commsState ? 'No matching messages in the loaded history.' : 'No messages in this channel yet.' : 'Reading communications…') : '');
     const stream = el('section', { class: 'ch-stream ch-card', 'aria-label': home || 'Messages' }, el('header', { class: 'ch-stream-head' },
