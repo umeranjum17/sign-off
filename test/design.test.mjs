@@ -2926,7 +2926,10 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
   await evaluate('document.querySelector(".t-more-line").click()');
-  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  const moreLinks = () => evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")');
+  await until(async () => (await moreLinks()).includes('Designs1'));
+  // Channels is one more place in the same sheet, and it carries no count.
+  assert.equal(await moreLinks(), '#designs Designs1|#channels Channels');
   assert.equal(await evaluate('document.querySelector(".t-up .q").textContent + "|" + document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Nothing waits on you|Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
   // Today lists it under Designs to review, its tile a thumbnail of its first screen, one tap from its review.
@@ -2988,13 +2991,13 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await evaluate(`location.href = ${JSON.stringify(url)}`);
   await until(async () => await evaluate('!!document.querySelector(".t-more-line")'));
   await evaluate('document.querySelector(".t-more-line").click()');
-  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1');
+  await until(async () => (await evaluate('[...document.querySelectorAll("#t-more a.ui-pr")].map((a) => a.getAttribute("href") + " " + a.textContent).join("|")')) === '#designs Designs1|#channels Channels');
   assert.equal(await evaluate('document.querySelector(".t-tiles .ui-stat").getAttribute("aria-label")'), 'Cleared today: 0 of 0');
   await evaluate('document.getElementById("t-more").close()');
   const desktop = await browse(join(dir, 'desktop-browser'), 1280);
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
-  // The desk's sidebar holds Designs after Reports with its count, lit on Designs; Decide is not.
-  await until(async () => (await desktop.evaluate('[...document.querySelectorAll("#nav a:not(.sfind)")].map((a) => [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join("") + (a.hasAttribute("aria-current") ? "*" : "")).join("|") + " " + document.querySelector("#nav a[href=\\"#designs\\"] .n")?.textContent')) === 'Today|Inbox|Decide|Evidence|Reports|Designs*|Tickets 1');
+  // The desk's sidebar holds Designs after Reports with its count, lit on Designs, and Channels after Tickets; Decide is not.
+  await until(async () => (await desktop.evaluate('[...document.querySelectorAll("#nav a:not(.sfind)")].map((a) => [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join("") + (a.hasAttribute("aria-current") ? "*" : "")).join("|") + " " + document.querySelector("#nav a[href=\\"#designs\\"] .n")?.textContent')) === 'Today|Inbox|Decide|Evidence|Reports|Designs*|Tickets|Channels 1');
   await desktop.evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await desktop.evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await desktop.evaluate('document.querySelector("#nav a[href=\\"#designs\\"][aria-current=page]")?.getClientRects().length > 0'), true);
@@ -5717,8 +5720,8 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     assert.deepEqual(await list(), [['New', '* Ship the settings page Friday?', '* Open the beta to every team?'], ['Waiting on agents', 'Turn on the CSV export?']]);
     assert.equal(await evaluate('document.querySelector(".ib-fold").textContent'), 'Show 1 archived');
     assert.equal(await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Turn on the CSV")).querySelector(".l2").textContent'), 'You: Yes · Read');
-    // Every place stays, the inbox one more.
-    assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#', '#inbox', '#waiting', '#evidence', '#reports', '#designs', '#tickets']);
+    // Every place stays, the inbox one more and Channels beside Designs.
+    assert.deepEqual(await evaluate('[...new Set([...document.querySelectorAll(".side a, .tabs a")].map((a) => a.getAttribute("href")))]'), ['#find', '#', '#inbox', '#waiting', '#evidence', '#reports', '#designs', '#tickets', '#channels']);
     // The kind chips, each with what is still open; Tickets reads the board's ticket roll-up when picked. A pick filters the list, and search narrows it.
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".ib-chip")].map((c) => c.textContent)'), ['All3', 'Decisions3', 'Tickets']);
     // A ticket nobody commented on is not a thread: it stays in Tickets.

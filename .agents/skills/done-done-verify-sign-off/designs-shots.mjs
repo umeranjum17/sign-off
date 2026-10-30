@@ -55,7 +55,7 @@ const MEASURE = `(async () => {
   const nav = desk ? [...document.querySelectorAll('#nav a:not(.sfind)')].filter(vis).map((a) => ({ name: [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join('').trim(), current: a.getAttribute('aria-current') === 'page', n: a.querySelector('.n')?.textContent ?? null }))
     : [...document.querySelectorAll('.tabs a')].map((a) => ({ name: a.getAttribute('aria-label').split(',')[0], current: a.getAttribute('aria-current') === 'page' }));
   const lit = nav.filter((x) => x.current).map((x) => x.name).join(',');
-  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Inbox,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
+  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Inbox,Decide,Evidence,Reports,Designs,Tickets,Channels') fail.push('sidebar places ' + nav.map((x) => x.name));
   if (desk && nav.length && lit !== 'Designs') fail.push('sidebar lights ' + lit);
   if (desk && nav.length && (nav.find((x) => x.name === 'Designs')?.n !== '3' || nav.find((x) => x.name === 'Evidence')?.n !== '3')) fail.push('sidebar counts ' + JSON.stringify(nav));
   // The Designs label's count (the sidebar's on a desk, the phone's Asks / Designs switch) must equal the rows the list draws; any difference fails the run.

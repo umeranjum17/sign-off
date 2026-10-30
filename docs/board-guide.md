@@ -4,7 +4,7 @@
 
 ## The board
 
-Five places, in the dock at the bottom of a phone and the sidebar on a desk: **Today**, **Decide**, **Evidence**, **Reports** and **Tickets**.
+The phone dock holds **Today**, **Inbox**, **Decide**, **Evidence**, **Reports** and **Tickets**. The desktop sidebar also holds **Designs** and **Channels**. On a phone, open Channels from Today's **More**.
 
 <table>
   <tr>
@@ -28,6 +28,27 @@ Every card opens to its own screen with the same parts: one **action bar** (the 
 The board installs as an app (More, then Install app; on an iPad, Share, then Add to Home Screen) and, once opened, reads offline: with the board unreachable it shows the last update under "Offline, showing the last update", and sends fail rather than queue. A phone needs the board on HTTPS or localhost to install it.
 
 On a phone, larger Decide lists open quickly and **Show more** brings in the next asks, Later items or answers. The counts always include the whole board.
+
+### Fleet channels
+
+Channels shows fleet communication in time order, grouped by home and worker thread. Every message keeps its sender, recipient, model/runtime, kind, and read/handled state. A source that omits a field shows **not recorded**; a status report does not prove that somebody read or handled it. Open full text for the complete redacted message and a bookmarkable address. Search the loaded history, filter by kind, receipt, participant or date, and use **Earlier messages** to read older source pages.
+
+While Channels is open, it checks every three seconds. **Live** means the source is reachable; **Not live** preserves the last messages after an error. New arrivals wait behind the **new messages** pill so the message being read keeps its position. A status-ledger fallback explicitly says it does not yet include steering and replies. Exported offline copies do not connect to fleet communications.
+
+The `config.yaml` beside the board configures read-only sources and the complete home roster:
+
+```yaml
+comms_state: ~/fleet/state
+comms_ledger: ~/fleet/state/fleet-ledger.jsonl
+comms_feed: ~/fleet/data/comms.jsonl
+comms_homes: Main, alpha, beta
+```
+
+`comms_state` reads the fleet as files, which is what makes every home visible before any feed exists. Every `*.status` in that folder becomes a channel; every task in a home's own `state` folder becomes one of its threads, and each task's status log and steering inbox supply the messages. A home's `.meta` names its `harness` and `model`, which show beside its senders, and its `home` or `worktree` says where its state folder is. A home that records neither path shows its own status log and no worker history, and the board says how many channels that covers rather than leaving them out. A moved inbox file marks an order read, never handled.
+
+`SIGN_OFF_COMMS_STATE`, `SIGN_OFF_COMMS_LEDGER`, `SIGN_OFF_COMMS_FEED` and `SIGN_OFF_COMMS_HOMES` override those values. With neither ledger nor feed configured, an existing `fleet_home:` supplies `state/fleet-ledger.jsonl`. The roster should name every current home, including inactive homes; without one the fallback can discover only sources in the recent page. No source path is accepted from HTTP. The communications route uses the board's existing authentication, redacts before sending text or metadata, and never caches the response on disk or writes fleet state.
+
+The official JSONL feed replaces the ledger when its configured file appears. Each line carries `id`, `at` (UTC epoch seconds or ISO time), `home`, optional `thread`, `from` and `to` (names or objects with `name` and `model`/`runtime`), `kind`, `text`, and source-backed `read_at`/`handled_at` or explicit `read_state`/`handled_state`. A top-level `model` or `runtime` is also accepted. Missing lifecycle values remain unknown. The temporary ledger adapter reads its existing `ts`, `task`, `state` and `text` fields. Reads and earlier pages are bounded to 512 KiB of complete lines; the source is not loaded whole. Official stable message IDs remain deep-linkable after leaving that recent page.
 
 ### Evidence is not a decision
 

@@ -116,6 +116,11 @@ journeys:
   # measured in the browser; DESIGNS_PROTO=<the approved prototype's index.html> saves each beside the prototype's frame, DESIGNS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   designs:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${DESIGNS_THEME:-light}" "${DESIGNS_WIDTH:-390}"'
+  # Channels: one channel per fleet home and one thread per task, every message with its sender, its recorded runtime and its receipt, read from files only
+  # (a temp fleet and a temp board, never the captain's). At 390 and 1280 in light and dark: the list, a worker thread, one message whole, and a line arriving
+  # behind the new-messages pill without a reload; each frame measured in the browser for a live marker, a runtime beside its sender, honest receipts, no key on screen and no overflow.
+  channels:
+    command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/channels-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
   # Designs one tap away on a phone: Decide's Asks and Designs, Designs lighting Decide, the order sheet, Today's Designs to review with design thumbnails, project icons in every tile
   # and each phone list's end clear of the dock, at 360, 390, 445, 1280 and 1440 in light and dark. DESIGNS_ACCESS_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   designs-access:

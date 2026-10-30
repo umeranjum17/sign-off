@@ -154,7 +154,7 @@
   const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
   /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
-  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox)(?:\/|$)/;
+  const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox|channels)(?:\/|$)/;
   // A response can arrive after the person has started typing on the next card.
   // Keep the active editor and its selection across that redraw, just as a poll does.
   // The screens beyond the first screen's own (the guide, the plan and design reviews, the tickets, the evidence and decide desks, the report and
@@ -1123,9 +1123,9 @@
   // The tab bar holds six places: Today, Inbox, Decide (what waits on you, a design Main promoted too), Evidence, Reports and Tickets.
   // The sidebar holds those and Designs, after Reports, as the approved prototype's desk draws it. Designs and Answered are not tabs: both are links on Today's More.
   const TABS = [['', 'Today'], ['inbox', 'Inbox'], ['waiting', 'Decide'], ['evidence', 'Evidence'], ['reports', 'Reports'], ['tickets', 'Tickets']];
-  const SIDE = [...TABS.slice(0, 5), ['designs', 'Designs'], TABS[5]];
+  const SIDE = [...TABS.slice(0, 5), ['designs', 'Designs'], TABS[5], ['channels', 'Channels']];
   const EMPTY = { waiting: 'Nothing is waiting on you.', designs: 'No designs yet.', evidence: 'No evidence updates.', reports: 'No reports or explainers.', answered: 'Nothing answered yet.' };
-  const ICONS = { designs: 'M3 3h18v18H3zM3 9h18M9 21V9',
+  const ICONS = { 'tab-channels': 'M3 3h14v12H8l-5 4V3zm16 5h3v14l-5-4h-6v-1h8V8z', designs: 'M3 3h18v18H3zM3 9h18M9 21V9',
     waiting: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
     evidence: 'M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1zM9 12l2 2 4-4',
     reports: 'M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z',
@@ -1404,9 +1404,9 @@
   /** More: what Today leaves off, Answered and Designs with their counts, the Leash and Ask the agent, and last the version the board runs. */
   const todayMore = sheetOf('t-more');
   function fillMore(by) {
-    const go = (href, name, n) => el('a', { class: 'ui-pr', href }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), glyph('right')));
-    const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs]].filter(([, , l]) => l.length);
-    todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, l.length))) : '',
+    const go = (href, name, n) => el('a', { class: 'ui-pr', href }, el('span', { class: 'k' }, name), el('span', { class: 'v' }, n === undefined ? '' : el('span', { class: 'n' }, String(n)), glyph('right')));
+    const links = [['#answered', 'Answered', by.answered], ['#designs', 'Designs', by.designs], ['#channels', 'Channels', []]].filter(([h, , l]) => h === '#channels' || l.length);
+    todayMore.replaceChildren(el('div', {}, sheetHead('t-more', 'More'), links.length ? el('div', { class: 'ui-props' }, ...links.map(([h, name, l]) => go(h, name, h === '#channels' ? undefined : l.length))) : '',
       ...(state.leash ? leash() : []), ...(FROZEN || state.readonly || state.answers_only ? [] : [ask()]),
       FROZEN ? '' : window.signOffInstall?.() ?? '',
       state.version ? el('div', { class: 'ui-props' }, el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, 'Version'), el('span', { class: 'v' }, el('span', {}, state.version)))) : ''));
@@ -2713,7 +2713,7 @@
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
     by.answered.sort((x, y) => state.answers[y.key].at.localeCompare(state.answers[x.key].at));
-    const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
+    const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|inbox|channels)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
     const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.needs).length;
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity';
     if (showingTickets && !ticketScreen) readTickets(true);
@@ -2752,8 +2752,8 @@
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
-    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? by.asks.length : a && a !== 'tickets' ? by[a].length : undefined);
-    // Ask/inbox badges are red, unread reports ink, evidence plain.
+    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? by.asks.length : a && a !== 'tickets' && a !== 'channels' ? by[a].length : undefined);
+    // Ask/inbox badges are red, unread reports ink, evidence plain; Channels carries no count.
     const badge = (a) => (a === 'waiting' || a === 'inbox' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
@@ -2764,11 +2764,12 @@
       el('a', { class: 'sfind', href: '#find' }, document.getElementById('dock-find').firstChild.cloneNode(true), 'Search'), ...SIDE.map(link),
       el('div', { class: 'me' }, el('i', { 'aria-hidden': 'true' }, [...who][0].toUpperCase()), el('span', { dir: 'auto' }, who), themeButton()),
       state.version ? el('p', { class: 'ver' }, `Version ${state.version}`) : '');
-    paintTabs(active === 'designs' ? 'waiting' : active, count, badge);
+    paintTabs(active === 'channels' ? '' : active === 'designs' ? 'waiting' : active, count, badge);
     const ro = state.readonly ? 'Read only' : FROZEN ? `Read-only copy, ${FROZEN.exported}` : '';
     const pageTitle = head === 'decide' || head === 'waiting' ? 'Decide' : head === 'reports' ? 'Reports' : AREAS[head];
     document.body.classList.toggle('today', !at);
     document.body.classList.toggle('tickets', showingTickets);
+    document.body.classList.toggle('channels', at === 'channels');
     const bulk = { waiting: by.asks, designs: by.designs, evidence: by.evidence, reports: [...by.reports, ...by.notes], answered: by.answered }[at] ?? [];
     const answeredToday = by.answered.filter((d) => isToday(state.answers[d.key].at)).length;
     // Decide's head, as ui.css draws it: the title and the light-or-dark button at its right edge; More sits under the list.
@@ -2794,7 +2795,7 @@
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const th = inboxAt && all.find((t) => t.id === key), inboxRead = th?.d && opening && !inPlace(th.d) && (phone() || th.d.type !== 'evidence') ? th.d : undefined;
-    const content = inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', at === 'activity') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
+    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', at === 'activity') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.asks, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.asks, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
