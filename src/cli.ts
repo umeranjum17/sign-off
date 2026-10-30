@@ -158,6 +158,7 @@ Prints the latest saved answer per decision and counts the ones still waiting.
   --full  adds the button label, close and title
   --json  {"<key>":{"answer","label","close","at","note"?}} for the answered decisions; note only when the user wrote one
 A note column appears when any shown answer has a note.
+Reading an answer here is the agent taking it: its thread shows Read at that time (once per answer).
 examples:
   sign-off-axi answers --key keep-the-weekly-digest
   sign-off-axi answers ./decisions.json --json
@@ -763,6 +764,9 @@ function answers(args: string[]) {
   const rows = board(file).filter((d) => values.key === undefined || d.key === values.key);
   if (values.key !== undefined && !rows.length) throw fail(`no decision with key ${values.key} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi list${on}\` to see the waiting keys`);
   const waiting = rows.filter(waits).length, key = values.key === undefined ? '' : ` --key ${values.key}`;
+  // Reading an answer is the agent taking it, so each answered card read here shows Read on its thread; one mark per answer, never one per read.
+  const unread = new Set(readTrail(file, loadDecisions(file)).filter((t) => t.kind === 'answer' && !t.read).map((t) => t.key));
+  for (const d of rows) if (d.answer && unread.has(d.key)) appendMark(file, { op: 'read', key: d.key });
   return printAnswers(file, rows, waiting, values, waiting ? [`Run \`sign-off-axi open${on}\` so the user can answer the ${waiting} waiting`, `Run \`sign-off-axi wait${on}${key}\` to block until they answer`] : []);
 }
 
