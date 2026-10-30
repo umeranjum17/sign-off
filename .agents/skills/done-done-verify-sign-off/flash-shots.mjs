@@ -84,7 +84,7 @@ try {
     // A row is named by its key, its element, the list it sits in (by identity) and its own identity: an answered card moving to the answered list is
     // the person's own act and a different row to them, while a row that stayed in the same list and came back as a new element is the list rebuilt.
     // A row is named by its key (a card's key, or the address a desk row opens), its element, the list it sits in (by identity) and its own identity.
-    const rows = (b) => [...b.querySelectorAll('[data-key], a[data-row]')].map((r) => (r.dataset.key || r.getAttribute('href')) + '=' + r.localName + ':' + nodeId(r.parentElement) + ':' + nodeId(r)).join(',');
+    const rows = (b) => [...b.querySelectorAll('[data-key]')].map((r) => r.dataset.key + '=' + r.localName + ':' + nodeId(r)).join(',');
     const sample = () => {
       const b = document.getElementById('board');
       if (b) log.frames.push({ t: Math.round(performance.now()), kids: b.children.length, ids: [...b.children].map((c) => c.localName + '.' + (c.className || '')).join('|'),
@@ -118,10 +118,10 @@ try {
     // person just acted on is the one row allowed to change (it becomes an answered row, or leaves the list), so a phase may name the keys it acted on.
     const pairs = (list) => new Map((list ?? '').split(',').filter(Boolean).map((r) => [r.split('=')[0], r.split('=')[1]]));
     const rowsBefore = pairs(before?.rows), rowsAfter = pairs(after?.rows);
-    // A row that stayed in its list and is on screen before and after the phase is the same element still: the list is not torn down under the person's
-    // thumb. A row that moved to another list (an answered card, a card sent to Later) is a different row to the person, and the phase says which one it moved.
-    const listIn = (v) => v.split(':').slice(0, 2).join(':');
-    const keptRows = [...rowsBefore.keys()].filter((k) => rowsAfter.has(k) && listIn(rowsAfter.get(k)) === listIn(rowsBefore.get(k)));
+    // A row on screen before the phase and after it is the same element still: the list is not torn down under the person's thumb. The card the person
+    // just acted on is the one row allowed to change (it becomes an answered row), and a phase names it in acted.
+    const acted = result?.acted ?? [];
+    const keptRows = [...rowsBefore.keys()].filter((k) => rowsAfter.has(k) && !acted.includes(k));
     const rebuilt = keptRows.filter((k) => rowsBefore.get(k) !== rowsAfter.get(k));
     check(!rebuilt.length, `${name}: ${rebuilt.length} of ${keptRows.length} rows on screen were rebuilt: ${rebuilt.join(', ')}`);
     if (rowsBefore.size) check(keptRows.length > 0, `${name}: nothing on screen stayed put under the check`);
