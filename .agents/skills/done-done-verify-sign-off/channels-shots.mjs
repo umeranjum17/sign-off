@@ -155,6 +155,11 @@ try {
     assert.match(m.full.source, /Keys are hidden/, 'the sheet says keys are hidden');
   });
 
+  // Back to the thread itself, so the pill is captured over the messages and not under an open sheet.
+  await evaluate(`document.querySelector('.ch-full[open] .ch-close')?.click()`);
+  await until('!document.querySelector(".ch-full[open]")');
+  await until('!!document.querySelector(".ch-message")');
+
   // A line arrives while the page stays open: the pill counts it and the page has not been reloaded.
   const before = await evaluate('document.querySelectorAll(".ch-message").length');
   appendFileSync(join(fleet, 'release-home/state/task-export.status'), `resolved [at=${Math.floor(Date.now() / 1000)}]: The export endpoint's shape is settled.\n`);
