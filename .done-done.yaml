@@ -281,3 +281,7 @@ approved_requirements:
     name: design-pick-listing
     requirement: A design pick is listed under Designs.
     capture: designs.1440.dark.png
+# Paths a PR's size count skips: design-tool output, not hand-written code. The Inbox layout pick's option pages are first-draft output.
+checks:
+  generated_paths:
+    - "fixtures/contract/design.v1/design/inbox-layout-pick/*.html"

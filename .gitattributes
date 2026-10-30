@@ -1,0 +1,2 @@
+# The Inbox layout pick's option pages are first-draft design-tool output, not hand-written code: size checks and diffs treat them as generated.
+fixtures/contract/design.v1/design/inbox-layout-pick/*.html linguist-generated=true
