@@ -1630,7 +1630,7 @@
     b.onclick = () => { fillMore(by); todayMore.showModal(); todayMore.querySelector('h2').focus(); };
     return b;
   }
-  /** Today itself. A redraw keeps an open More current; the address #find opens Search over it. */
+  /** Today keeps More current and opens Search at #find. */
   function today(by) {
     const queue = [...by.asks].sort((x, y) => lead(x) - lead(y)), up = upNext(queue), rest = waitingOn(queue.slice(1)), tiles = todayTiles(by), more = moreLine(by), replies = repliesOn();
     if (todayMore.open) fillMore(by);
@@ -2452,11 +2452,11 @@
   const askHead = (d, sink) => el('div', { class: 'ui-shd split-bar' }, cardTile(d), sink.crumb, sink.more ?? '');
   /** An open item on a desk that is not an ask's own pane: one card with its head line over it. */
   const pane = (head, ...body) => el('section', { class: 'ui-card ui-pane s8 split-detail' }, head, ...body);
-  /** Decide on a desk: the list beside the ask it has selected (the first until a row is picked). Answering folds the row away and selects the next. */
+  /** Desk: list beside the selected ask; answering folds its row and selects the next. */
   function decideDesk(top, items, hidden, queue, key, done, today) {
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const list = [decideList(items, hidden, done, today)], sub = [`${plural(queue.filter((d) => !isPick(d)).length, 'ask')} ${queue.filter((d) => !isPick(d)).length === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
+    const asks = queue.filter((d) => !isPick(d)).length, list = [decideList(items, hidden, done, today)], sub = [`${plural(asks, 'ask')} ${asks === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
     if (!d) return split(top, sub, list, pane('', items.length ? emptyState('empty', { mark: 'waiting', title: 'No review open', text: 'Pick one from the list to answer it here.', small: true }) : allClear(true)));
     const bar = {}, page = decidePage(d, next, true, bar);
     return split(top, sub, list, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
@@ -2630,12 +2630,11 @@
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => !gone.has(d.key) && (d.kind === 'design' || (isPick(d) && !merged.has(d.key))));
-    // Waiting on you reads newest first. A sign-in blocks someone now, so sign-ins come first.
+    // Newest asks first, with sign-ins ahead.
     let latest = -Infinity;
     const inFileOrder = by.waiting.slice().reverse().map((d, i) => { const t = Date.parse(d.filed); if (!Number.isNaN(t)) latest = t; return { d, t: latest, i }; });
     const asked = inFileOrder.sort((x, y) => (x.t === y.t ? x.i - y.i : x.t - y.t)).map((x) => x.d).reverse();
     by.waiting = [...asked.filter((d) => d.type === 'signin'), ...asked.filter((d) => d.type !== 'signin')];
-    // A design pick is no ask: it is counted and listed once, under Designs, so every count and list of asks leaves it out (the pick still opens from Designs and steps with the rest).
     by.asks = by.waiting.filter((d) => !isPick(d));
     const hidden = state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'waiting');
     decideCtx = { all: decideOrder(by.waiting), hidden };
@@ -2680,7 +2679,7 @@
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
     const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? by.asks.length : a && a !== 'tickets' ? by[a].length : undefined);
-    // Decide's and the inbox's count is a red badge and new Reports' an ink one, in the sidebar and the tab bar alike; Evidence's is a plain number.
+    // Ask/inbox badges are red, unread reports ink, evidence plain.
     const badge = (a) => (a === 'waiting' || a === 'inbox' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,
       count(a) === undefined || (badge(a) && !count(a)) ? '' : el('span', { class: `n ${badge(a)}`.trim() }, String(count(a))));
