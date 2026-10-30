@@ -231,6 +231,9 @@ journeys:
   # at its own size with the stage scrolling sideways, then with Fit. SIGN_OFF_REPO=<base build> INBOX_LAYOUT_SIDE=before captures the base's viewer into before/.
   inbox-layout:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # One sealed merge run includes the Inbox redo and the required Designs 1440 dark capture.
+  inbox-layout-redo:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-merge-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   attach:
