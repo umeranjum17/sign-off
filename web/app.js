@@ -2144,7 +2144,7 @@
    *  the swipe actions sit under it, and on a desk a hover shows the same two as round buttons. */
   function decideRow(d, i, gone) {
     const g = gone?.group ?? sideOf(d), rec = recOf(d), t = ticketOf(d);
-    const meta = d.type === 'signin' ? el('span', {}, `${whoOf(d)} · `, signinRow(d)) : `${isPick(d) ? plain(d.title) : whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
+    const meta = d.type === 'signin' ? el('span', {}, `${whoOf(d)} · `, signinRow(d)) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
       ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }), selMark(d.key));
