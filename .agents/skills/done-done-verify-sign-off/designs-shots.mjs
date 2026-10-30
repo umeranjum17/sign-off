@@ -56,7 +56,7 @@ const MEASURE = `(async () => {
   const nav = desk ? [...document.querySelectorAll('#nav a:not(.sfind)')].filter(vis).map((a) => ({ name: [...a.childNodes].filter((n) => n.nodeType === 3).map((n) => n.data).join('').trim(), current: a.getAttribute('aria-current') === 'page', n: a.querySelector('.n')?.textContent ?? null }))
     : [...document.querySelectorAll('.tabs a')].map((a) => ({ name: a.getAttribute('aria-label').split(',')[0], current: a.getAttribute('aria-current') === 'page' }));
   const lit = nav.filter((x) => x.current).map((x) => x.name).join(',');
-  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
+  if (desk && nav.length && nav.map((x) => x.name).join(',') !== 'Today,Inbox,Decide,Evidence,Reports,Designs,Tickets') fail.push('sidebar places ' + nav.map((x) => x.name));
   if (desk && nav.length && lit !== 'Designs') fail.push('sidebar lights ' + lit);
   if (desk && nav.length && (nav.find((x) => x.name === 'Designs')?.n !== '3' || nav.find((x) => x.name === 'Evidence')?.n !== '3')) fail.push('sidebar counts ' + JSON.stringify(nav));
   if (!desk && (nav.length !== 5 || (!open && !sheet && lit !== 'Decide'))) fail.push('dock ' + JSON.stringify(nav));
