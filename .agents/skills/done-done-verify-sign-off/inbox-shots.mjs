@@ -55,9 +55,9 @@ await api('/api/answers', { key: 'beta', answer: 'no', note: 'Wait until the imp
 cli('wait', board, '--filer', 'settings-agent', '--timeout', '5');
 cli('feedback', 'beta', board, '--reply', 'Kept it to the ten teams. The import fix is in review.', '--link', 'https://github.com/example/settings/pull/245');
 // A question and a reply that asks for a next step: the person writes back instead of picking, the agent answers with two follow-ups.
-await api('/api/answers', { key: 'ship', answer: 'text', note: 'What does Friday need from QA?' });
+await api('/api/answers', { key: 'ship', answer: 'text', note: process.env.CHAT_ONLY ? 'What does Friday need from QA? I want the page, the copy and the settings export all checked before we say yes.' : 'What does Friday need from QA?' });
 cli('wait', board, '--filer', 'settings-agent', '--timeout', '5');
-cli('feedback', 'ship', board, '--reply', 'QA signs off Thursday, so Friday holds. Ship it Friday?', '--option', 'yes=Ship Friday', '--option', 'no=Wait a week');
+cli('feedback', 'ship', board, '--reply', (process.env.CHAT_ONLY ? 'QA signs off Thursday, so Friday holds. They have run the settings page on both phones and the desk, found nothing open, and the export check passed with the new columns. The copy review is the only thing left and it is booked for Thursday morning. Ship it Friday?' : 'QA signs off Thursday, so Friday holds. Ship it Friday?'), '--option', 'yes=Ship Friday', '--option', 'no=Wait a week');
 // Answered, then relayed: the lead reads the answer through `answers`, with no wait of its own and no feedback line, and the thread shows Read from that.
 await api('/api/answers', { key: 'name-tool', answer: 'yes', note: '' });
 cli('answers', board, '--json');
@@ -103,8 +103,18 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const dock = document.querySelector('#tabs')?.getBoundingClientRect(), foot = document.querySelector('.ib-ent:last-child');
   if (dock && dock.width > 0 && foot) { foot.scrollIntoView({ block: 'end' }); window.scrollTo(0, document.documentElement.scrollHeight); await new Promise((ok) => setTimeout(ok, 200)); if (foot.getBoundingClientRect().bottom > dock.top + 1) fail.push('the last rail entry is under the dock at the scroll end'); window.scrollTo(0, 0); }
   const thread = document.querySelector('.ib-thread');
-  const pairs = thread ? [...thread.querySelectorAll('.ib-pair')].filter(vis).map((p) => [...p.querySelectorAll('.ib-lab, .tr-lab')].map((l) => l.textContent.trim()).join(' > ')) : [];
-  const steps = thread ? [...thread.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent) : [];
+  // The open thread as a chat: each message's side and words, how far each of the person's reached, the artifacts inline, and which side of the screen each side sits on.
+  const msgs = thread ? [...thread.querySelectorAll('.ib-msg')].filter(vis).map((p) => (p.classList.contains('you') ? 'you: ' : 'agent: ') + (p.querySelector('.ib-say')?.textContent ?? '').trim()) : [];
+  const rcpts = thread ? [...thread.querySelectorAll('.ib-rcpt')].filter(vis).map((r) => r.textContent.replace(/\\d\\d:\\d\\d|\\d+ \\w+/, '').replace(/\\s+/g, ' ').trim()) : [];
+  const arts = thread ? [...thread.querySelectorAll('.ib-art')].filter(vis).map((a) => a.querySelector('.ib-at b').textContent + ' / ' + a.querySelector('.ib-at span').textContent) : [];
+  const log = thread?.querySelector('.ib-chat')?.getBoundingClientRect(), sides = log ? { you: [...thread.querySelectorAll('.ib-msg.you .ib-say')].filter(vis).map((e) => Math.round(log.right - e.getBoundingClientRect().right)), agent: [...thread.querySelectorAll('.ib-msg:not(.you) .ib-say, .ib-msg:not(.you) .ib-art')].filter(vis).map((e) => Math.round(e.getBoundingClientRect().left - log.left)) } : null;
+  // The latest message must be in view and clear of the box pinned under it.
+  const lastMsg = thread ? [...thread.querySelectorAll('.ib-msg')].filter(vis).at(-1)?.getBoundingClientRect() : null, cw = thread?.querySelector('.ib-cw')?.getBoundingClientRect(), scrollers = thread ? [thread, thread.parentElement, document.scrollingElement, document.body].map((e) => [e.tagName + '.' + e.className, Math.round(e.scrollTop), e.scrollHeight, e.clientHeight, getComputedStyle(e).overflowY, Math.round(scrollY)]) : null;
+  const optBox = thread ? [...thread.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.getBoundingClientRect()) : [], opts_clear = optBox.length && cw ? optBox.every((r) => r.top >= 0 && r.bottom <= cw.top + 1) : null;
+  const latest_clear = lastMsg && cw ? lastMsg.bottom <= cw.top + 1 && lastMsg.bottom <= window.innerHeight : null;
+  const barEl = document.querySelector('.ib-bar'), barTops = [...new Set([...document.querySelectorAll('.ib-chip, .ib-flt')].filter(vis).map((b) => Math.round(b.getBoundingClientRect().top)))];
+  const bar = barEl ? { rows: barTops.length, scrolls: barEl.scrollWidth > barEl.clientWidth, height: Math.round(barEl.getBoundingClientRect().height) } : null;
+  const footBox = document.querySelector('.ib-foot')?.getBoundingClientRect(), first_screen = footBox ? Math.round(footBox.bottom) <= (dock && dock.width > 0 ? dock.top : window.innerHeight) : false;
   const follow = [...document.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.textContent);
   const notice = [...document.querySelectorAll('.ib-note')].filter(vis).map((n) => n.innerText.replace(/\\n+/g, ' / '));
   const thread_answers = thread ? thread.querySelectorAll('.tr-opt, .tr-opts, [role=radio], input[type=radio], .pick-option, .answer').length : 0;
@@ -113,12 +123,13 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', pairs, steps, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', msgs, rcpts, arts, sides, bar, first_screen, latest_clear, opts_clear, page_scroll: Math.round(scrollY), scrollers, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
 const results = [];
 // RECEIPTS_ONLY=1 captures just the relayed answer's thread (journey `answer-receipts`).
 const capture = async (state, hash, before, check) => {
   if (process.env.RECEIPTS_ONLY && state !== 'relayed') return;
   if (process.env.RAIL_ONLY && !['rail', 'unread'].includes(state)) return;
+  if (process.env.CHAT_ONLY && !['list', 'chat', 'pr'].includes(state)) return;
   errors.length = 0;
   if (hash !== null) await go(hash);
   if (before) { await evaluate(before); await wait(700); }
@@ -153,7 +164,33 @@ try {
       assert.deepEqual(m.marks.map((r) => r[0]), ['Keep the weekly digest?'], 'only the thread its agent has not read: ' + JSON.stringify(m.marks));
     });
   }
-  if (!process.env.RAIL_ONLY) {
+  if (process.env.CHAT_ONLY) {
+    // One person, three screens: the Inbox list with nothing open, the thread with a long question and an agent's two choices (and a line the agent has not read) that scrolls on a phone, and the one an agent answered with a pull request.
+    // Trail times are whole seconds: a second goes by first, so the line is plainly after the reply it follows and that reply does not count as answering it.
+    await wait(1100);
+    await api('/api/messages', { kind: 'comment', key: 'ship', text: 'Is QA booked for Thursday?' });
+    await capture('list', '#inbox', '', (m) => {
+      assert.equal(m.bar.rows, 1, 'the filters are one row, not ' + m.bar.rows + ': ' + JSON.stringify(m.bar));
+      assert.deepEqual(m.flts.map((f) => f.replace(/\d+$/, '')), ['Unread from agents', 'Not read by agents']);
+      assert.deepEqual(m.entries.map((e) => e.replace(/\d+$/, '').trim()), ['Agentsread-only', 'Done']);
+      if (phone) assert.ok(m.first_screen, 'Agents and Done are on the first phone screen');
+    });
+    await capture('chat', '#inbox/ship', '', (m) => {
+      assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent', 'you'], 'time order, agent first: ' + m.msgs.join(' | '));
+      assert.match(m.msgs[1], /What does Friday need from QA/);
+      assert.deepEqual(m.rcpts, ['Read', 'Sent Not read'], 'how far each of yours got: ' + m.rcpts.join(' | '));
+      assert.ok(m.sides.you.every((g) => g <= 24) && m.sides.agent.every((g) => g <= 24), 'the person at the right edge, the agent at the left: ' + JSON.stringify(m.sides));
+      assert.deepEqual(m.follow, ['Ship Friday', 'Wait a week']);
+      assert.equal(m.latest_clear, true, 'the latest message is in view above the box: ' + JSON.stringify(m.scrollers));
+      assert.equal(m.opts_clear, true, 'the choice buttons are whole and above the box: ' + JSON.stringify(m.scrollers));
+      if (phone) assert.ok(m.page_scroll > 0, 'the phone thread is longer than the screen and opened at its end: ' + m.page_scroll);
+    });
+    await capture('pr', '#inbox/beta', '', (m) => {
+      assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent'], 'time order: ' + m.msgs.join(' | '));
+      assert.ok(m.arts.some((a) => /^Pull request 245/.test(a)), 'the pull request sits in the thread: ' + m.arts.join(' | '));
+    });
+  }
+  if (!process.env.RAIL_ONLY && !process.env.CHAT_ONLY) {
   await capture('inbox', '#inbox', (m) => {
     const want = phone ? ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Tickets'] : ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Designs', 'Tickets', 'Channels'];
     assert.deepEqual(m.menu, want, 'every menu and the Inbox: ' + m.menu.join(', '));
@@ -177,14 +214,14 @@ try {
   });
   await capture('thread', '#inbox/ship', `document.querySelector('.tr-opts')?.scrollIntoView({ block: 'center' })`, (m) => {
     assert.deepEqual(m.follow, ['Ship Friday', 'Wait a week']);
-    assert.ok(m.pairs.some((p) => /Your question > .*Reply/.test(p)), 'a question then its reply: ' + m.pairs.join(' | '));
+    assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent'], 'a question then its reply: ' + m.msgs.join(' | '));
   });
   // A relayed answer: the thread's track reads Sent and Read, and no Acted or Result, because only the relay's read was recorded.
-  await capture('relayed', '#inbox/name-tool', `document.querySelector('.ui-trail')?.scrollIntoView({ block: 'center' })`, (m) => {
-    assert.deepEqual(m.steps, ['Sent', 'Read'], 'card name-tool: the relayed answer shows ' + m.steps.join(', ') + ', not Sent and Read');
+  await capture('relayed', '#inbox/name-tool', `document.querySelector('.ib-rcpt')?.scrollIntoView({ block: 'center' })`, (m) => {
+    assert.deepEqual(m.rcpts, ['Read'], 'card name-tool: the relayed answer shows ' + m.rcpts.join(', ') + ', not Read');
   });
-  await capture('action', '#inbox/beta', `document.querySelector('.tr-said a')?.scrollIntoView({ block: 'center' })`, (m) => {
-    assert.ok(m.pairs.some((p) => /Your (answer|action)[\d:]* > .*What was done/.test(p)), 'an action then what was done: ' + m.pairs.join(' | '));
+  await capture('action', '#inbox/beta', `document.querySelector('.ib-art a')?.scrollIntoView({ block: 'center' })`, (m) => {
+    assert.ok(m.msgs.some((x) => x.startsWith('you: No')) && m.arts.some((a) => /^Pull request 245/.test(a)), 'an action then what was done with its link: ' + m.msgs.join(' | ') + ' / ' + m.arts.join(' | '));
   });
   await capture('answered', '#inbox/ship', tap('.tr-opt'), (m) => {
     assert.match(m.closed, /^Answered · Yes/, 'the thread says Answered: ' + m.closed);
@@ -217,6 +254,9 @@ const prior = existsSync(join(out, 'steps.json')) ? JSON.parse(readFileSync(join
 const receipts = process.env.RECEIPTS_ONLY ? {
   steps: ['The person answers an ask from the lead; the lead reads the answer with sign-off-axi answers, with no wait and no feedback line', 'The person opens the ask\u2019s thread in the Inbox'],
   result: 'the thread\u2019s track reads Sent and Read, each with its time, and Acted and Result stay empty because nothing more was recorded' }
+  : process.env.CHAT_ONLY ? {
+  steps: ['The person answers two asks and writes on one of them; the lead\u2019s wait takes the answers; one agent replies with a question\u2019s two choices, the other with a pull request link; nobody reads the last comment', 'The person opens the Inbox', 'The person opens the thread with the choices, then the thread with the pull request'],
+  result: 'the kind chips and the two unread filters are one row that scrolls sideways, Agents and Done are one short row under it above the first thread, and a thread reads as a chat in time order: the agent on the left, the person\u2019s own words as bubbles on the right with Read or Sent and Not read under them, the card and the pull request as inline cards' }
   : process.env.RAIL_ONLY ? {
   steps: ['The person answers two asks and writes on a third; the lead\u2019s wait takes the first answer and replies, and nobody reads the comment', 'The person opens the Inbox', 'The person taps Not read by agents'],
   result: 'each thread row carries the count of replies not opened and a Not read mark where its agent has not read what was sent, the two filters count the threads they list, the rail ends on Agents (read-only) and Done, and Not read by agents narrows the rail to the one thread' } : null;

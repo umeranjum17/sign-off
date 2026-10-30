@@ -2806,6 +2806,7 @@
     if (listEl && listTop) listEl.scrollTop = listTop;
     listEl?.querySelector('[data-row][aria-current]')?.scrollIntoView({ block: 'nearest' });
     if (!toast.hidden) placeToast();
+    if (inboxAt && moreReady) placeChat();
     if (at === 'reports' && !key) rpRisen = true;
     if (rpSel !== null) rpRisen = true;
     if (inboxAt) readPage(inboxRead, `inbox/${key}`); else readPage(rpFull ? shownReport : key && !(deskSplit && (at === 'evidence' || at === 'reports')) && !(at === 'designs' && !phone()) ? state.decisions.find((d) => d.key === key && !gone.has(d.key) && (at === 'reports' && reads(d) || at === 'designs' && d.kind === 'design' || at === 'evidence' && d.type === 'evidence' || d.type === 'plan' && (area(d) === at || (d.guided && (at === 'waiting' || at === 'answered'))))) : undefined, rpFull ? location.hash.slice(1) : at);
