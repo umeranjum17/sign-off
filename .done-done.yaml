@@ -229,7 +229,8 @@ journeys:
   # A design pick of three Inbox layouts on a throwaway board: listed under Designs, and each option open full screen as a page that runs, at 360, 390, 445, 1280 and 1440 in light and dark.
   design-pick:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/design-pick-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
-  # Decide's counts: a design pick is no ask, so Asks leaves it out and Designs counts it once; each count equals the rows under it, at 390 and 1280, light and dark. The required Designs capture rides in the same run.
+  # Decide's counts: a design pick is no ask, so Asks leaves it out and Designs counts it once; Waiting on you counts both (the hero, dock, sidebar and a desk's subtitle, said as "3 asks · 1 design") with the waiting design as a row above the tabs;
+  # each count equals the rows under it, at 390 and 1280, light and dark. The check on this build and on the base's web files (passes, fails naming both numbers) is kept as text. The required Designs capture rides in the same run.
   decide-counts:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/decide-counts-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A design card whose options carry a demo recording (post --video and --score): the card plays it muted in place on a tap, opens it full screen with the option's round score, and the Designs row shows its first frame; at 390 and 1280, light and dark.
