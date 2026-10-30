@@ -2043,12 +2043,12 @@
   }
   /** A design as a row: its tile (a thumbnail of its first screen), the title, its state and day (or its ticket's bar); it opens the design's review. */
   const designHref = (d) => (isPick(d) ? `#decide/${d.key}` : `#designs/${d.key}`);
-  /** A pick's thumbnail: its first option's mock as it first looks, the running page scaled down in its own frame (it takes no tap, the row opens the card) or the picture itself. */
+  /** A pick's thumbnail: its first option's mock, scaled into the row. Load it eagerly: the small transformed frame must paint even on a phone, where lazy frame scheduling can leave its visible tile empty. */
   function pickThumb(d) {
     const [m] = (d.options ?? []).map((o) => d.mocks?.find((x) => x.value === o.value)).filter((x) => x && x.hash !== null);
     if (!m) return '';
     const [path, query] = m.path.split('?'), url = src(mockUrl(d.key, m.value, path) + (query ? `?${query}` : ''));
-    return el('span', { class: 'pk-thumb', 'aria-hidden': 'true' }, /\.html?$/i.test(path) ? el('iframe', { src: url, title: '', sandbox: 'allow-scripts', tabindex: '-1', loading: 'lazy' }) : el('img', { src: url, alt: '', loading: 'lazy', decoding: 'async' }));
+    return el('span', { class: 'pk-thumb', 'aria-hidden': 'true' }, /\.html?$/i.test(path) ? guardFrame(el('iframe', { src: url, title: '', sandbox: 'allow-scripts', tabindex: '-1', loading: 'eager' }), `thumbnail of ${d.title}`) : el('img', { src: url, alt: '', loading: 'eager', decoding: 'async' }));
   }
   function designRow(d) {
     const t = ticketOf(d);
@@ -2111,8 +2111,8 @@
     const s = dsort === 'priority' ? [...items].sort((x, y) => (priOf(x) ?? 'P9').localeCompare(priOf(y) ?? 'P9')) : items;
     return [...s.filter((d) => sideOf(d) === 'now'), ...s.filter((d) => sideOf(d) === 'later')];
   };
-  /** Whose an ask is, as its row and its sheet name it: its project when it has one, else who asked. */
-  const whoOf = (d) => projectName(d) || (d.type === 'signin' ? d.waits : d.by) || 'Agent';
+  /** A design pick names the design in its header, never its filer's raw key. Other asks name their project or who asked. */
+  const whoOf = (d) => isPick(d) ? plain(d.title) : projectName(d) || (d.type === 'signin' ? d.waits : d.by) || 'Agent';
   /** What an ask carries, as one panel under its question (ui.css): its priority, and the ticket it belongs to (Its ask) with its progress, which opens the ticket's page.
    *  An ask with neither shows no panel: a ticket is only a reference, and a card without one shows nothing more. */
   const askProps = (d) => uiProps(priorityProp(priOf(d)), ticketProp(ticketOf(d), 'Its ask'));

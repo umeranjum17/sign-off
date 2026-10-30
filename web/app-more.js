@@ -1830,7 +1830,7 @@
     if (!d) return screenEmpty('waiting');
     const to = next ? `#decide/${next.key}` : '#waiting';
     skipTo = next && !state.readonly ? to : '';
-    const who = d.type === 'signin' ? d.waits : d.by || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
+    const who = isPick(d) ? whoOf(d) : d.type === 'signin' ? d.waits : d.by || 'Agent', at = d.filed ? ` · ${filedAt(d.filed)}` : '';
     sink.crumb = el('p', { class: 'crumb', dir: 'auto' }, el('b', {}, askKind(d)), ` · ${who}${at}`);
     const gone = xBtn(d, 'Discard', () => (location.hash = to));
     if (gone) { gone.setAttribute('role', 'menuitem'); gone.append(glyph('trash')); }

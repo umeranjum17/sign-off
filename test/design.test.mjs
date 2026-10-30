@@ -2647,6 +2647,59 @@ test('Decide after an ask is replaced under the same key: the pick remembered fr
   proc.kill();
 });
 
+test('Designs phone rows paint real image and page thumbnails, never blank boxes', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-phone-paint'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  writeFileSync(join(dir, 'picture.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844"><path fill="#cf291e" d="M0 0h390v844H0z"/></svg>');
+  writeFileSync(join(dir, 'page.html'), '<!doctype html><style>html,body{margin:0;min-height:100%;background:#cf291e}</style><h1>Actual preview</h1>');
+  const keys = ['fd-wrapper-design', 'inbox-design', 'animation-design'];
+  const items = keys.map((key, i) => ({ key, type: 'design', title: `Which layout should screen ${i + 1} use?`, filer: key,
+    options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], recommend_value: 'a',
+    mocks: [{ value: 'a', path: i ? 'page.html' : 'picture.svg' }, { value: 'b', path: 'page.html' }] }));
+  writeFileSync(file, JSON.stringify({ schema: 2, items }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, capture, close } = await browse(join(dir, 'browser'), 390, 844, true);
+  await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+  await until(async () => await evaluate('document.querySelectorAll(".dz-list > li").length === 3'));
+  // Sample the real compositor output: a white/empty frame, a zero-size frame or a project icon cannot satisfy this check.
+  for (const key of keys) {
+    const painted = async () => {
+      const box = await evaluate(`(() => { const e = document.querySelector('#item-${key} .pk-thumb'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()`);
+      if (!box || box.width < 30 || box.height < 30) return false;
+      const image = await capture(box);
+      let red = 0;
+      for (let i = 0; i < image.data.length; i += 4) if (image.data[i] > 130 && image.data[i] > image.data[i + 1] * 2 && image.data[i] > image.data[i + 2] * 2) red++;
+      return red > image.width * image.height / 2;
+    };
+    await until(painted);
+  }
+  close();
+  proc.kill();
+});
+
+test('opened design headers show a plain title, never a raw filer id, on phone and desktop', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-plain-header'), file = join(dir, 'board.json');
+  mkdirSync(dir);
+  const key = 'fd-wrapper-design', title = 'Which look should the app wrapper get?';
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [{ key, type: 'design', title, filer: key,
+    options: [{ value: 'a', label: 'Studio' }, { value: 'b', label: 'Focus' }], recommend_value: 'a' }] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  for (const width of [390, 1280]) {
+    const { evaluate, close } = await browse(join(dir, `browser-${width}`), width, 844, width === 390);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/${key}`)}`);
+    await until(async () => await evaluate('!!document.querySelector(".ask-sheet .sh-lab, .split-detail .crumb")'));
+    const headers = await evaluate('[...document.querySelectorAll("header, .crumb")].filter(e => e.getBoundingClientRect().height).map(e => e.textContent).join("|")');
+    assert.ok(!headers.includes(key), `screen header exposes raw id ${key}: ${headers}`);
+    assert.ok(headers.includes(title), 'opened design header names the design in plain words');
+    close();
+  }
+  proc.kill();
+});
+
 test('a posted contract design is listed under Designs only, never in Decide or a count of asks until Main promotes it, with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
