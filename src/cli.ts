@@ -14,10 +14,11 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
+import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
 import { homeOf, readAssignee, type Assignee } from './fleet.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
@@ -214,7 +215,7 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and i
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--video <value>=<file>]... [--score <value>=<number>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--attach <file>]... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
@@ -240,6 +241,7 @@ SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session 
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp, 5 MB or less), a --tradeoff line and a --recommend badge.
 One --link <value>=<url> per option (http or https) draws an Open link under that option's mock, outside its sandboxed frame; the option needs a --mock.
+One --video <value>=<file> per option (.mp4 or .webm, 50 MB or less) adds a demo recording beside that option's mock, with one --score <value>=<number> (0 to 100) for its round score; the option needs a --mock, and a score needs its --video. The file is copied byte for byte into evidence/video/ beside the board (never converted or re-encoded) and refused unless it is a real recording. The card plays it muted in place on a tap and opens it full screen with the score, and the Designs row shows its first frame.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
 After the user picks, answers --key <key> --json holds the pick and note; "rounds" holds an ask for another round.
@@ -1053,12 +1055,12 @@ const mockFile = (path: string) => path.split('?')[0];
 const pictureSheet = (html: string) => /<img\b[^>]*\bsrc\s*=\s*["']?data:image\//i.test(html) && !/<(script|a|button|input|select|textarea|form|details|svg|canvas|iframe|video|audio)\b|\son[a-z]+\s*=|:target/i.test(html);
 /** Posts an item. `raise` is the alias for `post --type decision`: same flags as before, same output. */
 function post(args: string[], cmd = 'post') {
-  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true },
+  const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true }, video: { type: 'string', multiple: true }, score: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
   const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
-  const given = [...RAISE_FIELDS, 'type', 'purpose', 'project', 'tradeoff', 'mock', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
+  const given = [...RAISE_FIELDS, 'type', 'purpose', 'project', 'tradeoff', 'mock', 'video', 'score', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
   const optionLinks: string[] = values.link ?? [];
   if (values.type !== 'design' && optionLinks.length) values.link = optionLinks.at(-1);
@@ -1088,7 +1090,7 @@ function post(args: string[], cmd = 'post') {
   if (!['decision', 'design', 'evidence', 'diagram', 'interactive', 'explainer'].includes(type)) throw fail(`--type must be decision, design, evidence, diagram, interactive, explainer, report or signin`, 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'evidence' || type === 'explainer') return postMedia(file, named, on, values, type, filer);
   if (values.media !== undefined || values.attach !== undefined || (type !== 'design' && values.link !== undefined) || values.chapter !== undefined) throw fail('--media, --attach, --link and --chapter need --type evidence or explainer (--link also goes on --type design, one per option)', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined)) throw fail('--tradeoff and --mock need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
+  if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined || values.video !== undefined || values.score !== undefined)) throw fail('--tradeoff, --mock, --video and --score need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer);
@@ -1125,9 +1127,58 @@ function post(args: string[], cmd = 'post') {
     const value = m.slice(0, at), link = optionLinks.find((l) => l.startsWith(`${value}=`));
     return { value, path, ...(link && { link: link.slice(value.length + 1) }) };
   });
+  const demos = designDemos(values.video ?? [], values.score ?? [], mocks, root);
+  if (mocks) for (const m of mocks) { const demo = demos.get(m.value); if (demo) (m as MockRef).video = demo(); }
   const lost = optionLinks.find((l) => !mocks?.some((m: { value: string }) => l.startsWith(`${m.value}=`)));
   if (type === 'design' && lost !== undefined) throw fail(`--link ${lost} must be <value>=<url> with a --mock for that value`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --link a=https://example.com/a --recommend a');
   return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
+}
+
+/** --video <value>=<file> and --score <value>=<number>: each option's demo recording and its round score. Checked before anything is copied; the returned
+ * function copies the recording, byte for byte, to evidence/video/<hash>.<ext> beside the board (a name made of its own hash, so no two options clash) and gives the pinned ref. */
+function designDemos(videos: string[], scores: string[], mocks: { value: string }[] | undefined, root: string): Map<string, () => DemoRef> {
+  const example = 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --video a=demo-a.mp4 --score a=8.5 --recommend a';
+  const pair = (flag: string, x: string) => {
+    const at = x.indexOf('=');
+    if (at < 1) throw fail(`--${flag} ${x} must be <value>=<${flag === 'video' ? 'file' : 'number'}>`, 'VALIDATION_ERROR', example);
+    return [x.slice(0, at), x.slice(at + 1)] as const;
+  };
+  const files = new Map<string, string>(), points = new Map<string, number>();
+  for (const x of videos) {
+    const [value, path] = pair('video', x);
+    if (files.has(value)) throw fail(`--video for ${value} is given twice`, 'VALIDATION_ERROR', 'One --video per option');
+    files.set(value, path);
+  }
+  for (const x of scores) {
+    const [value, text] = pair('score', x);
+    if (points.has(value)) throw fail(`--score for ${value} is given twice`, 'VALIDATION_ERROR', 'One --score per option');
+    if (!/^\d{1,3}(\.\d{1,2})?$/.test(text) || Number(text) > 100) throw fail(`--score ${x} must be a number from 0 to 100`, 'VALIDATION_ERROR', 'Give the option\'s round score, such as --score a=8.5');
+    points.set(value, Number(text));
+  }
+  for (const value of [...files.keys(), ...points.keys()]) {
+    if (!mocks?.some((m) => m.value === value)) throw fail(`--video and --score ${value} need a --mock for that value`, 'VALIDATION_ERROR', example);
+  }
+  for (const value of points.keys()) if (!files.has(value)) throw fail(`--score ${value} needs a --video for that value: the score is shown with the recording`, 'VALIDATION_ERROR', example);
+  const out = new Map<string, () => DemoRef>();
+  for (const [value, name] of files) {
+    const ext = extname(name).toLowerCase(), path = resolve(root, name);
+    if (ext !== '.mp4' && ext !== '.webm') throw fail(`--video ${name} must end in .mp4 or .webm`, 'VALIDATION_ERROR', 'Post the recording as it was made; sign-off never converts it');
+    if (!path.startsWith(root + sep)) throw fail(`--video ${name} escapes the board folder`, 'VALIDATION_ERROR', 'Keep the recording next to the board file');
+    let info: Stats | undefined;
+    try { info = statSync(path, { throwIfNoEntry: false }); } catch (e: any) { throw fail(`--video ${name} ${reasonOf(e.code)}`, 'NOT_FOUND', 'Name a recording that is there'); }
+    if (!info?.isFile()) throw fail(`--video ${name} is not a file there`, 'NOT_FOUND', 'Paths are relative to the board file\'s folder');
+    if (info.size > MEDIA_BYTES) throw fail(`--video ${name} is over 50 MB`, 'VALIDATION_ERROR', 'Trim the recording');
+    const bytes = readFileSync(path);
+    if (!isRecording(bytes, ext)) throw fail(`--video ${name} is not a real ${ext.slice(1)} recording`, 'VALIDATION_ERROR', 'Name the recording itself, not a renamed picture or text file');
+    const hash = sha256(bytes);
+    out.set(value, () => {
+      const rel = `evidence/video/${hash.slice(0, 16)}${ext}`, dest = join(root, rel);
+      mkdirSync(dirname(dest), { recursive: true, mode: 0o700 });
+      writeFileSync(dest, bytes, { mode: 0o600 });
+      return { path: rel, sha256: hash, bytes: bytes.length, ...(points.has(value) && { score: points.get(value) }) };
+    });
+  }
+  return out;
 }
 
 const SIGNIN_FIELDS = ['service', 'unlocks', 'waits', 'expires', 'start'];
@@ -2671,6 +2722,7 @@ async function exportBoard(args: string[]) {
     // A diagram or an interactive page is the item's own view, inlined the same way.
     if (d.view) await inline(at(d.key, '', d.view), undefined, true);
     if (d.preview) await inline(at(d.key, '', d.preview));
+    for (const m of d.mocks ?? []) if (m.video) await inline(`/api/media?key=${q(d.key)}&video=${q(m.value)}`);
     for (const [i, m] of (d.media ?? []).entries()) for (const v of ['', ...['light', 'thumb', 'tile'].filter((v) => m[v as 'light'])]) await inline(`/api/media?key=${q(d.key)}&i=${i}${v && `&v=${v}`}`);
     for (const m of d.evidenceCard?.media ?? []) await inline(m.url);
   }
@@ -3210,7 +3262,9 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url?.startsWith('/api/media?')) {
     const q = new URL(req.url, 'http://localhost').searchParams;
     // v=light, v=thumb or v=tile asks for the copy post made of a still; with no v, the file as it was posted.
-    const v = q.get('v'), posted = loadDecisions(file).find((d) => d.key === q.get('key'))?.media?.[Number(q.get('i') || NaN)];
+    // video=<value> asks for that option's demo recording, which a design card carries beside its mock.
+    const v = q.get('v'), card = loadDecisions(file).find((d) => d.key === q.get('key')), demo = q.get('video');
+    const posted: MediaRef | undefined = demo === null ? card?.media?.[Number(q.get('i') || NaN)] : card?.mocks?.find((m) => m.value === demo)?.video;
     const m = v === null ? posted : v === 'light' || v === 'thumb' || v === 'tile' ? posted?.[v] : undefined, type = m && mediaTypes[extname(m.path).toLowerCase()];
     if (!m || !type) return [404, { error: 'Evidence is unavailable' }];
     try {

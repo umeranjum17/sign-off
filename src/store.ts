@@ -4,7 +4,9 @@ import { createHash, randomBytes } from 'node:crypto';
 
 export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
-export type MockRef = { value: string; path: string; link?: string };
+export type MockRef = { value: string; path: string; link?: string; video?: DemoRef };
+/** A demo recording (mp4 or webm) of an option, copied by post to evidence/video/<hash>.<ext>, pinned by its hash, with the option's round score. Never re-encoded. */
+export type DemoRef = { path: string; sha256: string; bytes: number; score?: number };
 export type MediaRef = { path: string; sha256: string; bytes: number; light?: CopyRef; thumb?: CopyRef; tile?: CopyRef };
 /** A smaller copy of a still that post made beside it (evidence/<number>/<n>-light.jpg, -thumb.png or -tile.jpg): the board shows it in place of the original. */
 export type CopyRef = { path: string; sha256: string; bytes: number; width: number; height: number };
@@ -297,6 +299,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
         throw bad('mocks', 'must list up to 6 items, each an option value and a board-relative mock path (an .html page may end in ?variant=<name>)');
       }
       if (!d.mocks.every((m: any) => m.link === undefined || (isText(m.link) && HTTP_LINK.test(m.link)))) throw bad('mocks', 'a link must be an http(s) link with no spaces');
+      if (!d.mocks.every((m: any) => m.video === undefined || (/^evidence\/video\/[0-9a-f]{16}\.(mp4|webm)$/.test(m.video?.path) && /^[0-9a-f]{64}$/.test(m.video.sha256) && Number.isInteger(m.video.bytes) && m.video.bytes > 0
+        && (m.video.score === undefined || (Number.isFinite(m.video.score) && m.video.score >= 0 && m.video.score <= 100))))) throw bad('mocks', 'a video must be an evidence/video/<hash>.mp4 or .webm file with its sha256, bytes and an optional score from 0 to 100: post writes it with --video and --score');
       const targets = d.mocks.map((m: MockRef) => m.value);
       if (new Set(targets).size < targets.length) throw bad('mocks', 'option values must be unique');
       for (const m of d.mocks) if (!values.includes(m.value)) throw bad('mocks', `value ${m.value} is not one of ${values.join(', ')}`);
@@ -305,7 +309,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       key: d.key, title: d.title, about: d.about, detail: d.detail, options: options.map((o: Option) => ({ value: o.value, label: o.label, ...(o.outcome && { outcome: o.outcome }) })),
       ...(d.ask_ref !== undefined && { ask_ref: d.ask_ref }), ...(d.why && { why: d.why }), ...(d.recommend_reason && { recommend_reason: d.recommend_reason }), ...(d.silent_by && { silent_by: d.silent_by }), ...(d.merges && { merges: [...d.merges] }), ...(d.proof && { proof: d.proof }), ...(d.report && { report: d.report }),
       recommend_value: d.recommend_value, default_if_silent: d.default_if_silent, close: d.close ?? 'done', evidence: d.evidence,
-      type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }) })),
+      type: plan ? 'plan' : d.type ?? 'decision', tradeoff: d.tradeoff, link: d.link, mocks: d.mocks?.map((m: MockRef) => ({ value: m.value, path: m.path, ...(m.link !== undefined && { link: m.link }), ...(m.video && { video: { path: m.video.path, sha256: m.video.sha256, bytes: m.video.bytes, ...(m.video.score !== undefined && { score: m.video.score }) } }) })),
       ...(views && { view: d.view }), ...(report && views && { preview: d.preview }), ...(d.reply && { reply: true }), ...(d.filer && { filer: d.filer }), ...(d.ticket && { ticket: d.ticket }), ...(d.priority && { priority: d.priority }), ...(d.guard && { guard: d.guard }), ...(d.area && { area: d.area }),
       ...(signin && { unlocks: d.unlocks, waits: d.waits, ...(d.expires && { expires: d.expires }), ...(d.start && { start: [...d.start] }) }),
       ...(d.group && { group: d.group }), ...(d.filed && { filed: d.filed }), ...(d.decided && { decided: d.decided }),

@@ -190,7 +190,10 @@ New guided defaults use plan schema 3 / report schema 5, contract 1, with a requ
 - `mocks`: optional on design items, up to 6 entries of an option `value`, a
   `path` to a mock file (`.html`, `.svg`, `.png`, `.jpg`, `.jpeg`, `.webp`, 5 MB or less), relative to the board file's folder, and an optional `link` (http or
   https, no spaces, 500 characters or fewer) drawn as an Open live link under that option's mock,
-  outside its sandboxed frame. Each value must
+  outside its sandboxed frame, and an optional `video` (`path`, `sha256`, `bytes` and an optional `score` from 0 to 100, the option's round score;
+  `post --video <value>=<file>` and `--score <value>=<number>` write it): a demo recording, `.mp4` or `.webm` and 50 MB or less, which `post` checks is a real recording and
+  copies byte for byte (never converted) to `evidence/video/<hash>.<ext>` beside the board. The card plays it muted in place on a tap and opens it full screen with the score, the Designs row
+  uses its first frame, and the board serves only that file while it still has its hash. A card without `video` works as it did. Each value must
   name one of the item's own options. Served only from inside that folder. An
   `.html` path may end in `?variant=<name>` (1-64 of `A-Z a-z 0-9 . _ -`): the
   page is loaded with that query, so one page can show each variant. An `.html`

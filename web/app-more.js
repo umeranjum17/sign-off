@@ -216,6 +216,46 @@
       state.readonly || FROZEN || !(d.options.length || d.reply) ? '' : verdicts(d)));
   }
 
+  const withScore = (score) => (score === undefined ? '' : el('span', { class: 'demo-score' }, el('small', {}, 'Round score'), el('b', {}, String(score))));
+  /** The demo under an option's mock: a tap plays it muted in place, Full screen opens it with the score. */
+  function demoBlock(d, o) {
+    const demo = demoOf(d, o.value);
+    if (!demo) return '';
+    const video = el('video', { src: still(demo.url), muted: '', playsinline: '', loop: '', preload: 'metadata', 'aria-label': `Demo, ${o.label}` });
+    video.muted = true;
+    const play = el('button', { class: 'demo-play', type: 'button', 'aria-label': `Play demo, ${o.label}` }, gic('play'));
+    const stage = el('div', { class: 'demo-stage' }, video, play);
+    play.onclick = () => (video.paused ? video.play().catch(() => {}) : video.pause());
+    video.onclick = play.onclick;
+    video.onplay = () => { stage.classList.add('playing'); play.setAttribute('aria-label', `Pause demo, ${o.label}`); };
+    video.onpause = () => { stage.classList.remove('playing'); play.setAttribute('aria-label', `Play demo, ${o.label}`); };
+    const full = el('button', { class: 'demo-full-open', type: 'button', 'aria-label': `Open demo full screen, ${o.label}`, 'data-demo': `${d.key}~${o.value}` }, glyph('expand'), 'Full screen');
+    full.onclick = () => { video.pause(); openDemo(d, o, full.dataset.demo); };
+    return el('figure', { class: 'demo' }, el('figcaption', { dir: 'auto' }, o.label), stage, el('div', { class: 'demo-bar' }, withScore(demo.score), full));
+  }
+  /** The demos of a card's options, the recommended first, under its mocks: nothing for a card with none. */
+  function demoRow(d) {
+    const blocks = [...d.options].sort((a, b) => (b.value === d.recommend_value) - (a.value === d.recommend_value)).map((o) => demoBlock(d, o)).filter(Boolean);
+    return blocks.length ? el('div', { class: 'demos', role: 'group', 'aria-label': `Demos, ${d.title}` }, ...blocks) : '';
+  }
+  /** The demo full screen over the whole viewport, with its option and round score in the bar; Close (or Escape) goes back to the card. */
+  function openDemo(d, o, from) {
+    const demo = demoOf(d, o.value);
+    const video = el('video', { src: demo.url, controls: '', muted: '', autoplay: '', playsinline: '', 'aria-label': `Demo, ${o.label}` });
+    video.muted = true;
+    const close = el('button', { class: 'pf-close', type: 'button', 'aria-label': 'Close demo' }, glyph('x'), 'Close');
+    const dialog = el('dialog', { class: 'proto-full demo-full', 'aria-labelledby': 'demo-title' },
+      el('header', { class: 'pf-bar' }, el('div', { class: 'pf-top' }, close, el('h2', { id: 'demo-title', tabindex: '-1', autofocus: '', dir: 'auto' }, o.label), withScore(demo.score))),
+      el('div', { class: 'demo-view' }, video));
+    const shut = () => {
+      if (!dialog.isConnected) return;
+      dialog.close(); dialog.remove();
+      document.querySelector(`[data-demo="${CSS.escape(from)}"]`)?.focus({ preventScroll: true });
+    };
+    close.onclick = shut; dialog.onclose = shut;
+    document.body.append(dialog); dialog.showModal();
+  }
+
   /** One proof on a desk, as the prototype's open proof: its project and time across, then its title in full and its capture on the left; beside them its panel
    *  (done-done's word, its priority, the ask it serves, its pull request), what it says, the verdict and its Activity. */
   function openFull(d, value, from) {
@@ -1888,7 +1928,7 @@
     if (askLater) askLater.onclick = later;
     const lead = el('div', { class: 'lead' }, badge(d), el('h2', { id: 'ask-title', class: 'dt', tabindex: '-1', dir: 'auto' }, name), d.filed && !given ? el('p', { class: 'since' }, `Waiting on you since ${day(d.filed)} ${hhmm(d.filed)}`) : '');
     // What it carries (Priority, Its ask) sits right under when it was asked, as the prototype's sheet has it; then why, its preview and its proof.
-    const about = [askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? fullButton(d) : '') : '',
+    const about = [askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? demoRow(d) : '', cards ? fullButton(d) : '') : '',
       ...(d.mocks?.length ? [annotations(d)] : []), proofLine];
     const picks = done || !(live && opts.length) ? [] : [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
       ownRow ? el('li', {}, ownRow) : ''), ownRow ? el('div', { class: 'own-field' }, el('div', {}, ownBox)) : ''];
