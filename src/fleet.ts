@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { TICKET_KEY } from './store.js';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
@@ -55,21 +56,44 @@ export const homeOf = (named?: string) => {
   return raw === '~' ? homedir() : raw.startsWith('~/') ? join(homedir(), raw.slice(2)) : raw;
 };
 
+/** What a ticket's task record says beyond who works on it: the kind of work it is and, while it is held, the words that say why. */
+export type TaskRecord = { assignee?: Assignee; type?: string; key?: string; hold_reason?: string };
+/** Why a task is held, from the last line of its status file that says so (`paused [at=…]: waiting on review`, `blocked: …`, `needs-decision: …`): the words after the colon, and nothing when the file has no such line. */
+export function holdReasonOf(status: string | undefined): string | undefined {
+  const line = (status ?? '').split(/\r?\n/).filter(Boolean).at(-1);
+  const m = line && /^(?:paused|blocked|needs-decision|hold)\b[^:]*:\s*(.+)$/i.exec(line.trim());
+  const why = m?.[1]?.trim();
+  return why ? why.replace(/\s*\(key=[^)]*\)\s*$/, '').slice(0, 160) : undefined;
+}
 /** The assignee of a ticket from <home>/state/<id>.meta, or undefined when there is no home, no record or no usable id. Read only: it never writes a file and runs nothing.
  * The task is live when its record names an endpoint (window= or endpoint:), no <id>.exit marks it ended, and its last status line is not done or failed. */
 export function readAssignee(home: string | undefined, id: string): Assignee | undefined {
+  return readTask(home, id)?.assignee;
+}
+/** Everything a ticket's task record says that the board shows: who works on it (see readAssignee), the kind of work it is, and why it is held. */
+export function readTask(home: string | undefined, id: string): TaskRecord | undefined {
   if (!home || !/^[\w.-]{1,128}$/.test(id) || id.startsWith('.')) return undefined;
   const state = join(home, 'state'), meta = read(join(state, `${id}.meta`));
   if (meta === undefined) return undefined;
-  const rec = lines(meta), harness = rec.get('harness'), model = rec.get('model');
-  const last = (read(join(state, `${id}.status`)) ?? '').split(/\r?\n/).filter(Boolean).at(-1)?.split(/[\s:[]/)[0]?.toLowerCase();
+  const rec = lines(meta), harness = rec.get('harness'), model = rec.get('model'), status = read(join(state, `${id}.status`));
+  const last = (status ?? '').split(/\r?\n/).filter(Boolean).at(-1)?.split(/[\s:[]/)[0]?.toLowerCase();
   const live = !!(rec.get('window') || rec.get('endpoint')) && !existsSync(join(state, `${id}.exit`)) && last !== 'done' && last !== 'failed';
   const tool = harness ? TOOLS[harness.toLowerCase()] : undefined, family = model ? modelOf(model) : undefined;
+  // What kind of work it is, as the record names it; the board reads the words it knows and leaves the rest to its ticket line.
+  const kind = (rec.get('type') || rec.get('kind') || '').toLowerCase();
+  // The ticket's readable name, when the lead that owns the task gives one (key= or ticket_key=); the ticket's own line wins over it.
+  const key = (rec.get('key') || rec.get('ticket_key') || '').trim().toUpperCase();
+  const hold_reason = holdReasonOf(status);
   return {
-    lead: rec.get('lead') || rec.get('owner') || (rec.get('project') ? basename(rec.get('project')!.replace(/[\\/]+$/, '')) : '') || (home ? basename(home.replace(/[\\/]+$/, '')) : '') || 'Fleet lead',
-    ...(live && { worker: workerTitle(rec.get('endpoint_task_id') || id, rec.get('title')), worker_id: rec.get('endpoint_task_id') || id }),
-    ...(family && { model: family.label, model_logo: family.logo }),
-    ...(harness && { tool: tool ? tool[0] : harness, tool_logo: logo(tool ? tool[1] : GENERIC) }),
-    live,
+    assignee: {
+      lead: rec.get('lead') || rec.get('owner') || (rec.get('project') ? basename(rec.get('project')!.replace(/[\\/]+$/, '')) : '') || (home ? basename(home.replace(/[\\/]+$/, '')) : '') || 'Fleet lead',
+      ...(live && { worker: workerTitle(rec.get('endpoint_task_id') || id, rec.get('title')), worker_id: rec.get('endpoint_task_id') || id }),
+      ...(family && { model: family.label, model_logo: family.logo }),
+      ...(harness && { tool: tool ? tool[0] : harness, tool_logo: logo(tool ? tool[1] : GENERIC) }),
+      live,
+    },
+    ...(kind && { type: kind }),
+    ...(TICKET_KEY.test(key) && { key }),
+    ...(hold_reason && { hold_reason }),
   };
 }

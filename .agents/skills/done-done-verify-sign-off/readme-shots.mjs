@@ -38,7 +38,7 @@ try {
   tk('T-42', 'Settings on a phone', 'sign-off', ['--parent', 'T-41', '--progress', '100', '--state', 'done', '--pr', 'https://github.com/umeranjum17/sign-off/pull/239']);
   tk('T-43', 'Theme in one tap', 'sign-off', ['--parent', 'T-41', '--progress', '40']);
   tk('T-44', 'Export settings as a file', 'sign-off', ['--parent', 'E-1', '--progress', '0', '--state', 'queued']);
-  tk('T-12', 'Push service for the beta', 'Beacon', ['--progress', '30', '--priority', 'P2', '--hold', 'yes', '--state', 'on hold']);
+  tk('T-12', 'Push service for the beta', 'Beacon', ['--progress', '30', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the beta push', '--state', 'on hold']);
   tk('T-7', 'Tide table on the harbor screen', 'Harbor', ['--asked', 'yes', '--progress', '60']);
   const raise = (key, filer, ticket, title, why, outcomes, extra = []) => so('raise', board, '--ask-ref', 'readme-demo', '--filer', filer, '--ticket', ticket, '--key', key, '--title', title, '--why', why,
     ...outcomes.flatMap((o) => ['--outcome', o]), ...extra);

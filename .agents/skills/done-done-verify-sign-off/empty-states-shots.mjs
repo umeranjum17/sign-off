@@ -83,7 +83,7 @@ try {
   const later = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-a', '--release', 'later']);
   facts.twin = { status: twin.status, said: (twin.stdout + twin.stderr).trim() }; facts.later = { status: later.status, said: (later.stdout + later.stderr).trim() };
   T('mig-a', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--release', 'v1.4');
-  for (const [id, title, p, project, progress, flags] of [['bill-1', 'The billing page shows when the plan renews', 'P1', 'billing', '40', []], ['bill-2', 'Refunds in two taps from the invoice', 'P2', 'billing', '0', ['--hold', 'yes']],
+  for (const [id, title, p, project, progress, flags] of [['bill-1', 'The billing page shows when the plan renews', 'P1', 'billing', '40', []], ['bill-2', 'Refunds in two taps from the invoice', 'P2', 'billing', '0', ['--hold', 'yes', '--hold-reason', 'waiting on the billing copy']],
     ['docs-1', 'A changelog page that lists each release', 'P3', 'docs', '100', []], ['old-1', 'Archive the 2025 invoice export', 'P3', 'docs', '0', []]]) T(id, title, '--priority', p, '--project', project, '--progress', progress, '--asked', 'yes', ...flags);
   // old-1 was last written long ago and 205 newer tickets came after it: the feed keeps the newest 200 events, so it holds none of old-1's.
   const lines = readFileSync(`${board.replace(/\.json$/, '')}.tickets.jsonl`, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((t) => (t.id === 'old-1' ? { ...t, at: '2025-01-02T09:00:00.000Z' } : t));

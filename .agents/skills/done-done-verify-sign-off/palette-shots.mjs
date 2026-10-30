@@ -74,7 +74,7 @@ try {
   // Tickets for the Tickets screen and a ticket's sheet (an epic, a P0 ticket under it, one on hold, a done system one), and a P0 ask and a P1 report on them.
   const so = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args]), board = join(dir, 'board.json');
   for (const args of [['--id', 'T-9', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0'],
-    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--asked', 'yes'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) so('ticket', board, ...args);
+    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the release notes', '--asked', 'yes'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) so('ticket', board, ...args);
   so('post', board, '--ask-ref', 'message-feel', '--ticket', 'T-29', '--priority', 'P0', '--key', 'friday', '--title', 'Ship the settings page on Friday?', '--why', 'Support is fully staffed on Friday.', '--outcome', 'yes=It ships Friday.', '--outcome', 'no=It waits a week.',
     '--recommend', 'yes', '--recommend-reason', 'Support is on hand.', '--default', 'no');
   const reportKey = JSON.parse(readFileSync(board, 'utf8')).items.filter((i) => i.kind === 'report').at(-1).key;

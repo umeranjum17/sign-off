@@ -34,7 +34,7 @@ async function serve(...flags) {
 // An epic with two tickets under it (one with a sub-task), and a card that names one of them.
 axi('ticket', board, '--id', 'E-1', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes');
 axi('ticket', board, '--id', 'T-1', '--title', 'Build the page', '--progress', '40', '--parent', 'E-1');
-axi('ticket', board, '--id', 'T-2', '--title', 'Publish it', '--progress', '80', '--parent', 'E-1', '--hold', 'yes');
+axi('ticket', board, '--id', 'T-2', '--title', 'Publish it', '--progress', '80', '--parent', 'E-1', '--hold', 'yes', '--hold-reason', 'waiting on the review');
 axi('ticket', board, '--id', 'S-1', '--title', 'Wire the save button', '--progress', '20', '--parent', 'T-1');
 axi('raise', board, '--title', 'Ship the settings page on Friday?', '--why', 'The page is ready and the release goes out Friday.', '--outcome', 'yes=It ships on Friday.', '--outcome', 'no=It waits.',
   '--recommend', 'yes', '--recommend-reason', 'Every check passed.', '--default', 'no', '--ask-ref', 'message-test', '--ticket', 'T-1');
@@ -66,21 +66,65 @@ test('the ticket API lists every ticket with its roll-up and reads one with its 
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets`, { method: 'POST', body: '{}' })).status, 404);
 });
 
+// A ticket's own additions (a hold that says why, a readable key, a description) are proved on a board of their own, so this file's other reads stay exact.
+const own = () => { const file = join(scratch, 'tickets-own.json'); if (!readFileSync(file, 'utf8').includes('"schema"')) writeFileSync(file, '{"schema":2,"items":[]}\n'); return file; };
+writeFileSync(join(scratch, 'tickets-own.json'), '{"schema":2,"items":[]}\n');
+
+test('a hold says why: recording one without a reason is refused, and releasing it drops the reason', () => {
+  const file = own();
+  // A refusal prints its reason on stdout, as every CLI refusal does, so the test reads both streams.
+  const refused = (args) => { try { axi('ticket', file, ...args); return null; } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? '') + String(e.message); } };
+  assert.match(refused(['--id', 'H-1', '--title', 'Held work', '--hold', 'yes']), /a hold needs --hold-reason/);
+  assert.match(refused(['--id', 'H-2', '--title', 'Held work', '--state', 'on hold']), /a hold needs --hold-reason/);
+  assert.equal(JSON.parse(axi('ticket', file, '--json')).tickets.some((t) => t.id === 'H-1' || t.id === 'H-2'), false);
+  // A hold with its words is stored, and a write that leaves the hold alone is never refused.
+  axi('ticket', file, '--id', 'H-3', '--title', 'Held with a reason', '--hold', 'yes', '--hold-reason', 'waiting for the marketing copy');
+  assert.equal(JSON.parse(axi('ticket', file, '--id', 'H-3', '--json')).ticket.hold_reason, 'waiting for the marketing copy');
+  axi('ticket', file, '--id', 'H-3', '--progress', '10');
+  assert.equal(JSON.parse(axi('ticket', file, '--id', 'H-3', '--json')).ticket.hold_reason, 'waiting for the marketing copy');
+  // An old board's hold with no words of its own keeps working, and takes the reason its task record gives.
+  appendFileSync(join(scratch, 'tickets-own.tickets.jsonl'), JSON.stringify({ id: 'H-4', title: 'Held before reasons', progress: 0, hold: true, at: new Date().toISOString() }) + '\n');
+  mkdirSync(join(scratch, 'fleet', 'state'), { recursive: true });
+  writeFileSync(join(scratch, 'fleet', 'state', 'H-4.meta'), 'window=w1:p1\nharness=pi\nmodel=claude-sonnet-5-5\nkey=JG-404\n');
+  writeFileSync(join(scratch, 'fleet', 'state', 'H-4.status'), 'paused [at=1]: waiting for a test account (key=store-review)\n');
+  const fed = JSON.parse(execFileSync(process.execPath, [cli, 'ticket', file, '--json'], { env: { ...env, SIGN_OFF_FLEET_HOME: join(scratch, 'fleet') }, encoding: 'utf8' })).tickets.find((t) => t.id === 'H-4');
+  assert.deepEqual([fed.hold, fed.hold_reason, fed.key], [true, 'waiting for a test account', 'JG-404']);
+  // Releasing it drops the words with it.
+  axi('ticket', file, '--id', 'H-3', '--hold', 'no');
+  assert.equal(JSON.parse(axi('ticket', file, '--id', 'H-3', '--json')).ticket.hold_reason ?? null, null);
+});
+
+test('a ticket carries a readable key and a description, each held to its own shape', () => {
+  const file = own();
+  const refused = (args) => { try { axi('ticket', file, ...args); return null; } catch (e) { return String(e.stdout ?? '') + String(e.stderr ?? '') + String(e.message); } };
+  assert.match(refused(['--id', 'K-1', '--title', 'Bad key', '--key', 'jg-1']), /key must be a readable name such as JG-101/);
+  assert.match(refused(['--id', 'K-1', '--title', 'Bad key', '--key', 'JG-']), /key must be a readable name/);
+  axi('ticket', file, '--id', 'K-2', '--title', 'Keyed work', '--key', 'JG-102', '--type', 'bug',
+    '--description', 'One line of summary.\n# What ships\n- the page\n> The captain: keep it small\nSee [the notes](https://example.com/notes)');
+  const t = JSON.parse(axi('ticket', file, '--id', 'K-2', '--json')).ticket;
+  assert.deepEqual([t.key, t.type, t.description.includes('# What ships')], ['JG-102', 'bug', true]);
+  assert.match(refused(['--id', 'K-2', '--type', 'chore']), /type must be one of epic, ticket, bug, decision, evidence, merge/);
+  // An empty value takes either field off, as every optional ticket field does.
+  axi('ticket', file, '--id', 'K-2', '--key', '', '--description', '');
+  const after = JSON.parse(axi('ticket', file, '--id', 'K-2', '--json')).ticket;
+  assert.deepEqual([after.key ?? null, after.description ?? null], [null, null]);
+});
+
 test('ticket lifecycle activity and hold release use effective progress', async () => {
-  axi('ticket', board, '--id', 'E-2', '--title', 'Release epic', '--hold', 'yes', '--state', 'on hold');
+  axi('ticket', board, '--id', 'E-2', '--title', 'Release epic', '--hold', 'yes', '--hold-reason', 'waiting on the review', '--state', 'on hold');
   axi('ticket', board, '--id', 'T-3', '--title', 'Release child', '--progress', '40', '--parent', 'E-2');
   const comment = JSON.stringify({ id: 'release-reply', at: 1792820000, text: 'Which date?', picked: 1792820100, replies: [{ at: 1792820200, text: 'Friday' }] });
   axi('ticket', board, '--id', 'E-2', '--comment', comment);
   const released = JSON.parse(axi('ticket', board, '--id', 'E-2', '--json')).ticket;
   assert.deepEqual([released.hold, released.state], [false, 'in progress']);
 
-  axi('ticket', board, '--id', 'T-6', '--title', 'Reply to the release note', '--hold', 'yes');
+  axi('ticket', board, '--id', 'T-6', '--title', 'Reply to the release note', '--hold', 'yes', '--hold-reason', 'waiting on the review');
   const replayComment = { id: 'reply-once', at: 1792820000, text: 'Which date?', replies: [] };
   axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820100 }));
   const reply = { at: 1792820200, text: 'Friday' };
   axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820300, replies: [reply] }));
   assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, false);
-  axi('ticket', board, '--id', 'T-6', '--hold', 'yes');
+  axi('ticket', board, '--id', 'T-6', '--hold', 'yes', '--hold-reason', 'waiting on the review');
   axi('ticket', board, '--id', 'T-6', '--comment', JSON.stringify({ ...replayComment, picked: 1792820400, replies: [reply] }));
   assert.equal(JSON.parse(axi('ticket', board, '--id', 'T-6', '--json')).ticket.hold, true);
 

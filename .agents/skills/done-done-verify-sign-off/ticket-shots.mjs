@@ -57,14 +57,14 @@ try {
   so('ticket', board, '--id', 'T-31', '--title', 'Ship the settings release', '--stage', 'queued');
   so('ticket', board, '--id', 'T-31', '--stage', 'building', '--progress', '25');
   so('ticket', board, '--id', 'T-31', '--stage', 'review', '--progress', '60');
-  so('ticket', board, '--id', 'T-31', '--hold', 'yes');
+  so('ticket', board, '--id', 'T-31', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('ticket', board, '--id', 'T-31', '--stage', 'done', '--progress', '100');
   so('ticket', board, '--id', 'T-31', '--stage', '');
-  so('ticket', board, '--id', 'T-32', '--title', 'Choose the rollout date', '--hold', 'yes');
+  so('ticket', board, '--id', 'T-32', '--title', 'Choose the rollout date', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('raise', board, '--ticket', 'T-32', '--key', 'hold-answer', '--title', 'When should the rollout ship?', '--why', 'Choose the rollout date.', ...ask);
   so('ticket', board, '--id', 'T-33', '--title', 'Validate ticket sync', '--stage', 'queued', '--progress', '25');
   so('ticket', board, '--id', 'T-33', '--stage', 'building');
-  so('ticket', board, '--id', 'T-33', '--hold', 'yes');
+  so('ticket', board, '--id', 'T-33', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('ticket', board, '--id', 'T-33', '--hold', 'no');
   so('ticket', board, '--id', 'T-33', '--stage', 'done', '--progress', '100');
   so('raise', board, '--ticket', 'T-29', '--key', 'settings-friday', '--title', 'Ship the settings page on Friday?', '--why', 'It is built and checked on a phone; the release goes out Friday.', ...ask);

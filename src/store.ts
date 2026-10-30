@@ -631,9 +631,14 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
   });
   return [...promoted];
 }
+/** What a row on the Tickets screen is. epic, ticket and bug are tickets; decision, evidence and merge are the cards and pull requests a ticket links to. A ticket with tickets under it is an epic whatever its type says. */
+export const TICKET_TYPES = ['epic', 'ticket', 'bug', 'decision', 'evidence', 'merge'] as const;
+export type TicketType = (typeof TICKET_TYPES)[number];
+/** A ticket's readable name: a short prefix and a number, as `JG-101`, which rows, the sheet and search show in place of the id's long slug. */
+export const TICKET_KEY = /^[A-Z][A-Z0-9]{1,9}-\d{1,6}$/;
 /** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
  * Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** Who wrote this line (a tool or agent id passed with --filer), kept only when one was given. */ by?: string; at: string };
+export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** What the row is: epic, ticket, bug, decision, evidence or merge. Absent reads as a ticket, or an epic once it has tickets under it. */ type?: TicketType; /** Why the ticket is on hold, as written when the hold was recorded: a hold without one is refused. */ hold_reason?: string; /** The readable name a row, the sheet and search show in place of the id's slug (JG-101); absent falls back to the slug. */ key?: string; /** The ticket's description as the sheet draws it: a summary paragraph, then headings, lists, links and quotes; no structure reads as plain text. */ description?: string; /** Who wrote this line (a tool or agent id passed with --filer), kept only when one was given. */ by?: string; at: string };
 /** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
 export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
 /** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
@@ -649,12 +654,20 @@ export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z
   : t.last_event_at !== undefined && !(Number.isSafeInteger(t.last_event_at) && t.last_event_at >= 0 && t.last_event_at <= 8640000000000) ? 'last_event_at must be nonnegative whole epoch seconds in the date range'
   : t.prs !== undefined && (!Array.isArray(t.prs) || !t.prs.every((u: any) => { try { return typeof u === 'string' && /^https?:\/\//.test(u) && !!new URL(u).hostname; } catch { return false; } })) ? 'prs must be an array of full HTTP or HTTPS URLs'
   : t.by !== undefined && !isKey(t.by) ? 'by must be 1-128 of A-Z a-z 0-9 . _ -'
+  : t.type !== undefined && !(TICKET_TYPES as readonly string[]).includes(t.type) ? `type must be one of ${TICKET_TYPES.join(', ')}`
+  : t.hold_reason !== undefined && (!isText(t.hold_reason) || !t.hold_reason.trim() || [...t.hold_reason].length > 160) ? 'hold_reason must be text of 160 characters or fewer'
+  : t.key !== undefined && (typeof t.key !== 'string' || !TICKET_KEY.test(t.key)) ? 'key must be a readable name such as JG-101 (a prefix of A-Z and 0-9, a dash, then a number)'
+  : t.description !== undefined && (!isText(t.description) || !t.description.trim() || [...t.description].length > 4000) ? 'description must be text of 4000 characters or fewer'
   : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
   : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
 /** A release names what ships (v1.4, 2026-11), never when: a word like "later" beside a priority reads as a contradiction, and priority is where urgency goes. */
 export const releaseIsWhen = (release: unknown) => typeof release === 'string' && /^(later|soon|now|next|someday|eventually|asap|urgent|tbd|tba|backlog|never)$/i.test(release.trim());
 /** Whether a ticket is still open work: not marked done by state, stage or progress. */
 const ticketOpen = (t: Ticket) => t.state !== 'done' && t.stage !== 'done' && t.progress < 100;
+/** A ticket's readable name: its `key` when the feed names one, else its id, the long slug the board has always used. */
+export const ticketName = (t: Pick<Ticket, 'id' | 'key'>) => t.key || t.id;
+/** Whether a ticket is held, by either of the two fields that say so. */
+export const ticketHeld = (t: Pick<Ticket, 'hold' | 'state'>) => t.hold === true || t.state === 'on hold';
 /** The work a ticket names, for telling the same work filed twice: its project, what it sits under and its title, without regard to case or spacing. */
 export const ticketWork = (t: Pick<Ticket, 'title' | 'project' | 'parent'>) => [t.project?.toLowerCase() ?? '', t.parent ?? '', t.title.trim().replace(/\s+/g, ' ').toLowerCase()].join('\0');
 /** The open ticket that already tracks this work under another id, if any: a second one is the same work filed twice. */
@@ -670,7 +683,7 @@ function oneOfEach(tickets: Ticket[]): Ticket[] {
   }
   return [...first.values()];
 }
-const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'by'] as const;
+const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'hold_reason', 'type', 'key', 'description', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'by'] as const;
 /** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
 const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
@@ -718,7 +731,7 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
       if (merged) add('merged', 'Ticket merged', [had.stage, t.stage]);
       const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
       const holdChanged = wasHeld !== isHeld;
-      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? 'Put on hold' : 'Hold released', [wasHeld ? 'on hold' : 'not on hold', isHeld ? 'on hold' : 'not on hold']);
+      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? (t.hold_reason ? `Put on hold: ${t.hold_reason}` : 'Put on hold') : 'Hold released', [wasHeld ? 'on hold' : 'not on hold', isHeld ? 'on hold' : 'not on hold']);
       const stateChanged = had.state !== t.state;
       if (stateChanged && !(merged && t.state === 'done') && !(holdChanged && (had.state === 'on hold' || t.state === 'on hold')))
         add('state', t.state ? `State changed to ${t.state}` : 'State cleared', [had.state, t.state]);

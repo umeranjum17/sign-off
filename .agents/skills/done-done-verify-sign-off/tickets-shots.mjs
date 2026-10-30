@@ -64,12 +64,20 @@ const MEASURE = `(async () => {
   // Rows: 68px on a phone, 88px on a desk's lists (a sheet's or panel's inset list lets a two-line title grow it), a 40px tile 12px in, the title 12px after it.
   const lines = (e) => Math.round(box(e).height / parseFloat(getComputedStyle(e).lineHeight));
   const rows = [...scope.querySelectorAll('.ui-row:not(.tk-feed .ui-row)')].filter(vis).filter((e) => box(e).bottom > 0 && box(e).top < H).map((e) => { const r = box(e), t = box(e.querySelector('.ui-icon')), title = e.querySelector('.t'), card = box(e.closest('.tk-card') ?? e.closest('.ui-list')), pad = e.closest('.tk-card') ? 24 : 12, meta = e.querySelector('.meta');
-    return { title: title.textContent.slice(0, 40), height: r2(r.height), inset: !!e.closest('.tk-in'), tile: r2(t.width) + 'x' + r2(t.height), pad, tileIn: r2(t.left - card.left), titleGap: r2(box(title).left - t.right), rightIn: r2(card.right - box(e.querySelector('.rm')).right),
+    // A child inside an epic's group is one step in (20px on a phone, 56 on a desk): its tile starts that far past the card's padding, and no further.
+    const kid = !!e.closest('li.tk-kid');
+    // A ticket with a readable name leads its title line with it: the key sits 12px after the tile and the title 12px after the key, on the same line.
+    const keyEl = e.querySelector('.l1 .tk-key'), afterTile = keyEl ? box(keyEl) : t;
+    return { title: title.textContent.slice(0, 40), height: r2(r.height), inset: !!e.closest('.tk-in'), tile: r2(t.width) + 'x' + r2(t.height), pad, tileIn: r2(t.left - card.left), titleGap: r2(box(title).left - afterTile.right), keyGap: keyEl ? r2(box(keyEl).left - t.right) : null, kid,
+      keyLine: keyEl ? Math.abs(box(keyEl).top - box(title).top) < 12 : null, rightIn: r2(card.right - box(e.querySelector('.rm')).right),
       lines: lines(title), cut: title.scrollHeight > title.clientHeight + 1 || title.scrollWidth > title.clientWidth + 1, metaCut: meta ? meta.scrollWidth > meta.clientWidth + 1 : false, meta: meta?.textContent ?? null,
       chip: e.querySelector('.ui-pc')?.textContent ?? null, icon: e.querySelector('.ui-icon img') ? 'picture' : e.querySelector('.ui-icon .mono') ? 'initials' : 'drawing', bar: e.querySelector('.ui-bar i')?.style.width ?? null }; });
   rows.forEach((x, i) => {
     const tall = !desk ? (x.inset ? x.height >= 68 : x.height === 68) : x.inset ? x.height >= 68 : x.height === 88;
-    if (!tall || x.tile !== '40x40' || x.tileIn !== x.pad || x.titleGap !== 12 || x.rightIn !== x.pad) fail.push('row ' + i + ' ' + JSON.stringify(x));
+    const indent = x.tileIn - x.pad;
+    if (!tall || x.tile !== '40x40' || x.titleGap !== 12 || x.rightIn !== x.pad) fail.push('row ' + i + ' ' + JSON.stringify(x));
+    if (x.kid ? !(indent > 0 && indent <= 56) : indent !== 0) fail.push('row ' + i + ' indent ' + indent + ' ' + JSON.stringify(x));
+    if (x.keyGap !== null && (x.keyGap !== 12 || !x.keyLine)) fail.push('row ' + i + ' key off the title line ' + JSON.stringify(x));
     if (x.lines > (desk ? 2 : x.inset ? 2 : 1)) fail.push('row title on ' + x.lines + ' lines ' + x.title);
     if (x.metaCut) fail.push('second line cut: ' + x.meta);
     if (x.bar === '0%') fail.push('an empty bar on ' + x.title);
@@ -105,7 +113,7 @@ const MEASURE = `(async () => {
     const lists = [...document.querySelectorAll('.tk-rows')].map((l) => { const r = box(l), fades = l.classList.contains('fades') && !l.classList.contains('at-end'), fz = parseFloat(l.style.getPropertyValue('--fz')) || 0;
       const shown = [...l.children].map((k) => box(k)).filter((b) => b.bottom > r.top + 0.5 && b.top < r.bottom - 0.5);
       const cut = shown.filter((b) => (b.bottom > r.bottom + 0.5 && !(fades && b.top >= r.bottom - fz - 0.5)) || b.top < r.top - 0.5).length;
-      return { head: l.closest('.tk-card').querySelector('.tk-ch').textContent, rows: l.children.length, whole: shown.filter((b) => b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5).length, fades, more: l.scrollHeight > l.clientHeight + 1, cut, tail: r2(r.bottom - Math.max(r.top, ...shown.filter((b) => b.bottom <= r.bottom + 0.5).map((b) => b.bottom))) }; });
+      return { head: l.closest('.tk-card')?.querySelector('.tk-ch')?.textContent ?? '', rows: l.children.length, whole: shown.filter((b) => b.top >= r.top - 0.5 && b.bottom <= r.bottom + 0.5).length, fades, more: l.scrollHeight > l.clientHeight + 1, cut, tail: r2(r.bottom - Math.max(r.top, ...shown.filter((b) => b.bottom <= r.bottom + 0.5).map((b) => b.bottom))) }; });
     lists.forEach((l) => { if (l.cut) fail.push('a row cut in ' + l.head); if (l.more && !l.fades && l.tail > 40) fail.push('room left under ' + l.head + ' ' + l.tail); });
     const pane = document.querySelector('.tk-pane'), paneM = pane && { more: pane.scrollHeight > pane.clientHeight + 1, fades: pane.classList.contains('fades') };
     if (paneM?.more && !paneM.fades) fail.push('the open ticket holds more than it shows with no fade');
@@ -124,7 +132,11 @@ const MEASURE = `(async () => {
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
   const hit = (e) => { const r = box(e), a = getComputedStyle(e, '::after'), o = (v) => Math.max(0, -parseFloat(v) || 0), wide = a.content !== 'none' && a.position === 'absolute';
     return { top: r.top, bottom: r.bottom, height: r.height + (wide ? o(a.top) + o(a.bottom) : 0), width: r.width + (wide ? o(a.left) + o(a.right) : 0) }; };
-  const under = !desk ? [...(dialog ?? sheet ?? document).querySelectorAll('button, a[href], summary, input')].filter(vis).filter((e) => !e.closest('.ui-act')).filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
+  // A link inside a ticket's formatted description is prose, not a control: it is one run of words in a sentence, and the 44px rule is for controls a thumb aims at
+  // (WCAG 2.5.8 exempts a link in a sentence the same way). Every control outside that text is still measured whole.
+  const prose = (e) => !!e.closest('.tk-desc');
+  const under = !desk ? [...(dialog ?? sheet ?? document).querySelectorAll('button, a[href], summary, input')].filter(vis).filter((e) => !e.closest('.ui-act') && !prose(e))
+    .filter((e) => { const r = hit(e); return r.top < innerHeight && r.bottom > 0 && (r.height < 43.5 || r.width < 43.5); })
     .map((e) => (e.getAttribute('aria-label') || e.textContent).trim().slice(0, 24) + ' ' + Math.round(box(e).width) + 'x' + Math.round(box(e).height)) : [];
   const overflowing = [...document.querySelectorAll('body *')].filter((e) => vis(e) && box(e).right > w + 1).slice(0, 10).map((e) => e.tagName.toLowerCase() + '.' + (e.classList[0] ?? ''));
   return { viewport: innerWidth + 'x' + innerHeight, edges: [r2(edgeL), r2(edgeR)], blocks, rows, title, rounds, dock, clear, desk: deskM, under, fail,
@@ -133,12 +145,15 @@ const MEASURE = `(async () => {
 
 const prof = mkdtempSync(join(tmpdir(), 'so-tickets-chrome-'));
 // A desk runs with the classic scrollbars a Linux or Windows viewer has, so a list's scrollbar taking a row's room would show; a phone's are overlays.
-// The task records of a fleet home (state/<ticket id>.meta), as Juggernaut writes them: three running workers and one finished task; every other ticket has none.
+// The task records of a fleet home (state/<ticket id>.meta), as Juggernaut writes them: three running workers and one finished task, one of them a bug by its kind, and
+// one hold whose reason only its record carries (so the board backfills it); every other ticket has none.
 mkdirSync(join(dir, 'fleet', 'state'), { recursive: true });
-for (const [id, harness, model, last, lead] of [['settings-epic', 'codex', 'openai-codex/gpt-6.1-sol', 'working', 'web-app'], ['settings-publish', 'claude', 'claude-opus-5-5', 'working', 'web-app'], ['export-label', 'opencode', 'ollama/qwen3-coder', 'paused', 'notes'], ['settings-theme', 'pi', 'ollama-cloud/deepseek-v4.1-flash', 'done', 'notes']]) {
-  writeFileSync(join(dir, 'fleet', 'state', `${id}.meta`), `window=default:w1:p1\nendpoint_task_id=${id}\nproject=~/fleet/projects/${lead}\nharness=${harness}\nmodel=${model}\n`);
+for (const [id, harness, model, last, lead, kind] of [['settings-epic', 'codex', 'openai-codex/gpt-6.1-sol', 'working', 'web-app', 'epic'], ['settings-publish', 'claude', 'claude-opus-5-5', 'working', 'web-app', 'ship'], ['export-label', 'opencode', 'ollama/qwen3-coder', 'paused', 'notes', 'ship'], ['settings-theme', 'pi', 'ollama-cloud/deepseek-v4.1-flash', 'done', 'notes', 'ship']]) {
+  writeFileSync(join(dir, 'fleet', 'state', `${id}.meta`), `window=default:w1:p1\nendpoint_task_id=${id}\nproject=~/fleet/projects/${lead}\nharness=${harness}\nmodel=${model}\nkind=${kind}\n`);
   writeFileSync(join(dir, 'fleet', 'state', `${id}.status`), `${last} [at=1]: on it\n`);
 }
+// One system ticket with a record of its own, so a hold on the system side still says who holds it.
+writeFileSync(join(dir, 'fleet', 'state', 'backup-check.meta'), `window=default:w1:p2\nendpoint_task_id=backup-check\nproject=~/fleet/projects/docs\nharness=codex\nmodel=openai-codex/gpt-6.1-sol\nkind=ship\n`);
 const chrome = spawn(chromium, ['--headless=new', '--no-sandbox', `--user-data-dir=${prof}`, '--remote-debugging-port=0', ...(phone ? ['--hide-scrollbars'] : []), 'about:blank'], { stdio: 'ignore' });
 process.on('exit', () => { try { chrome.kill(); } catch {} });
 let ws;
@@ -147,8 +162,9 @@ try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo }).trim().split('\n').pop();
   // The tickets, through the real CLI. Your asks: an epic with three tickets, one of them with four sub-tasks (two done), and eight more; then three system tickets.
   const T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--title', title, ...flags);
-  T('settings-epic', 'Ship the new settings page', '--priority', 'P0', '--project', 'settings', '--asked', 'yes');
-  T('settings-publish', 'Publish the settings page to the app stores', '--parent', 'settings-epic', '--priority', 'P0');
+  T('settings-epic', 'Ship the new settings page', '--priority', 'P0', '--project', 'settings', '--asked', 'yes', '--key', 'JG-101',
+    '--description', 'Ship the settings page to both stores, with the listings written and the packages built.\n# What ships\n- The settings page itself\n- The store listings\n- The release packages\n# Who signs it off\n> The captain: keep this one small, and ship it with support on hand.\nThe run book is [in the release notes](https://example.com/releases/settings).');
+  T('settings-publish', 'Publish the settings page to the app stores', '--parent', 'settings-epic', '--priority', 'P0', '--key', 'JG-102');
   for (const [id, title, p] of [['settings-build', 'Build the release packages', '100'], ['settings-listings', 'Write the store listings', '100'], ['settings-npm', 'Publish to npm', '0'], ['settings-stores', 'Send the build to the app stores', '0']])
     T(id, title, '--parent', 'settings-publish', '--priority', 'P0', '--progress', p);
   T('settings-theme', 'Move the theme switch to the top of the page', '--parent', 'settings-epic', '--priority', 'P1', '--progress', '100');
@@ -156,8 +172,8 @@ try {
   T('export-label', 'The export button says what people look for', '--priority', 'P1', '--project', 'chat-app', '--asked', 'yes', '--progress', '60');
   T('onboarding', 'Chat app onboarding in three screens', '--priority', 'P1', '--project', 'chat-app', '--asked', 'yes', '--progress', '100');
   T('help-search', 'Search the help center from the app', '--priority', 'P2', '--project', 'docs', '--asked', 'yes', '--progress', '100');
-  T('digest-monday', 'Send the weekly digest on Mondays', '--priority', 'P2', '--project', 'newsletter', '--asked', 'yes', '--progress', '30', '--hold', 'yes');
-  T('admin-two-step', 'Two-step sign-in for team admins, with a backup code they can print', '--priority', 'P0', '--project', 'settings', '--asked', 'yes', '--hold', 'yes');
+  T('digest-monday', 'Send the weekly digest on Mondays', '--priority', 'P2', '--project', 'newsletter', '--asked', 'yes', '--progress', '30', '--hold', 'yes', '--hold-reason', 'waiting for the newsletter copy from marketing', '--key', 'JG-201');
+  T('admin-two-step', 'Two-step sign-in for team admins, with a backup code they can print', '--priority', 'P0', '--project', 'settings', '--asked', 'yes', '--hold', 'yes', '--hold-reason', 'the backup-code print sheet is still being drawn');
   T('renewal-date', 'The billing page shows when the plan renews', '--priority', 'P1', '--project', 'billing', '--asked', 'yes');
   T('invoice-dark', 'Invoices read well in dark mode', '--priority', 'P3', '--project', 'billing', '--asked', 'yes');
   // More of your asks, as a board in use holds: enough that each list holds more than it shows.
@@ -170,10 +186,12 @@ try {
     ['search-filters', 'Filter help articles by product', 'P3', 'docs', '0'], ['font-size', 'A larger text size for the whole app', 'P2', 'settings', '0'],
     ['pin-chats', 'Pin up to five chats to the top', 'P2', 'chat-app', '0'], ['link-preview', 'Link previews load without blocking the message', 'P1', 'chat-app', '100'],
     ['refund-flow', 'Refunds in two taps from the invoice', 'P1', 'billing', '100'], ['changelog', 'A changelog page that lists each release', 'P3', 'docs', '100']])
-    T(id, title, '--priority', p, '--project', project, '--asked', 'yes', '--progress', progress, ...(hold ? ['--hold', 'yes'] : []));
+    T(id, title, '--priority', p, '--project', project, '--asked', 'yes', '--progress', progress, ...(hold ? ['--hold', 'yes', '--hold-reason', 'waiting on the pricing copy from marketing'] : []));
   T('image-library', 'Upgrade the image library', '--priority', 'P2', '--project', 'chat-app', '--progress', '40');
   T('staging-keys', 'Rotate the staging keys', '--priority', 'P1', '--project', 'billing', '--progress', '100');
-  T('backup-check', 'A nightly check that the backups restore', '--priority', 'P3', '--project', 'docs', '--hold', 'yes');
+  T('backup-check', 'A nightly check that the backups restore', '--priority', 'P3', '--project', 'docs', '--hold', 'yes', '--hold-reason', 'waiting for a test account on the backup service');
+  // One bug, so a row of every type the board knows shows: a bug is red, and it is not a ticket.
+  T('flaky-login-bug', 'Sign-in fails one run in ten on the beta channel', '--priority', 'P1', '--project', 'settings', '--type', 'bug', '--progress', '20');
   for (const [id, title, p, project, progress] of [['log-retention', 'Keep server logs for thirty days', 'P2', 'billing', '60'], ['dep-updates', 'Weekly dependency updates', 'P3', 'settings', '0'],
     ['cdn-move', 'Serve pictures from the new image host', 'P2', 'chat-app', '0'], ['error-alerts', 'Alerts when the error rate doubles', 'P1', 'docs', '100'],
     ['ci-cache', 'Cache the test run between builds', 'P2', 'settings', '55'], ['flaky-login', 'Find why the sign-in test fails one run in twenty', 'P1', 'settings', '35'],
@@ -279,7 +297,7 @@ try {
   await until(`location.hash === '#ticket/settings-epic' && !!document.querySelector('${phone ? '.tk-sheet' : '.tk-pane'} .tk-dt')`, 'the epic open');
   facts.epic = await read();
   facts.epicAssigned = await js(`[...document.querySelectorAll('${phone ? '.tk-sheet' : '.tk-pane'} .tk-assigned .ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())`);
-  assert.deepEqual(facts.epicAssigned, ['Lead web-app', 'Worker Settings epic', 'Model gpt-6.1-sol', 'Tool Codex', 'Worker live Live'], 'the epic names its assignee');
+  assert.deepEqual(facts.epicAssigned, ['Assignee web-app · gpt-6.1-sol Live', 'Lead web-app', 'Worker Settings epic', 'Model gpt-6.1-sol', 'Tool Codex', 'Worker live Live'], 'the epic leads its Assigned block with who owns it, then the record');
   await capture('epic');
   await pair('epic', tree, 'tickets/T-9');
   await go(url + '#ticket/settings-epic');
@@ -289,7 +307,7 @@ try {
   facts.ticket = await read();
   // Who works on it: the Assigned block of this ticket (lead, worker, model, tool, live), and the quiet line on each row, Unassigned where no task record names one.
   facts.assigned = await js(`[...document.querySelectorAll('${phone ? '.tk-sheet' : '.tk-pane'} .tk-assigned .ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())`);
-  assert.deepEqual(facts.assigned, ['Lead web-app', 'Worker Settings publish', 'Model Opus 5.5', 'Tool Claude Code', 'Worker live Live'], 'the ticket page names its assignee');
+  assert.deepEqual(facts.assigned, ['Assignee web-app · Opus 5.5 Live', 'Lead web-app', 'Worker Settings publish', 'Model Opus 5.5', 'Tool Claude Code', 'Worker live Live'], 'the ticket page leads with who owns it, then the record');
   facts.assigneeLines = await js(`[...document.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href').slice(8) + ': ' + a.querySelector('.tk-as')?.innerText.replace(/\\s+/g, ' ').trim()).slice(0, 12)`);
   assert.ok(facts.assigneeLines.every((l) => !/undefined$/.test(l)), 'every row has an assignee line');
   await capture('ticket');
@@ -326,6 +344,76 @@ try {
       l.scrollTo(0, 1e6); await new Promise((ok) => setTimeout(ok, 700)); r1.atEndFadeGone = !l.classList.contains('fades') || l.classList.contains('at-end'); out.push(r1); } return out; })()`);
     for (const s of facts.scroll) if (Math.abs(s.firstRowOffset) > 1 || !s.atEndFadeGone) problems.push(`scroll ${JSON.stringify(s)}`);
   }
+  // The type system, the assignee and the hold reason: a row of each type on screen, six glyphs in six colours, the assignee at the row's right on a desk and on the row's
+  // own second line on a phone (so the title keeps the full width), an epic's roll-up beside ordinary rows, and a hold that says why.
+  // A fresh load, so the fleet-upkeep filter the walk picked earlier is not still on: the type check reads every ticket, yours and the fleet's.
+  await go('about:blank');
+  await go(url + '#tickets');
+  await until(`!!document.querySelector('.tk-hero')`, 'the lists drawn for the type check');
+  // A phone shows three rows a list until See all: open every list so the type check reads every ticket, yours and the fleet's.
+  await js(`[...document.querySelectorAll('main button.see')].filter((b) => b.textContent === 'See all').forEach((b) => b.click())`);
+  await until(`!!document.querySelector('${rowOf('digest-monday')}') && !!document.querySelector('${rowOf('settings-epic')}')`, 'every row on screen');
+  facts.types = await js(`(() => { const rows = [...document.querySelectorAll('main a.tk-row')];
+    const typeOf = (a) => (a.querySelector('.tk-tile')?.className.match(/t-(epic|ticket|bug|decision|evidence|merge)/) ?? [])[1];
+    const byType = new Map(); for (const a of rows) { const k = typeOf(a); if (k && !byType.has(k)) byType.set(k, getComputedStyle(a.querySelector('.tk-tile')).color); }
+    // The row the fit check reads is a rendered one: the widest ticket row on screen, not one scrolling out of sight.
+    const widest = (list) => list.filter((a) => a.querySelector('.l1 .t')?.getBoundingClientRect().width > 40).sort((x, y) => y.querySelector('.l1 .t').getBoundingClientRect().width - x.querySelector('.l1 .t').getBoundingClientRect().width)[0];
+    const epic = widest(rows.filter((a) => typeOf(a) === 'epic')), ticket = widest(rows.filter((a) => typeOf(a) === 'ticket')), bug = widest(rows.filter((a) => typeOf(a) === 'bug'));
+    const box = (e) => e.getBoundingClientRect();
+    const fullWidth = (a) => { const r = box(a), t = box(a.querySelector('.l1 .t')), asg = a.querySelector('.tk-as') && box(a.querySelector('.tk-as'));
+      return { title: Math.round(t.width), row: Math.round(r.width), titleRight: Math.round(r.right - t.right), asgTop: asg ? Math.round(asg.top - r.top) : null, asgRight: asg ? Math.round(r.right - asg.right) : null }; };
+    return { glyphs: Object.fromEntries(byType), epic: epic ? { roll: epic.querySelectorAll('.tk-roll i').length, meta: epic.querySelector('.meta')?.textContent, label: epic.getAttribute('aria-label') } : null,
+      bug: bug?.getAttribute('aria-label') ?? null, ticket: fullWidth(ticket), epicRow: epic ? fullWidth(epic) : null }; })()`);
+  const seen = Object.keys(facts.types.glyphs);
+  for (const k of ['epic', 'ticket', 'bug']) if (!seen.includes(k)) problems.push(`no ${k} row on screen: ${seen.join(', ')}`);
+  if (new Set(Object.values(facts.types.glyphs)).size !== seen.length) problems.push(`two types share a colour: ${JSON.stringify(facts.types.glyphs)}`);
+  if (!facts.types.epic?.roll || !/of \d+ done/.test(facts.types.epic?.meta ?? '')) problems.push(`the epic row shows no roll-up: ${JSON.stringify(facts.types.epic)}`);
+  if (!facts.types.epicRow) problems.push('no epic row beside the ordinary rows');
+  // The approved change: at 390 the assignee sits under the title, so the title takes the row's whole width; on a desk it sits at the row's right edge.
+  // The approved responsive rule, at both widths: the title keeps the row's whole width and who owns the ticket sits on its own line under it.
+  const fit = facts.types.ticket;
+  if (!(fit.asgTop > 20 && fit.title > fit.row * 0.6)) problems.push(`the assignee does not sit under a full-width title: ${JSON.stringify(fit)}`);
+  facts.holdRow = await js(`(() => { const a = [...document.querySelectorAll('main a.tk-row')].find((x) => x.getAttribute('aria-label')?.includes('Send the weekly digest'));
+    return a ? { meta: a.querySelector('.meta')?.textContent, label: a.getAttribute('aria-label'), assignee: a.querySelector('.tk-as')?.innerText.replace(/\\s+/g, ' ').trim() } : null; })()`);
+  if (!/waiting for the newsletter copy/.test(facts.holdRow?.meta ?? '')) problems.push(`the hold row does not say why: ${JSON.stringify(facts.holdRow)}`);
+  if (!/on hold, waiting for the newsletter copy/.test(facts.holdRow?.label ?? '')) problems.push(`the hold row's own name does not say it is held and why: ${JSON.stringify(facts.holdRow)}`);
+  // The readable name: a row carries its key on the title line, and the ticket's page names it by that key with its slug as the small line under the title.
+  facts.keyRow = await js(`(() => { const a = document.querySelector('${rowOf('settings-epic')}'); if (!a) return null;
+    const key = a.querySelector('.tk-key'), slugEl = a.querySelector('.tk-row-slug'), title = a.querySelector('.l1 .t');
+    const r = a.getBoundingClientRect(), k = key?.getBoundingClientRect(), titleBox = title.getBoundingClientRect();
+    // The slug keeps its own quiet line under the title, in the row's owner line and never on the progress line.
+    const slugBox = slugEl?.getBoundingClientRect();
+    return { key: key?.textContent ?? null, onTitleLine: !!k && Math.abs(k.top - titleBox.top) < 12, height: Math.round(r.height), titleWidth: Math.round(titleBox.width), rowWidth: Math.round(r.width),
+      slug: slugEl?.textContent ?? null, slugOnQuietLine: !!slugBox && slugBox.top > titleBox.bottom && !slugEl.closest('.l2') }; })()`);
+  if (facts.keyRow?.key !== 'JG-101') problems.push(`the epic row does not carry its readable key: ${JSON.stringify(facts.keyRow)}`);
+  if (!facts.keyRow?.onTitleLine) problems.push(`the key is not on the row's title line: ${JSON.stringify(facts.keyRow)}`);
+  if (!facts.keyRow?.slugOnQuietLine) problems.push(`the slug is not on its own quiet line under the title: ${JSON.stringify(facts.keyRow)}`);
+  await js(`document.querySelector('${rowOf('settings-epic')}').scrollIntoView({ block: 'center', behavior: 'instant' })`);
+  await capture(phone ? 'key-row' : 'tickets');
+  // The same ticket in its page, named by the key, its slug a small line under the title, and its description drawn as formatted text.
+  await tap(rowOf('settings-epic'));
+  await until(`location.hash === '#ticket/settings-epic' && !!document.querySelector('${phone ? '.tk-sheet' : '.tk-pane'} .tk-dt')`, 'the epic open by its key');
+  facts.keySheet = await js(`(() => { const p = document.querySelector('${phone ? '.tk-sheet' : '.tk-pane'}');
+    const key = p.querySelector('.tk-shd .tk-key')?.textContent ?? null, slug = p.querySelector('.tk-slug')?.textContent ?? null, d = p.querySelector('.tk-desc');
+    return { key, slug, summary: d?.querySelector('.tk-sum')?.textContent ?? null, headings: [...(d?.querySelectorAll('.tk-dh') ?? [])].map((h) => h.textContent),
+      items: [...(d?.querySelectorAll('.tk-dl li') ?? [])].map((li) => li.textContent), links: [...(d?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('href')), quotes: [...(d?.querySelectorAll('.tk-dq p') ?? [])].map((q) => q.textContent) }; })()`);
+  if (facts.keySheet?.key !== 'JG-101') problems.push(`the ticket's page does not name it by its key: ${JSON.stringify(facts.keySheet)}`);
+  if (facts.keySheet?.slug !== 'settings-epic') problems.push(`the slug is not the small line under the title: ${JSON.stringify(facts.keySheet)}`);
+  if (!facts.keySheet?.summary || !facts.keySheet?.headings.length || !facts.keySheet?.items.length || !facts.keySheet?.links.length || !facts.keySheet?.quotes.length)
+    problems.push(`the description is not drawn as formatted text: ${JSON.stringify(facts.keySheet)}`);
+  await capture('key-sheet');
+  await pair('key-sheet', tree, 'tickets/T-9');
+  // The hold, in its own list, with the reason on the row (the lists are open from the type check above).
+  await js(`document.querySelector('${rowOf('digest-monday')}').scrollIntoView({ block: 'center', behavior: 'instant' })`);
+  await capture('holds');
+  // The Epics view: every epic with its children under it, a figure and the states they are in.
+  await go(url + '#epics');
+  await until(`!!document.querySelector('.tk-epic')`, 'the Epics view drawn');
+  facts.epics = await js(`({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' (on)' : '')),
+    groups: [...document.querySelectorAll('.tk-epic')].map((g) => ({ rows: g.querySelectorAll('a.tk-row').length, kids: g.querySelectorAll('li.tk-kid').length, text: g.querySelector('.l1 .t')?.textContent + ' · ' + g.querySelector('.meta')?.textContent, fig: g.querySelector('.tk-fig')?.textContent ?? null })) })`);
+  if (!facts.epics.seg.some((x) => x === 'Epics (on)')) problems.push(`the Epics view is not its own tab: ${JSON.stringify(facts.epics.seg)}`);
+  if (!facts.epics.groups.length || !facts.epics.groups[0].kids) problems.push(`no epic group with children: ${JSON.stringify(facts.epics.groups)}`);
+  await capture('epics');
   writeFileSync(join(out, `${name('tickets')}.facts.json`), JSON.stringify(facts, null, 2) + '\n');
   writeFileSync(join(out, `measure.${side}.${theme}.${width}w.txt`), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
