@@ -2958,7 +2958,13 @@
       // One redraw for what the poll read: the lists come in with the page, and the rest of the board draws once when its own pages land.
       await readLists();
       if (heard) noticeNew(heard);
-      rest();
+      // A whole-board read (an answer, a discard, a note) holds the board as it was when that request was written, and the poll's own page carries
+      // the asks, never a proof. So when the board holds a row that read did not have, the pages bring it; while the page holds every row, nothing
+      // is read again and a report being read keeps its place.
+      if (!wholeBoard || state.decisions.length >= (state.counts?.items ?? 0)) return rest();
+      wholeBoard = false;
+      await rest();
+      wholeBoard = state.decisions.length >= (state.counts?.items ?? 0);
     } catch (e) { failed(e); } finally { busy(false); }
   }
   /** The first screen: one page of the asks waiting on the person, painted before the rest of the board is read. The shell starts that read itself,

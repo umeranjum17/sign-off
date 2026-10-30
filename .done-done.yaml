@@ -239,6 +239,10 @@ journeys:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/attach-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   evidence-guard:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-guard-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # The Evidence feed: a proof filed after the board was read whole (an answer) reaches Evidence on the next poll as the newest row, and the
+  # feed-stall alarm fails with both timestamps and the 30-minute limit when the board's newest proof never reached the page.
+  evidence-feed:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-feed-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's load budget: Evidence on a phone with 60 updates loads at most 12 captures and 1.5 MB, text goes compressed, a reload and a poll are 304s.
   load-budget:
     command: 'npm run build > /dev/null && node --test --test-name-pattern="load budget" test/design.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/load-budget.log" 2>&1'
