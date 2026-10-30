@@ -2707,6 +2707,8 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon img")?.getAttribute("src")?.includes("welcome.webp") && !document.querySelector(".dz-list .mono")'), true);
   assert.equal(await evaluate('(async () => { const i = document.querySelector(".dz-list .design-thumb"); await i.decode(); return i.getBoundingClientRect().height <= i.parentElement.getBoundingClientRect().height; })()'), true, 'portrait thumbnail fits its tile');
   assert.equal(await evaluate('document.querySelector(".dz-list .meta")?.textContent'), 'In review · 18 Oct');
+  // The row carries its project, never the words "No project".
+  assert.equal(await evaluate('document.querySelector(".dz-list .ui-icon")?.getAttribute("aria-label")'), 'Sign-in');
   await evaluate(`location.href = ${JSON.stringify(`${url}#designs/d1-design`)}`);
   await until(async () => (await evaluate('document.querySelector(".design-review .foot button")?.textContent')) === 'Approve');
   assert.equal(await evaluate('document.querySelector(".design-preview-full")?.getAttribute("target")'), '_blank');
