@@ -1301,11 +1301,13 @@
     return img;
   }
   const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
+  /** The board's own identity, which a design card with no project of its own wears: its name and app icon, never an empty tile. */
+  const boardPic = () => el('img', { src: '/icon.svg', alt: '' });
   const cardTile = (d) => {
-    const design = d.kind === 'design' || d.type === 'design', tile = projectTile(projectName(d), () => design ? icon('designs') : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
+    const design = d.kind === 'design' || d.type === 'design', tile = design && !projectName(d) ? projectTile('Sign-off', boardPic) : projectTile(projectName(d), () => design ? boardPic() : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
     const frame = design && designFrame(d), demo = isPick(d) && demoThumb(d);
     if (demo) tile.replaceChildren(demo);
-    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), () => icon('designs'))); tile.replaceChildren(img); }
+    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.onerror = () => img.replaceWith(projectPic(projectName(d), boardPic)); tile.replaceChildren(img); }
     return tile;
   };
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
