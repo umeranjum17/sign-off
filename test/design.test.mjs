@@ -6,10 +6,11 @@ import { createHash } from 'node:crypto';
 import { createServer as createHttpServer, get, request } from 'node:http';
 import { createServer } from 'node:net';
 import { networkInterfaces, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import jpeg from 'jpeg-js';
 import { asked } from './support/ask.mjs';
+import { liveLinkVerdict } from './support/live-link.mjs';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-design-'));
@@ -635,12 +636,75 @@ test('an interactive page that posts its height gets a frame that fits it, each 
     [['Calm', 'http://100.64.0.1:4430/#/o/1/play'], ['Bold', 'http://100.64.0.1:4430/#/o/2/play']]);
   assert.match(dom, /<p class="tradeoff"[^>]*><strong>Trade-off <\/strong>B reads best\.<\/p>/);
   assert.ok(figures.every((f) => !f.includes('first-draft')));
-  // An option's own link is a real anchor under its mock, outside the sandboxed frame; only B has one.
-  assert.match(figures[0], /<a class="option-link" href="https:\/\/example\.com\/b" target="_blank" rel="noopener"[^>]*>Open live<\/a>/);
+  // A page mock's Open live is that option's own prototype, under its mock and outside the sandboxed frame; B's --link is the reference beside it.
+  assert.match(figures[0], /<a class="option-link" href="[^"]*look~b\/quiet\.html" target="_blank" rel="noopener" data-live="look~b"[^>]*>Open live<\/a>/);
+  assert.match(figures[0], /<a class="option-link ref-link" href="https:\/\/example\.com\/b" target="_blank" rel="noopener"[^>]*>Reference<\/a>/);
   assert.ok(figures[0].indexOf('</iframe>') < figures[0].indexOf('option-link'));
-  assert.equal(figures.filter((f) => f.includes('option-link')).length, 1);
+  assert.equal(figures.filter((f) => f.includes('ref-link')).length, 1);
+  assert.equal(figures.filter((f) => f.includes('data-live')).length, 3);
   close();
   proc.kill();
+});
+
+test('the live-link check rejects a live link that is the reference, or another option\'s prototype, and passes the option\'s own', () => {
+  const key = 'inbox', m = { value: 'a', link: 'https://linear.app/docs/inbox' }, own = 'http://127.0.0.1:4410/mock/local/inbox~a/index.html?variant=a';
+  const verdict = (live) => liveLinkVerdict({ key, value: m.value, reference: m.link, live, prototype: own });
+  assert.equal(verdict(own), '');
+  assert.equal(verdict(m.link), 'Open live is the reference, inbox~a');
+  assert.equal(verdict(own.replace('~a', '~b')), 'Open live is not inbox~a: http://127.0.0.1:4410/mock/local/inbox~b/index.html?variant=a');
+  assert.equal(verdict(null), 'no Open live under inbox~a');
+});
+
+test("every existing design card's Open live opens that option's own prototype, never the reference beside it", { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'live-links'), file = join(dir, 'board.json');
+  // One card per shape the board's design picks already use: a shared page per option with its variant in the query (the Inbox pick, with a reference doc
+  // under each option), plain pages, pictures, a mix of both, one shared page without variants, and values that are not a, b, c.
+  const design = (key, values, path, links = {}) => ({ key, type: 'design', title: `Which ${key}?`, options: values.map((v) => ({ value: v, label: `${v.toUpperCase()}: ${key}` })), recommend_value: values[0],
+    mocks: values.map((v) => ({ value: v, path: path(v), ...(links[v] && { link: links[v] }) })) });
+  const cards = [
+    design('inbox', ['a', 'b', 'c'], (v) => `mocks/inbox/index.html?variant=${v}`,
+      { a: 'https://linear.app/docs/inbox', b: 'https://slack.com/help/articles/threads', c: 'https://docs.github.com/inbox' }),
+    design('plan', ['a', 'b', 'c'], (v) => `mocks/plan/${v}.html`),
+    design('cloud', ['a', 'b', 'c'], (v) => `mocks/cloud/${v}.png`),
+    design('wrapper', ['a', 'b'], (v) => `mocks/wrapper/${v}.html`, { a: 'https://example.com/branch' }),
+    design('stealth', ['a', 'b', 'c'], (v) => 'mocks/stealth/index.html'),
+    design('direction', ['a', 'a9', 'c', 'f', 'h', 'g'], (v) => `mocks/direction/${v}.png`),
+  ];
+  for (const d of cards) for (const m of d.mocks) {
+    const mockFile = join(dir, m.path.split('?')[0]);
+    mkdirSync(dirname(mockFile), { recursive: true });
+    writeFileSync(mockFile, /\.html?$/i.test(m.path.split('?')[0]) ? '<a href="#next">Next</a>' : sized(60, 120));
+  }
+  writeFileSync(file, JSON.stringify({ schema: 2, items: cards }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { mockBase } = await (await fetch(`${url}api/decisions`)).json();
+  // The prototype URL that option's mock is served at, exactly as the board serves it.
+  const own = (d, m) => new URL(`${mockBase}${d.key}~${m.value}/${encodeURIComponent(m.path.split('?')[0].split('/').pop())}${m.path.includes('?') ? `?${m.path.split('?')[1]}` : ''}`, url).href;
+  // The check: Open live must be that option's own prototype page, never the URL kept beside it as its reference.
+  const check = (d, m, live) => liveLinkVerdict({ key: d.key, value: m.value, reference: m.link, live, prototype: own(d, m) });
+  const { evaluate, close } = await browse(dir);
+  try {
+    for (const d of cards) {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#decide/${d.key}`)}`);
+      await until(async () => (await evaluate('location.hash')) === `#decide/${d.key}` && (await evaluate("document.querySelectorAll('.ask-sheet figure.mock').length")) === d.options.length);
+      const shown = await evaluate(`[...document.querySelectorAll('.ask-sheet figure.mock')].map((f) => ({
+        label: f.querySelector('.label')?.textContent, live: f.querySelector('[data-live]')?.href ?? null, ref: f.querySelector('.ref-link')?.href ?? null, words: f.querySelector('.ref-link')?.textContent ?? null }))`);
+      for (const m of d.mocks) {
+        const o = d.options.find((x) => x.value === m.value), fig = shown.find((f) => f.label === o.label);
+        assert.ok(fig, `${d.key}~${m.value} is drawn`);
+        // A picture is not a prototype: only a page mock has an Open live link.
+        if (/\.html?$/i.test(m.path.split('?')[0])) assert.equal(check(d, m, fig.live), '', `${d.key}~${m.value}: ${fig.live}`);
+        else assert.equal(fig.live, null, `${d.key}~${m.value} is a picture, so it has no Open live`);
+        // Its reference stays on the card as its own link, labelled as the reference.
+        assert.equal(fig.ref, m.link ?? null, `${d.key}~${m.value} reference`);
+        assert.equal(fig.words, m.link ? 'Reference' : null, `${d.key}~${m.value} reference label`);
+      }
+    }
+  } finally {
+    close(); proc.kill();
+  }
 });
 
 test('report and plan documents use one page scroll and the available width at 390 and 1280', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
@@ -2527,8 +2591,9 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     await until(() => evaluate(`${pages}.includes('index.html')`));
     // The whole screen, the recommended option first, at phone size, its live link in the bar, and the files beside the page loaded.
     assert.deepEqual(await evaluate(box(full)), [0, 0, 390, 844]);
-    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-pick').value, ${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${full}.querySelector('.pf-ref').getAttribute('aria-pressed'), ${full}.querySelector('.pf-live').href]`),
-      ['a', 'phone', 'false', 'https://example.com/a']);
+    // Open live in the bar is the option's own prototype, not its reference link.
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-pick').value, ${full}.querySelector('.pf-size [aria-pressed=true]').dataset.size, ${full}.querySelector('.pf-ref').getAttribute('aria-pressed'), ${full}.querySelector('.pf-live').href.endsWith('fleet~a/index.html')]`),
+      ['a', 'phone', 'false', true]);
     // Phone is a phone's own 390 by 844, scaled down to the stage under the bar.
     assert.deepEqual(await evaluate(viewport()), ['390px', '844px']);
     assert.equal(await evaluate(fits()), true);
@@ -2551,9 +2616,9 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-back figcaption').textContent, ${full}.querySelector('.pf-back iframe').title, ${box(port(1))}.join() === ${box(port(0))}.join()]`), ['ReferenceB: Cards', 'Reference: B: Cards', true]);
     await tap(await evaluate(centre(`${full}.querySelector('.pf-ref')`)));
     await until(() => evaluate(`${full}.querySelector('.pf-stage').dataset.mode === 'one' && ${full}.querySelector('.pf-back').hidden`));
-    // Another option replaces the page shown; it has no live link.
+    // Another option replaces the page shown, and Open live follows it to that option's own prototype.
     await evaluate(`(s => { s.value = 'b'; s.dispatchEvent(new Event('change')); })(${full}.querySelector('.pf-pick'))`);
-    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-main iframe').title, ${full}.querySelector('.pf-live').hidden]`), ['Prototype: B: Cards', true]);
+    assert.deepEqual(await evaluate(`[${full}.querySelector('.pf-main iframe').title, ${full}.querySelector('.pf-live').href.endsWith('fleet~b/index.html')]`), ['Prototype: B: Cards', true]);
     // Close goes back to the card, on what opened it, at the same address.
     await tap(await evaluate(centre(`${full}.querySelector('.pf-close')`)));
     await until(() => evaluate(`!${full} && !document.querySelector('.proto-full')`));
@@ -2596,7 +2661,8 @@ test('Open full screen: a design pick\'s prototype over the whole screen takes r
     await until(() => evaluate("document.querySelector('.decide h2')?.textContent === 'Does the tour feel right?' && !!document.querySelector('.decide .full-open')"));
     await click(await evaluate(centre("document.querySelector('.decide .full-open')")));
     await until(() => evaluate(`!!${full}?.querySelector('iframe[title=\"Prototype: Does the tour feel right?\"]')`));
-    assert.deepEqual(await evaluate(`[!!${full}.querySelector('.pf-ref'), !!${full}.querySelector('.pf-pick'), ${full}.querySelector('.pf-live').hidden, ${full}.querySelector('iframe').getAttribute('sandbox')]`), [false, false, true, 'allow-scripts']);
+    // An interactive page's Open live is its own page, so the bar never hides it.
+    assert.deepEqual(await evaluate(`[!!${full}.querySelector('.pf-ref'), !!${full}.querySelector('.pf-pick'), ${full}.querySelector('.pf-live').hidden, ${full}.querySelector('.pf-live').href.endsWith('tour.html'), ${full}.querySelector('iframe').getAttribute('sandbox')]`), [false, false, false, true, 'allow-scripts']);
     close();
   }
   proc.kill();

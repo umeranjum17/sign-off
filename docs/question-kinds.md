@@ -57,7 +57,8 @@ pages beside it work. Its bar holds Close, the option shown, **Phone** (390)
 or **Desktop** (1280), which draws the prototype at that width, centred and
 scaled down only when the screen is narrower, and **Reference**, which shows
 another option's mock beside it (over it where the two do not fit), with an
-Open live link for an option's `--link` (a live site opens in its own tab;
+Open live (that option's own prototype page, in
+its own tab) and Reference, the option's `--link` (a live site or design opens in its own tab;
 the frame loads no remote files). An interactive page has no other option, so
 no Reference. A click with Cmd, Ctrl or Shift still opens the mock file in a tab. Mock paths are relative to the board file's folder
 and never escape it. One `.html` page can hold every variant:

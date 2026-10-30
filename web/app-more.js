@@ -283,7 +283,8 @@
     const showMain = () => {
       main.port.replaceChildren(view(shown, `Prototype: ${shown.label}`));
       main.cap.replaceChildren(el('span', {}, 'Prototype'), el('b', { dir: 'auto' }, shown.label));
-      live.hidden = !shown.link; if (shown.link) { live.href = shown.link; live.setAttribute('aria-label', `Open ${shown.label} live`); }
+      // Open live opens the prototype shown in its own tab, never a reference: liveUrl decides it for the card and this bar alike.
+      live.hidden = !shown.page; if (shown.page) { live.href = shown.url; live.setAttribute('aria-label', `Open ${shown.label} live`); }
       if (pick) pick.value = shown.value;
     };
     const showRef = () => {

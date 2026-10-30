@@ -1,6 +1,6 @@
 # Prototype full screen
 
-**Open full screen** on a design pick (under its mock frames, or a tap on a frame) and on an interactive page's card shows the prototype over the whole screen, in the same sandboxed frame, which takes every tap: the prototype's own links, tabs and the pages and files beside it work. One bar: Close, the card's title, Open live (when the option shown has a `--link`), the option shown, **Phone** (390) and **Desktop** (1280), and **Reference** (a design pick only).
+**Open full screen** on a design pick (under its mock frames, or a tap on a frame) and on an interactive page's card shows the prototype over the whole screen, in the same sandboxed frame, which takes every tap: the prototype's own links, tabs and the pages and files beside it work. One bar: Close, the card's title, Open live (the option shown's own prototype page, the same link its card draws), the option shown, **Phone** (390) and **Desktop** (1280), and **Reference** (a design pick only).
 
 ## How to get to it (user POV)
 
@@ -11,7 +11,7 @@ Open a design pick or an interactive page on Decide (`#decide/<key>`) and tap **
 - Fill the viewport (no board behind it, no sideways scroll), the recommended option first, at Phone on a phone and Desktop on a desk.
 - Draw the prototype in its device's own viewport, 390 by 844 CSS pixels for Phone and 1280 by 800 for Desktop, so its breakpoints and full-height layouts see that device; scaled down with a transform where it does not fit under the bar either way (Desktop on a phone is about 0.3, Phone on a 1280 desk about 0.84), centred, framed with rounded corners where it does not fill the width. A size change keeps the page and its state; another option loads that option's page. A click lands where the scaled page draws a control.
 - Reference: another option's mock beside the prototype, both labelled, where each keeps at least half its width (Phone on a desk), else over it (a phone, Desktop on a 1280 desk); a picker when there are more than two options. Off again, the prototype is as it was. An interactive page has no Reference and no option picker.
-- An option's `--link` is an Open live link in the bar, opening a tab: the frame loads no remote files.
+- Open live in the bar opens the option shown's own prototype page in a tab, never its `--link` (the reference): the frame loads no remote files.
 - While Comment on the mocks is on, a tap on a mock names an element and does not open the full screen.
 - Light and dark, 390 and 1280, all controls 44 px tall.
 

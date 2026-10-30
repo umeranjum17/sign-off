@@ -240,7 +240,8 @@ Listing --option needs --recommend <value>, on every type: the option you would 
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
 --type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp, 5 MB or less), a --tradeoff line and a --recommend badge.
-One --link <value>=<url> per option (http or https) draws an Open link under that option's mock, outside its sandboxed frame; the option needs a --mock.
+One --link <value>=<url> per option (http or https) is that option's reference, drawn under its mock as a Reference link, outside its sandboxed frame; the option needs a --mock.
+Open live is not the reference: it opens that option's own prototype (its --mock page) in a new tab, worked out in one place from the card's key and the option's value.
 One --video <value>=<file> per option (.mp4 or .webm, 50 MB or less) adds a demo recording beside that option's mock, with one --score <value>=<number> (0 to 100) for its round score; the option needs a --mock, and a score needs its --video. The file is copied byte for byte into evidence/video/ beside the board (never converted or re-encoded) and refused unless it is a real recording. The card plays it muted in place on a tap and opens it full screen with the score, and the Designs row shows its first frame.
 One .html page can hold every variant: --mock a=mocks/<key>/index.html?variant=a and so on; the page reads ?variant= to show one.
 An .html mock or view loads the css, scripts, images and fonts beside it by relative name, from its own folder only.
