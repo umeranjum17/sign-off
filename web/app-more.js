@@ -1815,7 +1815,7 @@
       return b;
     }));
     const hero = el('section', { class: 'ui-card ui-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Waiting on you'), today ? el('span', { class: 'chip' }, `${today} answered today`) : ''),
-      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(n)), later ? el('span', { class: 'vs' }, `${later} for later`) : '', leashChip()));
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(waitingTotal())), later ? el('span', { class: 'vs' }, `${later} for later`) : '', leashChip()), waitingSplit() ? el('p', { class: 'hs' }, waitingSplit()) : '');
     if (leashSheet.open) fillLeash();
     const sec = (name, k) => el('h2', { class: 'ui-sec' }, name, k === undefined ? '' : el('span', { class: 'n' }, String(k)));
     const card = (name, list, bare) => el('ul', { class: `${bare ? '' : 'ui-card '}ui-list dl-list`, 'aria-label': name }, ...list);
@@ -1835,7 +1835,7 @@
       : el('div', { class: `${desk ? '' : 'ui-card '}dl-clear` }, el('b', {}, 'All clear'), el('span', {}, `Nothing is waiting on you${state.name ? `, ${state.name}` : ''}.`));
     // Answers taken without the person sit under the asks until opened, each with its Change; then they join Answered.
     const took = done.filter((d) => takenOf(state.answers[d.key]) && unopened(d.key)), given = done.filter((d) => !took.includes(d));
-    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, phone() ? decideSeg('asks') : seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks, more('now', 'Asks', n)]),
+    return el('div', { class: `waiting-page decide-list${fresh ? ' rise' : ''}` }, waitingDesign(), phone() ? decideSeg('asks') : seg, hero, ...(desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Asks', n), asks)] : [sec('Asks'), asks, more('now', 'Asks', n)]),
       ...(took.length ? desk ? [el('section', { class: 'ui-card dl-asks' }, sec('Taken without you', took.length), card('Taken without you', took.map(tookRow), true))] : [sec('Taken without you', took.length), card('Taken without you', took.map(tookRow))] : []),
       ...(rows.later.length ? [sec('Later', later), card('Later', rows.later), more('later', 'Later', later)] : []),
       // Every answer given, newest first.

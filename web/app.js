@@ -2187,8 +2187,18 @@
   }
   /** On a phone Decide holds two lists, as Tickets holds Your asks and System: Asks (what waits on you) and Designs (the reviews still open), each with its count.
    *  A desk keeps Designs in the sidebar. */
-  let decideCounts = { asks: 0, designs: 0 };
+  let decideCounts = { asks: 0, designs: 0, waiting: [] };
+  /** What waits on the person: the open asks and the design picks waiting (a promoted review is already an ask), one number everywhere. */
+  const waitingTotal = () => decideCounts.asks + decideCounts.waiting.length;
+  /** The total in words: "7 asks · 1 design". */
+  const waitingSplit = () => [decideCounts.asks && plural(decideCounts.asks, 'ask'), decideCounts.waiting.length && plural(decideCounts.waiting.length, 'design')].filter(Boolean).join(' · ');
   const dzOpen = (d) => ['In review', 'Draft', 'Waiting on you'].includes(designStatus(d));
+  /** The newest design waiting, one row above Decide's tabs so it shows without a tab switch; the rest are counted in its line. */
+  function waitingDesign() {
+    const [d, ...more] = decideCounts.waiting;
+    if (!d) return '';
+    return el('a', { class: 'ui-card ui-row dl-dz', href: designHref(d), 'aria-label': `Design waiting, ${d.title}` }, ...uiRow({ tile: cardTile(d), title: d.title, meta: ['Design waiting', more.length && `${more.length} more in Designs`].filter(Boolean).join(' · ') }));
+  }
   function decideSeg(on) {
     const b = (v, href, name, n) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name, el('small', {}, String(n))); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = href; }; return x; };
     return el('div', { class: 'ui-seg dl-seg', role: 'group', 'aria-label': 'Decide' }, b('asks', '#waiting', 'Asks', decideCounts.asks), b('designs', '#designs', 'Designs', decideCounts.designs));
@@ -2469,7 +2479,7 @@
   function decideDesk(top, items, hidden, queue, key, done, today) {
     const old = done.find((x) => x.key === key), i = Math.max(0, queue.findIndex((d) => d.key === key)), d = old ?? queue[i], next = !old && queue.length > 1 ? queue[(i + 1) % queue.length] : undefined;
     deskSel = d?.key ?? '';
-    const asks = queue.filter((d) => !isPick(d)).length, list = [decideList(items, hidden, done, today)], sub = [`${plural(asks, 'ask')} ${asks === 1 ? 'waits' : 'wait'} on you · ${today} answered today`, leashChip()];
+    const asks = queue.filter((d) => !isPick(d)).length, list = [decideList(items, hidden, done, today)], sub = [`${waitingTotal()} waiting on you${waitingSplit() ? ` · ${waitingSplit()}` : ''} · ${today} answered today`, leashChip()];
     if (!d) return split(top, sub, list, pane('', items.length ? emptyState('empty', { mark: 'waiting', title: 'No review open', text: 'Pick one from the list to answer it here.', small: true }) : allClear(true)));
     const bar = {}, page = decidePage(d, next, true, bar);
     return split(top, sub, list, page.matches('.ui-pane') ? page : pane(askHead(d, bar), page));
@@ -2504,7 +2514,7 @@
     }
   };
   const visibleRoutes = (root) => [...new Set([...root.querySelectorAll('a[href]')]
-    .filter((a) => detailRoute.test(a.hash) && a.getClientRects().length && !a.closest(detailScope + ', .detail-sequence, .dl-menu'))
+    .filter((a) => detailRoute.test(a.hash) && a.getClientRects().length && !a.closest(detailScope + ', .detail-sequence, .dl-menu, .dl-dz'))
     .map((a) => a.hash))];
   document.addEventListener('click', (e) => {
     const a = e.target.closest?.('a[href]');
@@ -2724,7 +2734,7 @@
     const decideDone = by.answered.filter(redo), walk = [...decideDone].reverse().concat(decideQueue);
     // On a desk, Decide's list and its ask share the screen, Evidence's list and its update, and Reports' list and its report.
     // On a phone an ask opens as a sheet over Decide's list, so the page under it keeps the list's head.
-    decideCounts = { asks: by.asks.filter((d) => sideOf(d) === 'now').length, designs: by.designs.length };
+    decideCounts = { asks: by.asks.filter((d) => sideOf(d) === 'now').length, designs: by.designs.length, waiting: by.designs.filter((d) => dzOpen(d) && isPick(d)) };
     const deskSplit = !phone() && ((at === 'waiting' || at === 'decide' || at === 'reports') && !state.readonly || at === 'evidence' || inboxAt), head = at === 'decide' ? 'waiting' : at;
     deskSel = null;
     // A report in the address is shown (and read) beside the list; with none, the newest is shown, not yet marked read.
@@ -2752,7 +2762,7 @@
     // A decision lives under Decide; Designs has its own place in the sidebar, and on a phone, as the prototype's dock has it, Designs and Answered light Today, whose More opens them.
     const active = at === 'decide' ? 'waiting' : at === 'answered' ? '' : at === 'ticket' || at === 'activity' ? 'tickets' : at ?? '';
     // Tickets, as the prototype draws its place, carries no count.
-    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? by.asks.length : a && a !== 'tickets' && a !== 'channels' ? by[a].length : undefined);
+    const count = (a) => (a === 'reports' && !state.readonly ? by.reports.filter(unread).length : a === 'inbox' ? needs : a === 'waiting' ? waitingTotal() : a && a !== 'tickets' && a !== 'channels' ? by[a].length : undefined);
     // Ask/inbox badges are red, unread reports ink, evidence plain; Channels carries no count.
     const badge = (a) => (a === 'waiting' || a === 'inbox' ? 'red' : a === 'reports' && !state.readonly ? 'ink' : '');
     const link = ([a, name]) => el('a', { href: `#${a}`, ...(a === active && { 'aria-current': 'page' }) }, icon(`tab-${a || 'today'}`), name,

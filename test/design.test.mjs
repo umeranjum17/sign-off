@@ -597,6 +597,49 @@ test('a merged card is hidden while its shown merger waits, and shown again once
   }
 });
 
+/** What is wrong with a "Waiting on you" total, in words naming both numbers: it must be the asks plus the designs waiting. */
+const waitingFault = (shown, asks, designs) => (shown === asks + designs ? '' : `Waiting on you shows ${shown} but ${asks} asks + ${designs} ${designs === 1 ? 'design' : 'designs'} are waiting, so it should show ${asks + designs}`);
+
+test('Waiting on you counts a waiting design as well as the asks, says the split in words, and shows that design above the tabs, in the hero, the dock, the sidebar and a desk\'s subtitle', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const file = join(scratch, 'waiting-total.json');
+  const [asks, designs] = [3, 1];
+  for (let i = 1; i <= asks; i++) assert.equal(run('raise', file, '--key', `ask-${i}`, '--title', `Ask number ${i}?`).code, 0);
+  const board = JSON.parse(readFileSync(file, 'utf8'));
+  board.items.push({ key: 'look', type: 'design', title: 'Which look should ship?', options: ['a', 'b'].map((v) => ({ value: v, label: v.toUpperCase() })), recommend_value: 'b', filed: new Date().toISOString() });
+  writeFileSync(file, JSON.stringify(board));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const read = async (width, mobile, js) => {
+    const { evaluate, close } = await browse(scratch, width, 900, mobile);
+    try {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#waiting`)}`);
+      let got;
+      await until(async () => (got = await evaluate(js)) !== undefined && got !== null && got !== false);
+      return got;
+    } finally { await close(); }
+  };
+  try {
+    // A phone: the hero, the split line, the tabs and the dock.
+    const phone = await read(390, true, `(() => { const big = document.querySelector('.ui-hero .big'); if (!big) return; const num = (e) => Number(e?.textContent.match(/\\d+/)?.[0]);
+      return { hero: num(big), split: document.querySelector('.ui-hero .hs')?.textContent, tabs: [...document.querySelectorAll('.dl-seg button small')].map((e) => Number(e.textContent)),
+        dock: num(document.querySelector('#tabs a[href="#waiting"] .bd')), row: document.querySelector('.dl-dz')?.textContent ?? '',
+        rowAboveTabs: !!(document.querySelector('.dl-dz')?.compareDocumentPosition(document.querySelector('.dl-seg')) & Node.DOCUMENT_POSITION_FOLLOWING), asksFirstScreen: document.querySelector('.dl-list .dl-face')?.getBoundingClientRect().top < innerHeight } })()`);
+    assert.deepEqual(phone.tabs, [asks, designs], 'the tabs count the asks and the designs');
+    assert.equal(waitingFault(phone.hero, asks, designs), '', waitingFault(phone.hero, asks, designs));
+    assert.equal(phone.split, '3 asks · 1 design');
+    assert.equal(waitingFault(phone.dock, asks, designs), '', `the dock: ${waitingFault(phone.dock, asks, designs)}`);
+    assert.match(phone.row, /Which look should ship\?/, 'the waiting design is on the first screen');
+    assert.ok(phone.rowAboveTabs, 'the design row sits above the tabs');
+    assert.ok(phone.asksFirstScreen, 'the asks stay on the first screen');
+    // A desk: the sidebar's badge and the page's subtitle say the same total and split.
+    const desk = await read(1280, false, `(() => { const sub = document.querySelector('.split-head p, .ui-top p, header p')?.textContent; const side = document.querySelector('#nav a[href="#waiting"] .n'); if (!side) return;
+      return { side: Number(side.textContent), sub: [...document.querySelectorAll('p')].map((p) => p.textContent).find((t) => /waiting on you/.test(t)) } })()`);
+    assert.equal(waitingFault(desk.side, asks, designs), '', `the sidebar: ${waitingFault(desk.side, asks, designs)}`);
+    assert.match(desk.sub, /^4 waiting on you · 3 asks · 1 design/);
+  } finally { proc.kill(); }
+});
+
 test('an interactive page that posts its height gets a frame that fits it, each frame only its own and never past 10000px; a design shows the recommended phone frame first', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'fit'), file = join(dir, 'board.json'), pages = join(dir, 'mocks', 'page');
   mkdirSync(pages, { recursive: true });
@@ -1004,10 +1047,12 @@ test('each card has one place to type: Add a comment holds the note sent with th
   const cards = (dom) => [...dom.matchAll(/<article class="row[^"]*" id="item-(\w+)">(.*?)<\/article>/gs)].map((m) => [m[1], m[2]]);
   const waiting = await dump('#waiting');
   // Decide on a phone: Asks and Designs with their counts, the hero with how many wait, then the asks in one card of rows; More, the line under them, opens Select, Answer all recommended and Move all to later.
-  assert.match(waiting, /<div class="ui-seg dl-seg" role="group" aria-label="Decide"><button type="button" aria-pressed="true">Asks<small>1<\/small><\/button><button type="button" aria-pressed="false">Designs<small>1<\/small><\/button><\/div><section class="ui-card ui-hero"><div class="hl"><span class="lab">Waiting on you<\/span><\/div><div class="hv"><span class="big">1<\/span><\/div><\/section><h2 class="ui-sec">Asks<\/h2><ul class="ui-card ui-list dl-list" aria-label="Asks">/);
+  assert.match(waiting, /<div class="ui-seg dl-seg" role="group" aria-label="Decide"><button type="button" aria-pressed="true">Asks<small>1<\/small><\/button><button type="button" aria-pressed="false">Designs<small>1<\/small><\/button><\/div><section class="ui-card ui-hero"><div class="hl"><span class="lab">Waiting on you<\/span><\/div><div class="hv"><span class="big">2<\/span><\/div><p class="hs">1 ask · 1 design<\/p><\/section><h2 class="ui-sec">Asks<\/h2><ul class="ui-card ui-list dl-list" aria-label="Asks">/);
   assert.match(waiting, /href="#decide\/ship"[^>]*><span class="ui-icon"[^>]*>.*?<span class="t" dir="auto">When should it ship\?<\/span>/s);
   // The design pick is no ask: it is counted and listed under Designs, so Asks does not hold it.
-  assert.doesNotMatch(waiting, /href="#decide\/look"/);
+  assert.doesNotMatch(waiting, /<a class="dl-face[^>]*href="#decide\/look"/);
+  // It is counted in the total and shown once, as the design row above the tabs.
+  assert.match(waiting, /<a class="ui-card ui-row dl-dz" href="#decide\/look"/);
   assert.match(waiting, /<button class="t-more-line" type="button" aria-haspopup="dialog"><span>Select, answer all or move all to later<\/span>/);
   assert.doesNotMatch(waiting, /data-act="sort"|Oldest first/);
   assert.doesNotMatch(waiting, /<ol class="queue"|<p class="fhead"/);
@@ -1683,12 +1728,13 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   const more = (act) => evaluate(`(() => { document.querySelector(".decide-list .t-more-line").click(); document.querySelector('#d-more [data-act="${act}"]').click(); return true; })()`);
   // Decide lists the asks newest first in one card (a board with no filed times reads the file reversed), under the hero's count.
   await until(async () => (await askTitles()) === 'Which day for release?|Keep the weekly digest?');
-  assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big").textContent'), '2');
+  // The total counts the design waiting beside the two asks.
+  assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big").textContent'), '3');
   assert.equal(await heads(), 'Asks');
   // Every row uses the shared project tile; an unlinked ask labels its project as absent.
-  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project"]);
+  assert.deepEqual(await evaluate('[...document.querySelectorAll(".decide-list .dl-list .ui-icon")].map((p) => p.getAttribute("aria-label"))'), ["No project", "No project"]);
   // With no project and no filed time, a row's second line says who asked.
-  assert.equal(await evaluate('[...document.querySelectorAll(".decide-list .ui-row .meta")].map((s) => s.textContent).join("|")'), 'Agent|Agent');
+  assert.equal(await evaluate('[...document.querySelectorAll(".decide-list .dl-list .ui-row .meta")].map((s) => s.textContent).join("|")'), 'Agent|Agent');
   // A design pick is no ask: Asks does not list it, and it opens by its address.
   assert.equal(await evaluate('!!document.querySelector("#item-look")'), false);
   await evaluate('location.hash = "#decide/look"');
@@ -2174,7 +2220,7 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   ({ y } = await row('gamma'));
   await swipe({ x: 360, y }, { x: 30, y });
   await until(async () => (await heads()) === 'Asks|Later1|Answered2');
-  assert.equal(await evaluate('document.querySelector("#toast-text").textContent + "|" + document.querySelector(".ui-hero .big").textContent + " · " + document.querySelector(".ui-hero .vs").textContent + "|" + document.querySelector(".tabs .bd").textContent'), 'Gamma question? · moved to later|0 · 1 for later|1');
+  assert.equal(await evaluate('document.querySelector("#toast-text").textContent + "|" + document.querySelector(".ui-hero .big").textContent + " · " + document.querySelector(".ui-hero .vs").textContent + "|" + (document.querySelector(".tabs .bd")?.textContent ?? "none")'), 'Gamma question? · moved to later|0 · 1 for later|none');
   await evaluate('window.old = true, location.reload()');
   await until(async () => (await evaluate('!window.old')) && (await heads()) === 'Asks|Later1|Answered2');
   // A swipe on an answered row does nothing: it is changed on its ask.
@@ -2946,7 +2992,7 @@ test('a posted contract design is listed under Designs only, never in Decide or 
   await until(async () => (await evaluate('document.querySelector("#item-d1-design .t")?.textContent')) === message.title);
   assert.match(await evaluate('document.querySelector("#item-d1-design .meta")?.textContent'), / · 18 Oct$/); // the row is its title, whose it is and when it came
   assert.equal(await evaluate('document.querySelector("#item-d1-design")?.getAttribute("href")'), '#designs/d1-design');
-  assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big")?.textContent'), '1');
+  assert.equal(await evaluate('document.querySelector(".decide-list .ui-hero .big")?.textContent'), '1'); // the promoted design is the one ask
   assert.match(run('promote', 'd1-design', file, '--undo').out, /unpromoted\[1\]: d1-design/);
   await evaluate('window.old = true, location.reload()');
   await until(async () => (await evaluate('!window.old && document.querySelector(".decide-list .ui-hero .big")?.textContent')) === '0');
