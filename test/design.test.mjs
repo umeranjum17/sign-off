@@ -2770,6 +2770,124 @@ test('opened design headers show a plain title, never a raw filer id, on phone a
   proc.kill();
 });
 
+test('a design pick\'s option previews and their Recommended pill are never clipped by the preview\'s edges at 1280: two fit whole, four scroll from the first option', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-preview-edges'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks', 'layout-pick'), { recursive: true });
+  // The option row is a scroller inside the preview's inset: it starts at the inset's own left edge whatever it holds.
+  const options = [['warm', 'Studio (warm, brief column left)'], ['focus', 'Focus (big canvas, bottom composer)'],
+    ['ledger', 'Ledger (dense, tables first)'], ['quiet', 'Quiet (one column, no rail)']];
+  for (const [value, label] of options) writeFileSync(join(dir, 'mocks', 'layout-pick', `${value}.html`), `<!doctype html><title>${value}</title><p>${label}</p>`);
+  const pick = (key, n) => ({ key, type: 'design', title: `Which studio layout should screen ${n} use?`, filed: new Date().toISOString(),
+    options: options.slice(0, n).map(([value, label]) => ({ value, label })), recommend_value: 'warm',
+    mocks: options.slice(0, n).map(([value]) => ({ value, path: `mocks/layout-pick/${value}.html` })) });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [pick('pick-two', 2), pick('pick-four', 4)] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'browser'), 1280, 800);
+  // The inset, the row, and every option's frame, label and Recommended tag against the inset's own two edges.
+  const measure = `(() => { const r2 = (n) => Math.round(n * 10) / 10, box = (e) => e.getBoundingClientRect(),
+    inset = document.querySelector('.decide-preview'), row = inset.querySelector('.mocks'),
+    pad = (e) => ({ left: box(e).left + parseFloat(getComputedStyle(e).paddingLeft), right: box(e).right - parseFloat(getComputedStyle(e).paddingRight) });
+    const cards = [...row.querySelectorAll('.mock')].map((f) => { const label = f.querySelector('.label'), badge = f.querySelector('.badge'),
+      at = (e) => e && { left: r2(box(e).left), right: r2(box(e).right), cut: e.scrollWidth > e.clientWidth + 1 };
+      return { left: r2(box(f).left), right: r2(box(f).right), label: at(label), badge: at(badge), words: badge?.textContent ?? '' }; });
+    return { inset: { left: r2(box(inset).left), right: r2(box(inset).right), content: pad(inset) }, row: { left: r2(box(row).left), right: r2(box(row).right), ...pad(row),
+      scrollWidth: row.scrollWidth, clientWidth: row.clientWidth, scrollLeft: row.scrollLeft }, cards }; })()`;
+  try {
+    const seen = {};
+    for (const [key, count] of [['pick-two', 2], ['pick-four', 4]]) {
+      await evaluate(`location.href = ${JSON.stringify(`${url}#decide/${key}`)}`);
+      await until(async () => (await evaluate(`document.querySelectorAll('.decide-preview .mocks .mock').length`)) === count);
+      const m = await evaluate(measure);
+      seen[key] = m;
+      // The row begins at the inset's own left edge: centred at its own min-content, a wide row ran past both edges and its first label and tag were cut off.
+      // The row keeps 4px of its own for focus rings, so its first option starts on the inset's left edge within that.
+      assert.ok(Math.abs(m.cards[0].left - m.inset.content.left) <= 4.5, `${key}: the first option starts at ${m.cards[0].left}, not the inset's left edge ${m.inset.content.left}: ${JSON.stringify(m)}`);
+      assert.ok(m.row.left >= m.inset.left - 0.5 && m.row.right <= m.inset.right + 0.5, `${key}: the option row is not inside the inset: ${JSON.stringify(m.row)}`);
+      for (const [i, card] of m.cards.entries()) {
+        // Every option is reachable from the first, and no label or tag is cut by the row's own edge.
+        assert.ok(card.left >= m.row.left - 0.5, `${key}: option ${i} starts at ${card.left}, left of the row's edge ${m.row.left}`);
+        if (card.right <= m.row.right + 0.5) assert.ok(card.label.left >= m.row.left - 0.5 && card.label.right <= m.row.right + 0.5, `${key}: option ${i} label is cut by the row's edges: ${JSON.stringify(card)}`);
+        if (card.badge) {
+          assert.equal(card.words, 'Recommended');
+          assert.equal(card.badge.cut, false, `${key}: the Recommended tag cuts its own words: ${JSON.stringify(card)}`);
+          assert.ok(card.badge.left >= m.row.left - 0.5 && card.badge.right <= Math.min(m.row.right + 0.5, card.right + 0.5), `${key}: the Recommended tag is cut by the edges: ${JSON.stringify(card)}`);
+        }
+      }
+    }
+    // Two options fit whole at 1280: no scrolling, and both are inside the inset's box.
+    const two = seen['pick-two'];
+    assert.equal(two.row.scrollWidth <= two.row.clientWidth + 1, true, `two options do not fit: ${JSON.stringify(two.row)}`);
+    assert.equal(two.cards.length, 2);
+    assert.equal(two.cards.every((c) => c.left >= two.row.left - 0.5 && c.right <= two.row.right + 0.5), true, `both previews sit whole inside the row: ${JSON.stringify(two.cards)}`);
+    const tags = two.cards.filter((c) => c.badge);
+    assert.deepEqual(tags.map((c) => c.words), ['Recommended'], 'only the recommended option carries the tag');
+    assert.equal(tags.every((c) => c.badge.left >= two.row.left - 0.5 && c.badge.right <= Math.min(two.row.right, c.right) + 0.5), true, `the Recommended tag sits whole inside the row: ${JSON.stringify(tags)}`);
+    // Four do not fit at 1280, so the row scrolls and its last option can be reached from the first.
+    const four = seen['pick-four'];
+    assert.equal(four.row.scrollWidth > four.row.clientWidth + 1, true, `four options neither fit nor scroll: ${JSON.stringify(four.row)}`);
+    assert.equal(four.row.scrollLeft, 0, 'the row starts at its first option');
+    const last = four.cards.at(-1);
+    assert.equal(last.right > four.row.right, true, 'the last option starts out past the row, so the row has somewhere to scroll');
+    await evaluate(`(() => { const row = document.querySelector('.decide-preview .mocks'); row.scrollLeft = row.scrollWidth; return row.scrollLeft; })()`);
+    await until(async () => (await evaluate(`(() => { const row = document.querySelector('.decide-preview .mocks'); return row.scrollLeft > 0 && row.scrollLeft >= row.scrollWidth - row.clientWidth - 1; })()`)));
+    const reached = await evaluate(`(() => { const row = document.querySelector('.decide-preview .mocks'), f = [...row.querySelectorAll('.mock')].at(-1), b = f.getBoundingClientRect(), l = f.querySelector('.label').getBoundingClientRect();
+      return { card: [b.left, b.right], label: [l.left, l.right], row: [row.getBoundingClientRect().left, row.getBoundingClientRect().right] }; })()`);
+    assert.ok(reached.card[0] >= reached.row[0] - 0.5 && reached.card[1] <= reached.row[1] + 0.5, `the last option is reachable at the row's end: ${JSON.stringify(reached)}`);
+  } finally {
+    await close();
+    proc.kill();
+  }
+});
+
+test('the phone\'s Designs layout keeps its count on its rows, its real thumbnails and a plain title on an opened pick, and its option row inside the sheet', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'design-phone-intact'), file = join(dir, 'board.json');
+  mkdirSync(join(dir, 'mocks', 'phone-pick'), { recursive: true });
+  writeFileSync(join(dir, 'mocks', 'phone-pick', 'warm.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844"><path fill="#cf291e" d="M0 0h390v844H0z"/></svg>');
+  const pick = (key, title) => ({ key, type: 'design', title, filed: new Date().toISOString(), filer: key,
+    options: [{ value: 'warm', label: 'Studio (warm, brief column left)' }, { value: 'focus', label: 'Focus (big canvas, bottom composer)' }], recommend_value: 'warm',
+    mocks: [{ value: 'warm', path: 'mocks/phone-pick/warm.svg' }, { value: 'focus', path: 'mocks/phone-pick/warm.svg' }] });
+  writeFileSync(file, JSON.stringify({ schema: 2, items: [pick('studio-pick', 'Which studio layout should the brief use?'), pick('canvas-pick', 'Which canvas should the editor open?')] }));
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  const { evaluate, close } = await browse(join(dir, 'browser'), 390, 844, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#designs`)}`);
+    await until(async () => await evaluate('document.querySelectorAll(".dz-list > li").length === 2'));
+    // The Designs label counts the rows the list draws, and every row's thumbnail is a decoded picture, never a blank tile.
+    const list = await evaluate(`(async () => { const rows = document.querySelectorAll('.dz-list > li'),
+      thumbs = [...document.querySelectorAll('.dz-list .pk-thumb img')];
+      for (const img of thumbs) try { await img.decode(); } catch {}
+      return { label: [...document.querySelectorAll('.dl-seg button')].map((b) => /^Designs(\\d+)$/.exec(b.textContent.trim())?.[1]).find(Boolean),
+        rows: rows.length, titles: [...rows].map((r) => r.querySelector('.t')?.textContent ?? ''), thumbs: thumbs.length,
+        painted: thumbs.filter((i) => i.naturalWidth > 0 && i.naturalHeight > 0).length }; })()`);
+    assert.equal(Number(list.label), list.rows, `the Designs label reads ${list.label} but the list draws ${list.rows} rows`);
+    assert.deepEqual(list.titles.sort(), ['Which canvas should the editor open?', 'Which studio layout should the brief use?'].sort(), 'each row names its design in plain words');
+    assert.equal(list.thumbs, list.rows, 'each pick row draws its own thumbnail');
+    assert.equal(list.painted, list.rows, 'every thumbnail is a decoded picture');
+    // An opened pick's sheet names the design plainly, never its key, and its option row and Recommended tag sit inside the sheet.
+    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/studio-pick`)}`);
+    await until(async () => await evaluate('!!document.querySelector(".ask-sheet .mocks .badge")'));
+    const sheet = await evaluate(`(() => { const r2 = (n) => Math.round(n * 10) / 10, box = (e) => e.getBoundingClientRect(),
+      sheet = document.querySelector('.ask-sheet'), row = document.querySelector('.ask-sheet .mocks'), badge = row.querySelector('.badge'),
+      head = [...document.querySelectorAll('.ask-sheet header, .ask-sheet .crumb, .ask-sheet .sh-lab')].map((e) => e.textContent).join('|');
+      return { head, sheet: [r2(box(sheet).left), r2(box(sheet).right)], row: [r2(box(row).left), r2(box(row).right)],
+        badge: [r2(box(badge).left), r2(box(badge).right)], cards: [...row.querySelectorAll('.mock')].map((f) => r2(box(f).width)),
+        scrollLeft: row.scrollLeft }; })()`);
+    assert.ok(!sheet.head.includes('studio-pick'), `the sheet header exposes the raw key: ${sheet.head}`);
+    assert.ok(sheet.head.includes('Which studio layout should the brief use?'), `the sheet header names the design plainly: ${sheet.head}`);
+    assert.equal(sheet.scrollLeft, 0, 'the phone row starts at its first option');
+    assert.ok(sheet.row[0] >= sheet.sheet[0] - 0.5 && sheet.row[1] <= sheet.sheet[1] + 0.5, `the option row sits inside the sheet: ${JSON.stringify(sheet)}`);
+    assert.ok(sheet.cards.every((w) => w <= 128.5), `the phone keeps its option width: ${JSON.stringify(sheet.cards)}`);
+    assert.ok(sheet.badge[0] >= sheet.row[0] - 0.5 && sheet.badge[1] <= sheet.row[1] + 0.5, `the Recommended tag sits inside the row: ${JSON.stringify(sheet)}`);
+  } finally {
+    await close();
+    proc.kill();
+  }
+});
+
 test('a posted contract design is listed under Designs only, never in Decide or a count of asks until Main promotes it, with its preview and date, and opens for a saved approve/change review', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'contract-design-plain-row'), file = join(dir, 'board.json'), source = join(dir, 'design-message.json');
   mkdirSync(join(dir, 'design'), { recursive: true });
