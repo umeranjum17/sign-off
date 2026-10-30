@@ -381,13 +381,15 @@ try {
   facts.keyRow = await js(`(() => { const a = document.querySelector('${rowOf('settings-epic')}'); if (!a) return null;
     const key = a.querySelector('.tk-key'), slugEl = a.querySelector('.tk-row-slug'), title = a.querySelector('.l1 .t');
     const r = a.getBoundingClientRect(), k = key?.getBoundingClientRect(), titleBox = title.getBoundingClientRect();
-    // The slug keeps its own quiet line under the title, in the row's owner line and never on the progress line.
+    // The key is the row's name and leads its title line in the title's own type; the slug is the small second line right under it.
     const slugBox = slugEl?.getBoundingClientRect();
-    return { key: key?.textContent ?? null, onTitleLine: !!k && Math.abs(k.top - titleBox.top) < 12, height: Math.round(r.height), titleWidth: Math.round(titleBox.width), rowWidth: Math.round(r.width),
-      slug: slugEl?.textContent ?? null, slugOnQuietLine: !!slugBox && slugBox.top > titleBox.bottom && !slugEl.closest('.l2') }; })()`);
+    return { key: key?.textContent ?? null, onTitleLine: !!k && Math.abs(k.top - titleBox.top) < 12, keySize: k ? getComputedStyle(k).fontSize : null,
+      height: Math.round(r.height), titleWidth: Math.round(titleBox.width), titleClipped: title.scrollWidth > title.clientWidth + 1, rowWidth: Math.round(r.width),
+      slug: slugEl?.textContent ?? null, slugOnSecondLine: !!slugBox && slugBox.top >= titleBox.bottom - 2 && !slugEl.closest('.l1') }; })()`);
   if (facts.keyRow?.key !== 'JG-101') problems.push(`the epic row does not carry its readable key: ${JSON.stringify(facts.keyRow)}`);
   if (!facts.keyRow?.onTitleLine) problems.push(`the key is not on the row's title line: ${JSON.stringify(facts.keyRow)}`);
-  if (!facts.keyRow?.slugOnQuietLine) problems.push(`the slug is not on its own quiet line under the title: ${JSON.stringify(facts.keyRow)}`);
+  if (!facts.keyRow?.slugOnSecondLine) problems.push(`the slug is not the row's small second line: ${JSON.stringify(facts.keyRow)}`);
+  if (facts.keyRow?.titleClipped) problems.push(`the row's title is cut: ${JSON.stringify(facts.keyRow)}`);
   await js(`document.querySelector('${rowOf('settings-epic')}').scrollIntoView({ block: 'center', behavior: 'instant' })`);
   await capture(phone ? 'key-row' : 'tickets');
   // The same ticket in its page, named by the key, its slug a small line under the title, and its description drawn as formatted text.

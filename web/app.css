@@ -2024,10 +2024,9 @@
   .tk-as.missing .tk-k, .tk-as.missing .tk-k svg { width: 0.875rem; height: 0.875rem; }
   .tk-as.missing .tk-k svg { stroke-width: 1.5; }
   /* The slug shares the owner line: it keeps to under half of it and ellipsises, so the person's own model and lead always read. */
-  .tk-row-slug { min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+  .tk-row-slug { flex: none; min-width: 0; max-width: 45%; margin-right: 0.375rem; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1rem; text-overflow: ellipsis; }
   /* A ticket's priority chip ends its quiet line, so the title line is the title's. */
   .tk-as > .ui-pc { margin-left: auto; }
-  .tk-key { padding: 0 0.25rem; }
   .tk-aw { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .tk-live { display: inline-flex; flex: none; align-items: center; gap: 4px; color: var(--tk-text-secondary); }
   .tk-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--tk-up); }
@@ -2056,10 +2055,10 @@
   .tk-desk .tk-card > .tk-epic > .tk-epic-list { margin: 0; padding: 0; }
   .tk-desk .tk-epic + .tk-epic { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tk-line); }
   .tk-desk .tk-epic .ui-list > li.tk-kid .ui-row { padding-left: 3.5rem; }
-  /* A ticket's readable name (JG-101), on its row's title line and in its page's head, and the slug it replaced as a small line under the page's title. */
-  .tk-key { flex: none; padding: 0 0.375rem; border-radius: 0.375rem; background: var(--tk-inset); color: var(--tk-text-secondary); font-size: var(--tk-fs-small); line-height: 1.125rem;
-    font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; white-space: nowrap; }
-  .tk-shd .tk-key { height: 1.125rem; }
+  /* A ticket's readable name (JG-101) leads its row's title line in the title's own type, not as a chip beside it; the slug it replaced is the row's small second line. */
+  .tk-key { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em; white-space: nowrap; }
+  .tk-shd .tk-key { height: 1.125rem; padding: 0 0.375rem; border-radius: 0.375rem; background: var(--tk-inset); font-size: var(--tk-fs-small); line-height: 1.125rem; }
   .tk-slug { margin: 0.125rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); overflow-wrap: anywhere; }
   /* A description as the sheet draws it: the summary a step larger, then headings, lists, links and quoted words, each with its own spacing. */
   .tk-desc { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); padding: 0.75rem 1rem; }

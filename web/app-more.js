@@ -641,8 +641,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     else l2.replaceChildren(stage, bar, bar && el('span', { class: 'pct' }, `${progress}%`));
     // The quiet line under them: the slug (once a key names the ticket above) and its owner.
     const who = tkOwnerLine(t), chip = link.querySelector('.l1 .ui-pc');
-    if (t.key) who.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id), ' · ');
-    // The priority rides the quiet line's end, not the title's, so the title keeps as much of the row as there is.
+    // The slug is the row's small secondary line, right under the key that names it; whoever owns the ticket and the priority chip follow on the line below.
+    if (t.key) l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
     if (chip) who.append(chip);
     link.querySelector('.rm').append(who);
     return el('li', {}, link);
