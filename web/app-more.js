@@ -2205,7 +2205,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const linkCard = (url) => { const pr = /\/(?:pull|pulls|merge_requests)\/\d+/.test(url); let host = url; try { host = new URL(url).host; } catch {} return artCard(glyph(pr ? 'pr' : 'link'), pr ? changeName(url) : 'New version', pr ? `Pull request · ${host}` : host, url, /^https?:/.test(url)); };
   /** What the person sent, on the right in a bubble, with how far it got under it: Sent, Delivered or Read with its time, and a quiet Not read until its agent has opened it. */
   function youMsg(t, d, who) {
-    const r = t.reply, word = t.taken ? stepWord(t, 0) : t.read || r ? 'Read' : t.delivered ? 'Delivered' : 'Sent', at = t.taken ? t.at : t.read ?? r?.at ?? t.delivered ?? t.at;
+    // The person's own message says how far it got in one word: Replied once the agent has answered it, else Read, else Delivered, else Sent.
+    const r = t.reply, word = t.taken ? stepWord(t, 0) : r ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent', at = t.taken ? t.at : r?.at ?? t.read ?? t.delivered ?? t.at;
     return el('article', { class: 'ib-msg you' }, el('p', { class: 'ib-who' }, el('b', {}, 'You'), el('time', { datetime: t.at }, trailWhen(t.at))),
       el('p', { class: 'ib-say', dir: 'auto' }, youSaid(t, d)),
       el('p', { class: 'ib-rcpt' }, el('time', { datetime: at }, `${word} ${trailWhen(at)}`), unreadByAgent([t]) ? el('span', { class: 'ib-nr', title: `${who} has not read this` }, 'Not read') : ''));
@@ -2309,7 +2310,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const KIND_NAMES = { decision: 'Decision', plan: 'Plan', report: 'Report', design: 'Design', ticket: 'Ticket', proof: 'Proof' };
   const FILTERS = [['all', 'All'], ['decision', 'Decisions'], ['plan', 'Plans'], ['report', 'Reports'], ['design', 'Designs'], ['ticket', 'Tickets'], ['proof', 'Proofs']];
   const SECTIONS = [['new', 'New'], ['turn', 'Decide'], ['agent', 'Waiting on agents'], ['done', 'Done']];
-  let inKind = 'all', inFind = '', inDone = false, inFlt = '';
+  let inKind = 'all', inFind = '', inDone = false, inFlt = '', inAgent = '';
   const inMore = new Set();
   const threadKind = (d) => (d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : d.kind === 'report' || ['reports', 'notes'].includes(area(d)) ? 'report' : 'decision');
   /** What the person sent, in their words: an answer as it reads, a comment's text, else what it was. */
@@ -2374,11 +2375,18 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */
   function inboxList(all, key) {
     const q = inFind.trim().toLowerCase(), time = (t) => Date.parse(t.at) || 0, out = [];
-    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0) && (!q || [t.name ?? t.tk.title, ...(t.cards ?? []).flatMap((c) => [title(c), c.about ?? '', projectName(c) ?? ''])].join(' ').toLowerCase().includes(q)));
+    const agentOf = (t) => (t.d ?? t.cards?.at(-1))?.by ?? '';
+    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!inAgent || agentOf(t) === inAgent) && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0) && (!q || [t.name ?? t.tk.title, ...(t.cards ?? []).flatMap((c) => [title(c), c.about ?? '', projectName(c) ?? ''])].join(' ').toLowerCase().includes(q)));
     const count = (k) => all.filter((t) => t.st !== 'done' && (k === 'all' || t.kind === k)).length;
     const box = el('input', { type: 'search', id: 'ib-find', 'aria-label': 'Search the inbox', placeholder: 'Search', autocomplete: 'off', enterkeyhint: 'search' });
     box.value = inFind;
     box.oninput = () => { inFind = box.value; const at = box.selectionStart; render(); const b = document.getElementById('ib-find'); b?.focus(); b?.setSelectionRange(at, at); };
+    // The people this board hears from, each a filter of the rail: the only fact the board holds about an agent is its name.
+    const agents = [...new Set(all.map((t) => (t.d ?? t.cards?.at(-1))?.by).filter(Boolean))].sort();
+    const people = agents.length > 1 ? el('div', { class: 'ib-people', role: 'group', 'aria-label': 'Show one agent' },
+      ...agents.map((name) => { const n = all.filter((t) => ((t.d ?? t.cards?.at(-1))?.by ?? '') === name).length, b = el('button', { type: 'button', class: 'ib-chip ib-person', 'aria-pressed': String(inAgent === name) }, el('span', { dir: 'auto' }, name), el('b', {}, String(n)));
+        b.onclick = () => { inAgent = inAgent === name ? '' : name; render(); };
+        return b; })) : '';
     const chips = el('div', { class: 'ib-chips', role: 'group', 'aria-label': 'Show one kind' }, ...FILTERS.filter(([k]) => k === 'all' || k === inKind || k === 'ticket' || all.some((t) => t.kind === k)).map(([k, w]) => {
       const b = el('button', { type: 'button', class: 'ib-chip', 'aria-pressed': String(inKind === k) }, w, count(k) ? el('b', {}, String(count(k))) : '');
       // The ticket roll-up is the board's largest part: it is read when Tickets is picked.
@@ -2401,15 +2409,107 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       out.push(el('section', { class: 'ib-sec', 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('span', { class: 'n' }, String(mine.length))),
         el('ul', { class: 'ui-card ui-list ib-list' }, ...mine.slice(0, cap).map((t) => inboxRow(t, t.id === key))), mine.length > cap ? more : ''));
     }
-    // The rail's two quiet entries: the agents' own talk (read-only, the Channels room) and the finished threads.
+    // A search that names something the agents said finds it in #fleet, whatever kind of thread it sits in.
+    if (q && fleet.messages.length) {
+      const hits = fleet.messages.filter((m) => `${m.text} ${m.from} ${m.thread ?? ''}`.toLowerCase().includes(q)).slice(-6).reverse();
+      if (hits.length) out.push(el('section', { class: 'ib-sec', 'aria-label': 'In #fleet' }, el('h2', { class: 'ui-sec' }, 'In #fleet', el('span', { class: 'n' }, String(hits.length))),
+        el('ul', { class: 'ui-card ui-list ib-list' }, ...hits.map((m) => el('li', {}, el('a', { class: 'ui-row ib-row', href: '#inbox/fleet' },
+          el('span', { class: 'rm' }, el('span', { class: 'ib-ag', dir: 'auto' }, m.from || 'Agent'), el('span', { class: 't', dir: 'auto' }, m.thread || '#fleet'), el('span', { class: 'l2 meta', dir: 'auto' }, m.text.slice(0, 140))),
+          el('span', { class: 'ib-side' }, el('time', { datetime: new Date(m.at * 1000).toISOString() }, fleetAt(m.at)))))))));
+    }
+    // The rail's quiet entries: the agents' own group channel and room, and the finished threads.
     const doneN = all.filter((t) => t.st === 'done').length, doneB = el('button', { type: 'button', class: 'ib-ent ib-done', 'aria-pressed': String(inDone) }, el('span', {}, 'Done'), el('b', {}, String(doneN)));
     doneB.onclick = () => { inDone = !inDone; render(); if (inDone) document.querySelector('.ib-sec[aria-label="Done"]')?.scrollIntoView({ block: 'nearest' }); };
-    const foot = el('nav', { class: 'ib-foot', 'aria-label': 'More in the inbox' }, el('a', { class: 'ib-ent ib-agents', href: '#channels' }, el('span', {}, 'Agents'), el('small', {}, 'read-only')), doneB);
+    const foot = el('nav', { class: 'ib-foot', 'aria-label': 'More in the inbox' },
+      el('a', { class: 'ib-ent ib-fleet', href: '#inbox/fleet' }, el('span', {}, '#fleet'), el('small', {}, fleetMuted() ? 'muted' : 'agents')),
+      el('a', { class: 'ib-ent ib-agents', href: '#channels' }, el('span', {}, 'Agents'), el('small', {}, 'read-only')), doneB);
     // One row for every filter, kinds then the two unread sides, scrolling sideways rather than wrapping under itself. On a phone the rail's two entries sit right under it, so they are on the first screen.
     const bar = el('div', { class: 'ib-bar' }, chips, flt);
-    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), bar, ...(phone() ? [foot] : []),
+    return [el('label', { class: 'ib-find', role: 'search' }, document.getElementById('dock-find').firstChild.cloneNode(true), box), people, bar, ...(phone() ? [foot] : []),
       ...(out.length ? out : [el('p', { class: 'ib-empty' }, q ? `Nothing matches “${inFind.trim()}”` : inFlt === 'fresh' ? 'No unread replies from agents.' : inFlt === 'unread' ? 'Every agent has read what you sent.' : inKind === 'ticket' && tkLoad() === 'loading' ? 'Reading the tickets…' : 'Nothing here.')]), ...(phone() ? [] : [foot])];
   }
+  /* ---- #fleet: the agents' own group channel, read from the fleet's own record and drawn with this thread's bubbles, so it is the same chat with more participants.
+     Nothing new is stored: the messages are the fleet's, the mute is this board's own setting, and a mention is a board link resolved to the title a person reads. ---- */
+  const FLEET_MUTED = 'so-fleet-muted';
+  let fleet = { messages: [], ready: false, error: '', tag: '', asked: false, drawn: '' };
+  let fleetTimer = 0;
+  const fleetMuted = () => { try { return localStorage.getItem(FLEET_MUTED) === '1'; } catch { return false; } };
+  const setFleetMuted = (on) => { try { on ? localStorage.setItem(FLEET_MUTED, '1') : localStorage.removeItem(FLEET_MUTED); } catch {} };
+  const fleetAt = (sec) => trailWhen(new Date(sec * 1000).toISOString());
+  /** A board mention inside an agent's words: #reports/<key>, #tickets/<id>, #inbox/<key>, resolved to the title it carries. */
+  const MENTION = /#(inbox|reports|tickets|waiting|designs|evidence)\/([\w.~-]+)/g;
+  function mentionOf(kind, handle) {
+    const card = (state.decisions ?? []).find((d) => d.key === handle), tk = kind === 'tickets' ? tkById(handle) : undefined;
+    const name = tk?.title ?? (card ? (card.type === 'evidence' ? headline(card) : title(card)) : ''), label = { reports: 'report', tickets: 'ticket', inbox: 'thread', waiting: 'decision', designs: 'design', evidence: 'proof' }[kind];
+    // A card opens where the board keeps it when that place lists it, and otherwise in the thread that holds it, which always resolves.
+    const place = card ? (card.type === 'evidence' ? 'evidence' : card.type === 'plan' ? 'waiting' : area(card) === 'designs' ? 'designs'
+      : ['reports', 'notes'].includes(area(card)) && !isAnswered(card) ? 'reports' : 'inbox') : 'inbox';
+    return { href: kind === 'tickets' ? `#ticket/${handle}` : `#${place}/${handle}`, name: name || `${label} ${handle}`, label };
+  }
+  /** The words of a message with its mentions as chips: a title a person can tap, never an id. */
+  function withMentions(text) {
+    const s = String(text ?? ''), out = [];
+    let last = 0;
+    for (const m of s.matchAll(MENTION)) {
+      if (m.index > last) out.push(s.slice(last, m.index));
+      const found = mentionOf(m[1], m[2]), card = (state.decisions ?? []).some((d) => d.key === m[2]) || (m[1] === 'tickets' && tkById(m[2]));
+      // A mention of something this board does not hold stays as the agent's own words: no chip, and never a made-up title.
+      if (!card) out.push(m[0]);
+      else out.push(el('a', { class: 'ib-mention', href: found.href, 'aria-label': `${found.label}: ${found.name}`, dir: 'auto' }, el('span', {}, found.name), el('small', {}, `· ${found.label}`)));
+      last = m.index + m[0].length;
+    }
+    if (last < s.length) out.push(s.slice(last));
+    return out;
+  }
+  /** #fleet's messages, once: the fleet's feed when it has one, else its status log; a page the board cannot read says so rather than showing nothing. */
+  async function fleetRead() {
+    if (FROZEN) { fleet.ready = true; fleet.error = 'Communications are available on the live board.'; return; }
+    try {
+      const res = await fetch('/api/channels', { cache: 'no-store', signal: AbortSignal.timeout(12000), headers: fleet.tag ? { 'if-none-match': fleet.tag } : {} });
+      if (res.status === 304) return;
+      if (!res.ok) throw new Error('Could not read #fleet.');
+      fleet.tag = res.headers.get('etag') || '';
+      const body = await res.json();
+      fleet.ready = true;
+      if (!body.available) { fleet.error = body.error || 'The fleet’s own record could not be read.'; return; }
+      fleet.error = '';
+      fleet.messages = (body.messages ?? []).map((m) => ({ ...m, text: commsText(m.text) }));
+      if (location.hash.startsWith('#inbox/fleet')) render();
+    } catch { fleet.ready = true; fleet.error = 'Connection lost. Showing what was last read.'; }
+  }
+  let fleetTickets = false;
+  // A mention of a ticket is resolved to its title the same way a card's is, so #fleet reads the ticket roll-up once.
+  const fleetWatch = () => {
+    if (!fleetTickets) { fleetTickets = true; Promise.resolve(readTickets()).then(() => { if (location.hash.startsWith('#inbox/fleet')) render(); }); }
+    if (!fleet.asked) { fleet.asked = true; fleetRead(); } if (!fleetTimer) fleetTimer = setInterval(() => { if (location.hash.startsWith('#inbox')) fleetRead(); }, 6000); };
+  /** One message of the channel: the agent's name and time, its words with mentions as chips, and a quiet word for what kind of message it is. */
+  function fleetMsg(m) {
+    const rt = m.runtime && !/runtime not recorded/.test(m.runtime) ? m.runtime : '';
+    return el('article', { class: 'ib-msg' }, el('p', { class: 'ib-who' }, el('b', { dir: 'auto' }, m.from || 'Agent'), el('time', { datetime: new Date(m.at * 1000).toISOString() }, fleetAt(m.at)), rt ? el('span', { class: 'ib-rt', dir: 'auto' }, rt) : ''),
+      el('p', { class: 'ib-say', dir: 'auto' }, ...withMentions(m.text)), el('p', { class: 'ib-rcpt' }, `${m.kind || 'message'}${m.thread ? ` · ${m.thread}` : ''}`));
+  }
+  /** The channel's head: who is in it, and the mute that applies here and nowhere else. */
+  function fleetHead(desk) {
+    const members = [...new Set(fleet.messages.map((m) => m.from).filter(Boolean))];
+    const mute = el('button', { type: 'button', class: 'ib-mute', 'aria-pressed': String(fleetMuted()), 'aria-label': fleetMuted() ? 'Unmute #fleet' : 'Mute #fleet' },
+      glyph(fleetMuted() ? 'bell-off' : 'bell'), fleetMuted() ? 'Muted' : 'Mute');
+    mute.onclick = () => { setFleetMuted(!fleetMuted()); render(); };
+    return el('div', { class: 'ib-head' }, desk ? el('a', { class: 'ui-rb', href: '#inbox', 'aria-label': 'Back to the inbox' }, glyph('left')) : '',
+      el('span', { class: 'ib-crumb' }, el('span', { class: 'ib-kind' }, 'Group channel'), el('span', {}, `${members.length} ${members.length === 1 ? 'agent' : 'agents'}`)), mute);
+  }
+  /** #fleet as a conversation: the same bubbles as a thread, with the agents' own names, and a banner that says what mute does not do. */
+  function fleetView(desk) {
+    const muted = fleetMuted(), msgs = fleet.messages;
+    const stream = el('div', { class: 'ib-chat', role: 'log', 'aria-label': 'Messages in #fleet, oldest first' },
+      ...(msgs.length ? msgs.map(fleetMsg) : [fleet.ready ? el('p', { class: 'ib-empty' }, fleet.error ? fleet.error : 'No messages yet. The agents’ own talk lands here.') : el('p', { class: 'ib-empty' }, 'Reading #fleet…')]));
+    return el('article', { class: `ib-thread${desk ? ' desk' : ''}`, 'aria-labelledby': 'ib-fleet-title' }, fleetHead(desk),
+      desk ? el('h1', { class: 'ib-ttl', id: 'ib-fleet-title', tabindex: '-1' }, '#fleet') : '',
+      el('div', { class: 'ib-meta' }, el('span', { class: 'ib-state agent' }, `${msgs.length} ${msgs.length === 1 ? 'message' : 'messages'} · the agents among themselves`)),
+      muted ? el('p', { class: 'ib-mutebar', role: 'status' }, el('b', {}, 'Muted'), ' · #fleet stays quiet; a message that mentions a report or a ticket still lands in your inbox.') : '',
+      stream);
+  }
+  /** #fleet over the inbox on a phone: its own screen, with a back link to the list. */
+  const fleetScreen = () => [el('header', { class: 'ui-top' }, el('a', { class: 'ui-rb', href: '#inbox', 'aria-label': 'Back to the inbox' }, glyph('left')), el('h1', { tabindex: '-1' }, '#fleet'), themeButton()), fleetView(false)];
   /** An item answered in its thread's own place (an ask in its sheet, or in the pane beside its thread on a desk); a plan, a design, a page to read and a proof open in the reader. */
   const inPlace = (d) => d.type !== 'plan' && d.kind !== 'design' && !reads(d) && d.type !== 'evidence';
   /** Every reply not opened yet, oldest first. */
@@ -2430,16 +2530,17 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),
    *  and an item opened from its thread beside that thread. The thread and the item draw from app-more.js. */
   function inboxScreen(all, key, open) {
-    const th = threadFor(all, key, open);
+    const th = threadFor(all, key, open), channel = key === 'fleet';
     // The address #find opens Search over the inbox.
     if (location.hash === '#find' && !searchSheet.open) openSearch();
-    if (phone() && !th) ibAt = '';
-    if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, th?.id ?? key)];
+    fleetWatch();
+    if (phone() && !th && !channel) ibAt = '';
+    if (phone()) return channel && moreReady ? fleetScreen() : th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, th?.id ?? key)];
     const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done' && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0)).sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
     const shown = th ?? first;
     deskSel = shown?.id ?? '';
     const top = el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'));
-    const desk = moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''));
+    const desk = channel && moreReady ? split(top, inboxSub(all), inboxList(all, 'fleet'), pane('', fleetView(true))) : moreReady ? threadDesk(top, inboxSub(all), inboxList(all, shown?.id), shown, open && th) : split(top, inboxSub(all), inboxList(all, shown?.id), pane('', ''));
     desk.querySelector?.('.ui-dgrid')?.classList.add('ib-rail');
     return [desk];
   }

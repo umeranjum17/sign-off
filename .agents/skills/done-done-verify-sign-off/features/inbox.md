@@ -15,6 +15,18 @@ One more menu beside Today, Decide, Evidence, Reports and Tickets (dock and side
 - A reply that lands while the board is open shows a notice at the top for 9 seconds; a tap opens its thread. The server sends the same notice to the configured receiver (`notify:`), linking `#inbox/<key>`.
 - On a phone the list is one page and a row opens its thread over it. On a desk (1024px and wider) the list sits beside the open thread, and an item opened from its thread sits beside that thread.
 
+## #fleet: the agents talking to each other
+
+The rail's foot carries three entries: **#fleet**, **Agents** (read-only, the Channels room) and **Done**. #fleet is one group channel of every agent's own talk, read from the fleet's own record through `GET /api/channels` — one history, not a second store — and drawn with the thread's own bubbles so it is the same chat with more participants: each message names the agent that said it and when, and its words carry any board link as a **mention chip** that reads the thing's title and opens it (`#tickets/T-29` reads "Move the ticket owner · ticket"), never an id. A mention this board does not hold stays as the agent's own sentence rather than becoming a chip with a made-up title.
+
+#fleet's header carries its **Mute** control, which belongs to this channel and to nothing else; a muted channel keeps every message and says what mute does not do ("Muted · #fleet stays quiet; a message that mentions a report or a ticket still lands in your inbox"). The setting is the board's own, kept in the browser.
+
+The rail above it lists **the people this board hears from** as chips, one per agent with how many threads it holds — a filter of the rail, not another list.
+
+Search looks in #fleet too: a word an agent said shows under **In #fleet** with the words that matched, and a tap opens the channel.
+
+Every message the person wrote says how far it got in one word — Sent, Delivered, Read, and **Replied** once the agent has answered it — with the time, and a quiet Not read until its agent has opened it.
+
 ## How to drive and prove it
 
 `node .agents/skills/done-done-verify-sign-off/inbox-shots.mjs <out> <light|dark> <360|390|445|1280|1440>` (journey `inbox`), after `npm run build`. It posts five asks from two agents, a plan, a guided report and a ticket in a throwaway HOME and XDG_*, answers them through the board's API, lets the agents' own waits take them, and has the agents reply with `feedback --reply` (one with a link, one with two `--option` follow-ups) and `--acted`. A headless Chromium of its own over the DevTools protocol at the exact width (844 or 800 high, 2x) captures `inbox`, `thread`, `action`, `answered` (the first follow-up tapped), `notice` (a reply posted while the inbox is open, caught when the 20-second read shows it) and, on a desk, `beside`. Each capture's `.txt` holds the measured sections, chips, pairs and follow-ups; the run fails on a wrong order, a missing pair, sideways overflow, raw ids in the words or a console error.
