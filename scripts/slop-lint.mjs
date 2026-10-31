@@ -174,6 +174,7 @@ function browserTool(name) {
     // Wait for the screen the page draws for itself, then read it once it has settled.
     settle: (ready) => ax(['run'], `const wait = async (s) => { for (let i = 0; i < 200; i++) { if (await page.eval('() => !!document.querySelector(' + JSON.stringify(s) + ')')) return; await new Promise((r) => setTimeout(r, 100)); } throw new Error('Not ready: ' + s); };\nawait wait(${JSON.stringify(ready)}); await new Promise((r) => setTimeout(r, 900));`),
     shot: (path) => ax(['screenshot', path]),
+    write: (body) => ax(['run'], `await page.eval(${JSON.stringify(`() => {${body}}`)});`),
     measure: () => JSON.parse(ax(['run'], `console.log(JSON.stringify(await page.eval(${JSON.stringify(MEASURE)})));`).trim().split('\n').pop()),
     stop: () => { run('chrome-devtools-axi', ['stop'], session); },
   };
@@ -220,8 +221,9 @@ const line = (f) => `slop ${f.rule} ${locator(f)}${f.ratio ? ` ${f.ratio}:1` : '
 /** The self-check this lint leaves behind: one bad page, every rule fired, in the same format a real failure prints in. */
 async function seed(out) {
   const bad = `<title>Seed</title>
+<h1 style="font:600 20px system-ui">A page with slop on it</h1>
 <p>You are absolutely right, great question! \u{1F680}</p>
-<p>${'A single sentence that runs on far past any budget a person can read on a phone screen, ' .repeat(4)}and it keeps going.</p>
+<p>${'A single sentence that runs on far past any budget a person can read on a phone screen, '.repeat(4)}and it keeps going.</p>
 <p>Fixed in commit 4f2a9c1d3b7e5a6089bc, ticket t_b4x9zq, fm/slop-lint-fails-the-build-on-filler-walls-of-te-b4</p>
 <div style="background:#101010"><span style="color:#3a3a3a">Grey on near-black, which is what a token pair hides</span></div>
 <div class="chip" style="width:120px;height:32px;background:#e8e8e8;border-radius:8px"></div>`;
@@ -235,11 +237,25 @@ async function seed(out) {
     browser.emulate('390x844x2,mobile,touch', 'light');
     browser.open(page);
     found.push(...browser.measure().fails.map((f) => ({ ...f, file: 'seed/page.html', line: 4, ...(f.rule === 'low-contrast' ? { decl: { file: 'seed/page.html', line: 5 } } : {}) })));
-    if (out) { mkdirSync(out, { recursive: true }); browser.shot(join(out, 'slop-seed.png')); }
   } finally { browser.stop(); }
-  for (const f of found) console.log(line(f));
   const blind = ['filler', 'emoji', 'internal-id', 'wall', 'blank-block', 'low-contrast'].filter((rule) => !found.some((f) => f.rule === rule));
-  console.log(blind.length ? `slop lint seed: BLIND to ${blind.join(', ')}` : `slop lint seed: ${found.length} failures, every rule fired`);
+  const verdict = blind.length ? `slop lint seed: BLIND to ${blind.join(', ')}` : `slop lint seed: ${found.length} failures, every rule fired`;
+  for (const f of found) console.log(line(f));
+  console.log(verdict);
+  if (out) {
+    // The frame the self-check leaves: the seeded page with the lint's own verdict above it, so one picture carries both halves of the claim.
+    mkdirSync(out, { recursive: true });
+    const frame = browserTool('seed-frame');
+    try {
+      const page = `data:text/html,${encodeURIComponent(`<!doctype html><meta charset="utf-8">${bad}`)}`;
+      frame.open(page);
+      frame.emulate('390x844x2,mobile,touch', 'light');
+      frame.open(page);
+      frame.write(`const v = document.createElement('pre'); v.style.cssText = 'all:initial;display:block;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;background:#121210;color:#f4f2ef;padding:12px';
+        v.textContent = ${JSON.stringify([...found.map(line), verdict].join('\n'))}; document.body.prepend(v);`);
+      frame.shot(join(out, 'slop-seed.png'));
+    } finally { frame.stop(); }
+  }
   process.exit(blind.length ? 2 : found.length ? 1 : 2);
 }
 
