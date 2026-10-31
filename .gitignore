@@ -2,6 +2,8 @@ node_modules/
 dist/
 demo-dist/
 *.answers.jsonl
+*.report-actions.jsonl
+*.report-learnings.jsonl
 *.board.log
 *.tgz
 .live-check/

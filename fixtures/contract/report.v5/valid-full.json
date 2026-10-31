@@ -14,6 +14,7 @@
   "title": "Which push service fits a team of two",
   "project": "Beacon",
   "purpose": "research",
+  "actions": {"role": "addons lead", "owner": "Ada", "first_pull_request": "2026-11-06", "recommended": "approve"},
   "group": "Beacon",
   "about": "Five services compared on cost, delivery on a phone and setup time. Two fit; one is free up to our size.",
   "sections": [

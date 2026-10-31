@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -1312,6 +1312,57 @@ function reopen(args: string[]) {
   });
 }
 
+/** The person's three actions on a report, and Reopen: Approve starts the build by minting a queued ticket the fleet reads, Refine sends it
+ *  back to its owner with a note, Reject closes it and records the reason as a learning, and Reopen puts a closed one back on its block.
+ *  Every one of them is a line in <board>.report-actions.jsonl, which is what the fleet side reads (docs/file-formats.md). */
+function reportAction(file: string, input: any): { action: string; key: string; at: string; who: string; ticket?: string } {
+  const { key, action, note, reason } = input ?? {};
+  if (!isKey(key)) throw new InputError('Name the report by its key, 1-128 of A-Z a-z 0-9 . _ -');
+  if (!['approve', 'refine', 'reject', 'reopen'].includes(action)) throw new InputError('The action is approve, refine, reject or reopen');
+  const d = board(file).find((x) => x.key === key);
+  if (!d || d.kind !== 'report') throw new InputError(`${key} is not a report on this board`);
+  const actions = d.actions as ReportActions | undefined;
+  if (!actions) throw new InputError(`${key} declares no actions, so there is nothing to approve, refine or reject: post it again with an "actions" block`);
+  const at = new Date().toISOString().slice(0, 19) + 'Z', who = actions.owner?.trim() || actions.role.trim();
+  const prior = readReportActions(file)[key], closed = prior?.action === 'reject', approved = prior?.action === 'approve';
+  const base = { key, at, role: actions.role, ...(actions.owner && { owner: actions.owner }), who, ...(d.version && { version: d.version }) };
+  const refuse = (why: string) => { throw new InputError(why); };
+  if (action === 'reopen') {
+    if (!prior || prior.action === 'reopen') refuse(`${key} is already open`);
+    if (approved) refuse(`${key} is approved and its build has started: a running build is not reopened`);
+    appendReportAction(file, { ...base, action: 'reopen', result: 'open' });
+    return { action, key, at, who };
+  }
+  if (approved) refuse(`${key} is approved and its build has started: a running build is not reopened`);
+  if (closed && prior!.action === action) refuse(`${key} is already closed: reopen it first`);
+  if (closed) refuse(`${key} is closed: reopen it first`);
+  if (action === 'refine') {
+    const text = typeof note === 'string' ? note.trim() : '';
+    if (!text) refuse('Refine needs a note: one line on what should change');
+    if ([...text].length > NOTE_MAX) refuse(`The note is ${[...text].length} characters; keep it to ${NOTE_MAX}`);
+    appendReportAction(file, { ...base, action: 'refine', result: 'version', note: text });
+    return { action, key, at, who };
+  }
+  if (action === 'reject') {
+    const reasons = actions.reasons?.length ? actions.reasons : REPORT_REASONS, picked = typeof reason === 'string' ? reason.trim() : '';
+    if (!reasons.includes(picked)) refuse(`Pick a reason: ${reasons.join(', ')}`);
+    const text = typeof note === 'string' ? note.trim() : '';
+    if ([...text].length > NOTE_MAX) refuse(`The line is ${[...text].length} characters; keep it to ${NOTE_MAX}`);
+    // The reason is the owner's rule from now on: what the person typed when they typed anything, else the reason said as a rule.
+    const rule = text ? (/[.!?]$/.test(text) ? text : `${text}.`) : `Check for "${picked}" before proposing work like this again.`;
+    appendReportAction(file, { ...base, action: 'reject', result: 'closed', reason: picked, ...(text && { note: text }) });
+    appendReportLearning(file, { key, at, role: actions.role, ...(actions.owner && { owner: actions.owner }), who, reason: picked, ...(text && { note: text }), rule });
+    return { action, key, at, who };
+  }
+  // Approve: the build starts through the ticket the board already keeps for the fleet, never a second mechanism.
+  const ticket = `build-${key}`, project = d.project, title = d.title.slice(0, 160);
+  appendTicket(file, { id: ticket, title, progress: 0, state: 'queued', stage: 'queued', asked: true, type: 'ticket', by: 'sign-off',
+    ...(project && { project }), ...(d.priority && { priority: d.priority }), last_event_at: Math.floor(Date.now() / 1000),
+    description: `Approved from report ${key}. ${who} starts the build; the first pull request lands by ${actions.first_pull_request ?? 'a day the owner names'}.` });
+  appendReportAction(file, { ...base, action: 'approve', result: 'build', ticket });
+  return { action, key, at, who, ticket };
+}
+
 /** promote <key> [board.json] [--undo]: Main puts a design review it passed in front of the user, in Decide; --undo takes it back to Designs. */
 function promote(args: string[]) {
   const at = args.findIndex((a) => !a.startsWith('-') && !existsSync(a) && !a.endsWith('.json')), key = args[at];
@@ -1992,7 +2043,10 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       // A card the lead reopened (sign-off-axi reopen) may be asked again on its key: the new question or round replaces the old one, filed now, and its earlier answer stays in the thread.
-      const again = !!had && reopened.has(d.key) && differs();
+      // A report the owner redid is the same card one version on: it replaces the report in place, never a second card and never a new key, and it
+      // keeps the day it was first filed and every version it has had.
+      const bumped = !!had && had.kind === 'report' && d.kind === 'report' && Number.isInteger(d.version) && d.version! > (had.version ?? 1) && !!d.changes?.length;
+      const again = !!had && (bumped || (reopened.has(d.key) && differs()));
       if (had && !again && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
@@ -2000,12 +2054,13 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
         items.push({ filed: now, ...raw[i] });
       } else if (again) {
         fits(d.title, d.key);
-        items[items.findIndex((x) => x?.key === d.key)] = { filed: now, ...raw[i] };
+        items[items.findIndex((x) => x?.key === d.key)] = { filed: bumped ? (had.filed ?? now) : now, ...raw[i],
+          ...(bumped && { versions: [...(had.versions ?? []), { version: d.version!, at: now, changes: d.changes }] }) };
       }
-      return { key: d.key, status: !had ? 'raised' : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : bumped ? `version ${d.version} posted` : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     let picked: Answer[] = [];
-    if (raised.some((r) => r.status === 'raised' || r.status === 'raised again')) {
+    if (raised.some((r) => r.status === 'raised' || r.status === 'raised again' || /^version \d+ posted$/.test(r.status))) {
       const before = waitingKeys(file);
       writeItems(file, items);
       // On the leash Act, then tell me, a new ask takes its agent's recommended pick at once: the person sees it and can still change it.
@@ -2828,7 +2883,7 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 /** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
 const stampOf = (path: string) => { try { const st = statSync(path); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return ''; } };
 /** The files beside the board that hold what it shows: every answer, comment, ticket, read and handed-over reply changes the board's state. */
-const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery'];
+const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery', 'report-actions', 'report-learnings'];
 /** The files a board read is made from that are named without reading the board: the board itself, its sidecars, and the config and token beside it. */
 const stateSources = () => [file, config, tokenFile(file), ...SIDECARS.map((side) => `${file.replace(/\.json$/, '')}.${side}.jsonl`)];
 /** The files a read was built from beyond those, with the stamp each had: a run's proof or a mock replaced on disk is a new read. */
@@ -2964,6 +3019,9 @@ const state = () => {
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
     tickets: withRecords(rollUp(readTickets(file, warn)), file),
     projects: readProjects(file, warn),
+    // A report's own three actions, as the person took them, and the rules their rejections left on the owners.
+    report_actions: readReportActions(file),
+    report_learnings: readReportLearnings(file),
   };
 };
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
@@ -3331,7 +3389,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
   if (tickets) return tickets;
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
   // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
@@ -3423,6 +3481,13 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // The same rule as `sign-off-axi reopen`: the answer stays as history, the card waits again, and the same three cases are refused.
     const { key } = JSON.parse(body) ?? {};
     try { await locked(`${file}.lock`, () => reopenCard(file, key)); } catch (e) { if (e instanceof ReopenError) return [e.status, { error: e.message }]; throw e; }
+    return [200, state()];
+  }
+  if (req.url === '/api/report-action') {
+    // Approve, Refine, Reject and Reopen on a report: the three actions its own block declares, recorded as the fleet side reads them.
+    let input: any;
+    try { input = JSON.parse(body); } catch { return [400, { error: 'Send one JSON object: {"key","action","note"?,"reason"?"}' }]; }
+    try { await locked(`${file}.lock`, () => reportAction(file, input)); } catch (e) { if (e instanceof InputError) return [409, { error: e.message }]; throw e; }
     return [200, state()];
   }
   if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {

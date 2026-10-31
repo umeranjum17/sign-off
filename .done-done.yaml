@@ -264,8 +264,10 @@ journeys:
   # One sealed merge run includes the Inbox redo and the required Designs 1440 dark capture.
   inbox-layout-redo:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-merge-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # Every card kind's actions at 390 and 1280 in light and dark, then the report Actions block in each state with both replays as text,
+  # then the required Designs capture at 1440, dark, in the same run.
   board-actions:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/board-actions.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-actions-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
   # loader on screen), a poll that brings a new ask, and answering a card, with the main region read on every frame. It fails on a blank region, on a
   # region or row rebuilt under the person (the flash: every picture re-decoded and every entry animation played again), or on a read with no loader.

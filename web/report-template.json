@@ -9,6 +9,12 @@
   "about": "FILL: why it matters, in 2 sentences",
   "project": "FILL: the project this report is about",
   "group": "FILL: section name",
+  "actions": {
+    "role": "FILL: the role that does the work, such as addons lead",
+    "owner": "FILL: the name of who does it, or leave this line out",
+    "first_pull_request": "FILL: YYYY-MM-DD, the day the first pull request lands",
+    "recommended": "FILL: approve, refine or reject"
+  },
   "understood": [
     {
       "label": "You asked",

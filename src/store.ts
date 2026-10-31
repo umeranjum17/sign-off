@@ -65,6 +65,9 @@ export type Decision = {
   sections?: PlanSection[]; decisions?: PlanDecision[]; project?: string;
   /** A guided plan or report (plan 2, report 3): the board draws it as one page from these fields, with no page of the agent's own. */
   layout?: 'document'; engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
+  /** A guided report 5: the Actions block it declares (who owns the build, when the first pull request comes, which action it recommends),
+   *  its version, what changed since the version before, and every version the board has posted under this key. */
+  actions?: ReportActions; version?: number; changes?: VersionChange[]; versions?: { version: number; at: string; changes: VersionChange[] }[];
   /** Designs: project, date, review status, preview and screen views. An evidence update's `status` is one of EVIDENCE_STATUSES and its `captions` name each capture, in order. */
   status?: 'draft' | 'in_review' | 'approved' | 'Fixed' | 'In progress' | 'Waiting on you'; captions?: string[]; journeys?: DesignJourney[]; recommend?: string;
   /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
@@ -146,6 +149,14 @@ export const REPORT_PARTS: Record<string, [string, string][]> = {
   other: [],
 };
 const MARKS = ['ai', 'store', 'gate', 'fail'];
+/** The three things a report can end on. Approve starts the build, Refine sends it back to its owner, Reject closes it and records the reason. */
+export const REPORT_ACTIONS = ['approve', 'refine', 'reject'];
+/** The reasons the board offers when a report is rejected, unless the report declares its own. */
+export const REPORT_REASONS = ['Wrong direction', 'Too expensive', 'Not now', 'Already handled'];
+/** The Actions block a report declares: who does the work, when the first pull request comes, and which action it recommends. */
+export type ReportActions = { role: string; owner?: string; first_pull_request?: string; recommended: string; reasons?: string[] };
+/** One line of what changed between two versions of a report: added, rewritten (with the wording it replaces) or removed. */
+export type VersionChange = { kind: 'added' | 'rewritten' | 'removed'; text: string; was?: string };
 export const NOTE_MAX = 500;
 const TRADEOFF_MAX = 1000;
 const VIEWS: Record<string, [string, RegExp]> = { diagram: ['.svg, .png, .jpg, .jpeg or .webp', /\.(svg|png|jpe?g|webp)$/i], interactive: ['.html', /\.html$/i] };
@@ -245,6 +256,25 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     if (d.video !== undefined && !(isText(d.video) && d.video.trim() && [...d.video].length <= 10)) throw bad('video', 'must be text of 10 characters or fewer');
     if (d.asked_by !== undefined && !(isText(d.asked_by) && d.asked_by.trim() && [...d.asked_by].length <= 40)) throw bad('asked_by', 'must be text of 40 characters or fewer');
     if (d.decided !== undefined && !(isText(d.decided) && d.decided.trim() && [...d.decided].length <= 200)) throw bad('decided', 'must be text of 200 characters or fewer');
+    if (d.actions !== undefined) {
+      const a = d.actions;
+      if (!a || typeof a !== 'object' || Array.isArray(a) || typeof a.role !== 'string' || !a.role.trim() || [...a.role].length > 40
+        || (a.owner !== undefined && (typeof a.owner !== 'string' || !a.owner.trim() || [...a.owner].length > 40))
+        || (a.first_pull_request !== undefined && !(typeof a.first_pull_request === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.first_pull_request)))
+        || !REPORT_ACTIONS.includes(a.recommended)
+        || (a.reasons !== undefined && (!Array.isArray(a.reasons) || a.reasons.length < 2 || a.reasons.length > 4 || a.reasons.some((r: any) => typeof r !== 'string' || !r.trim() || [...r].length > 30)))) {
+        throw bad('actions', `must name the role that does the work, its owner when it has one, the day the first pull request lands and one of ${REPORT_ACTIONS.join(', ')}`);
+      }
+    }
+    if (d.version !== undefined && !(Number.isInteger(d.version) && d.version >= 1)) throw bad('version', 'must be a whole number from 1');
+    if (d.changes !== undefined && (!Array.isArray(d.changes) || !d.changes.length || d.changes.length > 8
+      || !d.changes.every((c: any) => c && ['added', 'rewritten', 'removed'].includes(c.kind) && typeof c.text === 'string' && c.text.trim() && [...c.text].length <= 120
+        && (c.kind === 'rewritten' ? typeof c.was === 'string' && c.was.trim() && [...c.was].length <= 120 : c.was === undefined)))) {
+      throw bad('changes', 'must list 1 to 8 lines of what changed, each added, rewritten (with the wording it replaces) or removed');
+    }
+    if (d.versions !== undefined && (!Array.isArray(d.versions) || !d.versions.every((v: any) => v && Number.isInteger(v.version) && v.version >= 2 && typeof v.at === 'string' && Array.isArray(v.changes)))) {
+      throw bad('versions', 'must list the versions the board posted, each a number from 2 and the lines that changed');
+    }
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     const signin = d.type === 'signin';
     if (d.link !== undefined && !(isText(d.link) && (HTTP_LINK.test(d.link) || /^[a-f0-9]{7,40}$/u.test(d.link))) && !signin) throw bad('link', 'must be an http(s) link or a commit hash');
@@ -327,6 +357,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(plan && { sections: d.sections, decisions: d.decisions }), ...((plan || report) && d.project && { project: d.project }),
       ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
       ...(guided && { guided: true, layout: d.layout, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
+      ...(report && d.actions && { actions: d.actions }), ...(report && d.version && { version: d.version }), ...(report && d.changes && { changes: d.changes }), ...(report && d.versions && { versions: d.versions }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.accepts && { accepts: d.accepts }), ...(d.reviewed && { reviewed: d.reviewed }), ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
     };
@@ -779,6 +810,45 @@ export type IconRef = { path: string; sha256: string; bytes: number };
 /** A project as the board draws it: its name and, optionally, its icon. A project with no icon shows a project outline. */
 export type Project = { name: string; icon?: IconRef; terminalApp?: boolean; at: string };
 /** Projects, one line per write (`project --name`), the latest line per name wins, names matched without regard to case. A board without the file has none. */
+/** The action the person took on a report: Approve starts the build, Refine sends it back with a note, Reject closes it with a reason,
+ *  and reopen takes a closed one back. The board's own record, one line each in <board>.report-actions.jsonl, latest per key wins. */
+export type ReportAction = { v: 1; key: string; action: 'approve' | 'refine' | 'reject' | 'reopen'; at: string; role: string; owner?: string; who: string;
+  result: 'build' | 'version' | 'closed' | 'open'; note?: string; reason?: string; ticket?: string; version?: number };
+/** The rule a rejection leaves on the report's owner: the reason picked and the line typed, as one learning, in <board>.report-learnings.jsonl. */
+export type ReportLearning = { v: 1; key: string; at: string; role: string; owner?: string; who: string; reason: string; note?: string; rule: string };
+export const reportActionsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.report-actions.jsonl';
+export const reportLearningsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.report-learnings.jsonl';
+/** What each action resolves to, in one word: the result the fleet side reads. */
+export const REPORT_RESULTS: Record<string, ReportAction['result']> = { approve: 'build', refine: 'version', reject: 'closed', reopen: 'open' };
+export const appendReportAction = (decisionsPath: string, a: Omit<ReportAction, 'v'>): ReportAction => {
+  const line = { v: 1 as const, ...a };
+  appendLine(reportActionsPath(decisionsPath), line);
+  return line;
+};
+/** The latest action on each report, by key, as the board shows it; a reopen line puts the report back on its actions block. */
+export function readReportActions(decisionsPath: string): Record<string, ReportAction> {
+  const all: Record<string, ReportAction> = {};
+  for (const line of readRaw(reportActionsPath(decisionsPath)).split('\n')) {
+    try {
+      const a = line && JSON.parse(line);
+      if (a && isKey(a.key) && ['approve', 'refine', 'reject', 'reopen'].includes(a.action) && isText(a.at)) all[a.key] = a;
+    } catch {}
+  }
+  return all;
+}
+export const appendReportLearning = (decisionsPath: string, l: Omit<ReportLearning, 'v'>): ReportLearning => {
+  const line = { v: 1 as const, ...l };
+  appendLine(reportLearningsPath(decisionsPath), line);
+  return line;
+};
+/** Every rule the captain's rejections left on the owners, newest last. */
+export function readReportLearnings(decisionsPath: string): ReportLearning[] {
+  const out: ReportLearning[] = [];
+  for (const line of readRaw(reportLearningsPath(decisionsPath)).split('\n')) {
+    try { const l = line && JSON.parse(line); if (l && isKey(l.key) && isText(l.rule) && isText(l.at)) out.push(l); } catch {}
+  }
+  return out;
+}
 export const projectsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.projects.jsonl';
 /** What an icon may be: a small picture of one of these types. */
 export const ICON_BYTES = 500_000;
