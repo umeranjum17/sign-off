@@ -33,16 +33,23 @@
     loaded = true;
     try { for (const [k, v] of JSON.parse(localStorage.getItem(stored())) ?? []) drafts.set(k, v); } catch {}
   }
+  /** Own writes: a poll out during one is older than the board on screen. */
+  let wrote = 0;
   async function call(path, init, sent) {
+    wrote++;
     const res = await fetch(path, init);
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
     if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status });
     // An answer, a round or a dismiss answers with the whole board: the board on screen is all of it, so no page is read over it.
-    (state = body), (wholeBoard = true);
+    (state = body), (wholeBoard = true), wrote++;
+    keepPending((() => { try { return JSON.parse(init.body).key; } catch {} })());
     loadDrafts();
     await sent?.();
     renderKeepingFocus();
   }
+  /** Answers shown before the board confirms them. */
+  const pending = new Map();
+  const keepPending = (saved) => { if (pending.size) state = { ...state, answers: { ...state.answers, ...Object.fromEntries([...pending].filter(([k]) => k !== saved)) } }; };
 
   /** A part of the board as it comes back: rows with the counts and the page they are, one card whole, or the ticket roll-up. */
   const view = (path) => fetch(path).then(async (res) => {
@@ -89,6 +96,7 @@
       ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened'].filter(had).map((name) => [name, kept(name)])),
       ...(had('reads') && { reads: kept('reads', (k) => k.split('/')[0]) }),
       ...(had('delivery') && { delivery: { ...state.delivery, ...body.delivery } }) };
+    keepPending();
   }
   /** A card whole for the screen that opens it: its body, its proof and its own activity come with it, never with the list it was found in. */
   const fetching = new Set();
@@ -193,6 +201,8 @@
   // The full-size and media views are taps of their own, not screens: a tap that lands before app-more.js arrives is finished when it does.
   function openFull(...args) { waitMore().then((ok) => ok && globalThis.openFull(...args)); }
   function openMediaViewer(...args) { waitMore().then((ok) => ok && globalThis.openMediaViewer(...args)); }
+  /** Holds the rows in view across a redraw (app-more.js). */
+  let holdRows;
   function renderKeepingFocus() {
     const typing = (document.activeElement?.tagName === 'TEXTAREA' || document.activeElement?.id === 'find') && document.activeElement;
     const start = typing && typing.selectionStart, end = typing && typing.selectionEnd, direction = typing && typing.selectionDirection;
@@ -202,7 +212,9 @@
     // the focus, so a poll never sends a reader back to the top of what they were reading.
     const open = document.getElementById('reader');
     const places = open && !open.hidden ? [...open.querySelectorAll('.gd-scroll')].map((s) => s.scrollTop) : null;
+    const held = holdRows?.(open);
     render();
+    held?.();
     if (places?.length) {
       const now = document.getElementById('reader');
       if (now && !now.hidden) [...now.querySelectorAll('.gd-scroll')].forEach((s, i) => { if (places[i]) s.scrollTop = places[i]; });
@@ -227,15 +239,29 @@
     const typed = state.answers_only || (o.value === 'text' && !d.reply) ? '' : (drafts.get(d.key) ?? '').trim();
     const note = drafts.get(words) ?? noteOf(d), before = answerOf(d.key);
     const drop = clearIfSaved(words, drafts.get(words));
+    // At once, marked saving; a failure puts it back.
+    const label = o.label ?? 'Your reply', hash = location.hash;
+    pending.set(d.key, { answer: o.value, label, note, at: new Date().toISOString(), pending: true });
+    keepPending();
+    say([el('b', {}, headline(d)), ` · ${label} · Saving…`], 10_000, null, 'later');
+    const landed = land?.() ?? (renderKeepingFocus(), 0);
+    // Not taken: as it was, and said.
+    const revert = async (words) => {
+      await landed; pending.delete(d.key);
+      const answers = { ...state.answers }; before ? (answers[d.key] = before) : delete answers[d.key]; state = { ...state, answers };
+      buttons.forEach((b) => b.classList.remove('done'));
+      if (location.hash !== hash) location.hash = hash; else renderKeepingFocus();
+      say(words, 8000); shown(err).textContent = words; unlock();
+    };
     try {
       const sent = await sendWithFeedback(`card:${d.key}`, buttons.at(-1), () => call('/api/answers', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, answer: o.value, note }),
-      }, async () => { forget(d.key); unfolded.delete(d.key); if (!typed) drop(); await land?.(); }));
-      if (!sent) { buttons.forEach((b) => b.classList.remove('done')); return unlock(); }
+      }, async () => { pending.delete(d.key); forget(d.key); unfolded.delete(d.key); if (!typed) drop(); await landed; }),
+      // Retry saves again, not through a gone button.
+      () => save(d, o, buttons, err, after, land, words));
+      if (!sent) return revert(`Couldn't save: your answer to ${headline(d)} did not save, so it is still waiting on you.`);
     } catch (e) {
-      buttons.forEach((b) => b.classList.remove('done'));
-      shown(err).textContent = `Couldn't save: ${e.message}`;
-      return unlock();
+      return revert(`Couldn't save: ${e.message}`);
     }
     offerUndo(d, before);
     after?.();
@@ -342,8 +368,15 @@
   function send(btn, err, body, draft, text) {
     if (!text) return;
     const unlock = lock(btn);
+    // Under its card at once; a failure puts the words back.
+    const mark = body.kind === 'comment' && { ...body, text, id: `pending-${Date.now()}`, at: new Date().toISOString(), pending: true }, words = drafts.get(draft);
+    if (mark) { state = { ...state, messages: [...(state.messages ?? []), mark] }; drafts.delete(draft); keep(); renderKeepingFocus(); }
     sendWithFeedback(`card:${body.key ?? 'prompt'}`, btn, () => call('/api/messages', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...body, text }) },
-      clearIfSaved(draft, drafts.get(draft)))).finally(unlock);
+      clearIfSaved(draft, drafts.get(draft))), () => send(btn, err, body, draft, text)).then((sent) => {
+      if (sent || !mark) return;
+      state = { ...state, messages: state.messages.filter((m) => m !== mark) }; drafts.set(draft, words); keep(); renderKeepingFocus();
+      say(`Couldn't save: your comment did not save. It is back in the box.`, 8000);
+    }).finally(unlock);
   }
 
   /** A linked run's result in plain words, for the line over the headline; the third word is the one the Evidence screens use. */
@@ -686,7 +719,7 @@
     const fold = el('details', { class: 'other comment', ...((unfolded.has(d.key) || drafts.get(d.key)) && { open: '' }) },
       el('summary', { 'aria-label': `${label}, ${name}` }, `${label}${status && ` · ${status}`}`),
       asked.length ? el('p', { class: 'meta saved-note', dir: 'auto' }, `You asked for another round: ${asked[asked.length - 1].note || 'with your comments on the mocks'}`) : '',
-      ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
+      ...comments.map((m) => el('p', { class: 'meta saved-note', dir: 'auto' }, `Your comment, ${m.pending ? 'sending…' : m.delivered ? 'read by the agent' : 'not read yet'}: ${m.text}`)),
       box, reply || more ? el('div', { class: 'actions' }, reply ? sendBtn : '', more) : '');
     fold.addEventListener('toggle', () => (fold.open ? unfolded.add(d.key) : unfolded.delete(d.key)));
     fold.firstChild.onclick = () => setTimeout(() => fold.open && box.focus());
@@ -2940,8 +2973,9 @@
   // Another program can change the board file (a feed, a new sign-in, signin done), so the page checks it every 20 seconds. The check is the
   // first screen's own page, tagged as last read: an unchanged board is a 304 with no body and no redraw, and a changed one is 15 KB, not five.
   let seenTag = '';
-  async function refresh() {
-    busy(true);
+  async function refresh(quiet) {
+    busy(!quiet);
+    const was = wrote;
     try {
       const open = /^#(?:waiting|decide|designs|evidence|reports|ticket|inbox)\/([\w.-]+)(?:\/open)?$/.exec(location.hash)?.[1];
       const heard = moreReady && heardReplies();
@@ -2950,15 +2984,16 @@
       if (res.status !== 304) {
         const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
         if (!res.ok) throw new Error(body.error);
+        if (wrote !== was) return;
         banner.hidden = true;
         seenTag = res.headers.get('etag') ?? '';
         mergeView(body);
         changed = true;
       }
       // The card on screen is read with the page: the board changes under an open card without changing the page that painted the first screen.
-      if (open) {
+      if (open && !quiet) {
         const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
-        if (card?.card) mergeView(card), (changed = true);
+        if (card?.card && wrote === was) mergeView(card), (changed = true);
       }
       if (/^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
       if (!changed) return;
