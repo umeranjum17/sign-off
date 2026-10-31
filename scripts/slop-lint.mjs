@@ -169,11 +169,11 @@ function browserTool(name) {
   const ax = (args, input) => { const r = run('chrome-devtools-axi', args, { ...session, input }); if (r.status !== 0) throw new Error(`chrome-devtools-axi ${args[0]}: ${r.stderr || r.stdout}`); return r.stdout; };
   return {
     // A browser that has just started sometimes has no page yet: it takes the address once it does.
-    open: (url) => { for (let i = 0; i < 20; i++) { if (run('chrome-devtools-axi', ['open', url], session).status === 0) return; spawnSync('sleep', ['0.3']); } throw new Error(`chrome-devtools-axi open ${url}: the browser took no page`); },
-    emulate: (viewport, theme) => { for (let i = 0; i < 20; i++) { if (run('chrome-devtools-axi', ['emulate', '--viewport', viewport, '--color-scheme', theme], session).status === 0) return; spawnSync('sleep', ['0.3']); } throw new Error('chrome-devtools-axi emulate: the browser took no page'); },
+    open: (url) => { for (let i = 0; i < 60; i++) { if (run('chrome-devtools-axi', ['open', url], session).status === 0) return; spawnSync('sleep', ['0.3']); } throw new Error(`chrome-devtools-axi open ${url}: the browser took no page`); },
+    emulate: (viewport, theme) => { for (let i = 0; i < 60; i++) { if (run('chrome-devtools-axi', ['emulate', '--viewport', viewport, '--color-scheme', theme], session).status === 0) return; spawnSync('sleep', ['0.3']); } throw new Error('chrome-devtools-axi emulate: the browser took no page'); },
     // Wait for the screen the page draws for itself, then read it once it has settled.
     settle: (ready) => ax(['run'], `const wait = async (s) => { for (let i = 0; i < 200; i++) { if (await page.eval('() => !!document.querySelector(' + JSON.stringify(s) + ')')) return; await new Promise((r) => setTimeout(r, 100)); } throw new Error('Not ready: ' + s); };\nawait wait(${JSON.stringify(ready)}); await new Promise((r) => setTimeout(r, 900));`),
-    shot: (path) => ax(['screenshot', path]),
+    shot: (path, full) => ax(['screenshot', path, ...(full ? ['--full-page'] : [])]),
     write: (body) => ax(['run'], `await page.eval(${JSON.stringify(`() => {${body}}`)});`),
     measure: () => JSON.parse(ax(['run'], `console.log(JSON.stringify(await page.eval(${JSON.stringify(MEASURE)})));`).trim().split('\n').pop()),
     stop: () => { run('chrome-devtools-axi', ['stop'], session); },
@@ -245,17 +245,22 @@ async function seed(out) {
   for (const f of found) console.log(line(f));
   console.log(verdict);
   if (out) {
-    // The frame the self-check leaves: the seeded page with the lint's own verdict above it, so one picture carries both halves of the claim.
+    // The frame the self-check leaves: the seeded page and, above it, the same command's verdict on that page and on the board this repo ships,
+    // so one picture carries both halves of the claim a reader has to check.
     mkdirSync(out, { recursive: true });
     const frame = browserTool('seed-frame');
     try {
       const page = `data:text/html,${encodeURIComponent(`<!doctype html><meta charset="utf-8">${bad}`)}`;
       frame.open(page);
-      frame.emulate('390x844x2,mobile,touch', 'light');
+      frame.emulate('900x1200x1', 'light');
       frame.open(page);
-      frame.write(`const v = document.createElement('pre'); v.style.cssText = 'all:initial;display:block;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;background:#121210;color:#f4f2ef;padding:12px';
-        v.textContent = ${JSON.stringify([...found.map(line), verdict, green].filter(Boolean).join('\n'))}; document.body.prepend(v);`);
-      frame.shot(join(out, 'slop-seed.png'));
+      const text = ['slop lint — one command, two pages', '',
+        'THE SEEDED PAGE BELOW (a filler phrase and its emoji, a raw task slug and a commit id, a wall, a painted chip showing nothing, grey on near-black):',
+        ...found.map(line), verdict, `exit 1 — a build that ran this would not ship`, '',
+        'THE BOARD THIS REPO SHIPS:', green.trim() || '(not given)', 'exit 0 — the build is green'].join('\n');
+      frame.write(`const v = document.createElement('pre'); v.style.cssText = 'all:initial;display:block;white-space:pre-wrap;font:11px/1.35 ui-monospace,monospace;background:#121210;color:#f4f2ef;padding:12px';
+        v.textContent = ${JSON.stringify(text)}; document.body.prepend(v);`);
+      frame.shot(join(out, 'slop-seed.png'), true);
     } finally { frame.stop(); }
   }
   process.exit(blind.length ? 2 : found.length ? 1 : 2);
