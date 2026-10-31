@@ -69,11 +69,14 @@ function measure() {
   const name = (el) => el.localName + (el.id ? `#${el.id}` : el.classList.length ? `.${[...el.classList].join('.')}` : '');
   const words = (el) => el.textContent.replace(/\s+/g, ' ').trim().slice(0, 60);
   const fails = [], reads = new Set();
+  let checked = 0, lowest = null;
   for (const el of document.querySelectorAll('body *')) {
     if (el.namespaceURI !== html || !shown(el) || el.closest(':disabled, [aria-disabled="true"]')) continue;
     // Only the element that paints a word itself: a box is judged by the words in it, not by its children's again.
     if (![...el.childNodes].some((n) => n.nodeType === 3 && n.data.trim())) continue;
     const bg = ground(el), r = ratio(over(rgb(getComputedStyle(el).color), bg), bg);
+    checked++;
+    if (!lowest || r < lowest.ratio) lowest = { element: name(el), ratio: r };
     if (r >= 4.5) { reads.add(el); continue; }
     fails.push({ element: name(el), ratio: r.toFixed(2), words: words(el) });
   }
@@ -89,7 +92,7 @@ function measure() {
     empties.push({ element: name(el), words: '(no words)', box: `${Math.round(box.width)}x${Math.round(box.height)}` });
   }
   const show = (c) => ({ color: `rgb(${[c.r, c.g, c.b].map(Math.round).join(' ')})`, luminance: Math.round(lum(c) * 1000) / 1000 });
-  return { url: location.href, ground: show(pageGround), ink: show(pageInk), fails, empties };
+  return { url: location.href, ground: show(pageGround), ink: show(pageInk), checked, lowest: lowest && { element: lowest.element, ratio: lowest.ratio.toFixed(2) }, fails, empties };
 }
 
 const server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
@@ -113,7 +116,7 @@ try {
     // Read again while the page is settling: the frame's own script fills its boxes on load, and the board's pass follows it.
     let m = ask(measure);
     for (let i = 0; i < 5 && (m.fails.length || m.empties.length); i++) { drive('await new Promise(r=>setTimeout(r,400));'); m = ask(measure); }
-    summary.cells[id] = { ground: m.ground.color, ink: m.ink.color, frame, fails: m.fails, empties: m.empties };
+    summary.cells[id] = { ground: m.ground.color, ink: m.ink.color, frame, checked: m.checked, lowest: m.lowest, fails: m.fails, empties: m.empties };
     writeFileSync(join(records, `contrast.${id}.json`), JSON.stringify({ ...m, frame }, null, 2) + '\n');
     // The board's own ground is dark in dark and light in light; a page that draws on another one is not following the board.
     const draws = theme === 'dark' ? m.ground.luminance < 0.2 : m.ground.luminance > 0.5;
@@ -123,7 +126,9 @@ try {
       ...m.fails.map((f) => `unreadable: ${f.element} reads ${f.ratio}:1 — "${f.words}"`),
       ...m.empties.map((e) => `shows nothing: ${e.element} (${e.box}) holds "${e.words}"`),
     ];
-    const lines = [`${title} — ${theme}, ${width}px`, `page ground ${m.ground.color} on ink ${m.ink.color}; reader frame ${frame.src ?? '(none)'} at ${frame.width ?? '?'}px`,
+    const lines = [`${title} — ${theme}, ${width}px`,
+      `page ground ${m.ground.color} on ink ${m.ink.color}; reader frame ${frame.src ?? '(none)'} at ${frame.width ?? '?'}px`,
+      `${m.checked} words read against what is behind them, the lowest ${m.lowest?.ratio ?? '?'}:1 at ${m.lowest?.element ?? '?'}; ${m.fails.length} unreadable, ${m.empties.length} painted with nothing`,
       ...problems.map((p) => `  ${p}`)];
     writeFileSync(join(records, `contrast.${id}.txt`), lines.join('\n') + '\n');
     if (problems.length) broken.push(...lines);
