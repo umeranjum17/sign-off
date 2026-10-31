@@ -2507,6 +2507,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       const st = sent.some(unseen) ? 'new' : (last && !last.reply) || tkStateOf(t) !== 'done' ? 'agent' : 'done';
       out.push({ id: `~${t.id}`, tk: t, kind: 'ticket', st, needs: st === 'new' && tkStateOf(t) !== 'done', fresh: sent.filter(unseen).length, unread: unreadByAgent(sent), last, at: last?.reply?.at ?? last?.at ?? t.at ?? '' });
     }
+    // A thread the person marked Done stays Done, out of the live list, until something lands on it after that mark: its agent's next words bring it
+    // back, unread (that is the thread's own count, read from the trail), and opening it clears the count as any thread's is cleared.
+    for (const t of out) if (state.done?.[t.id] && !(Date.parse(t.at) > Date.parse(state.done[t.id]))) t.st = 'done', t.needs = false;
     return out;
   }
   /** The thread a key opens: a card's own key (or the thread's) finds its thread; `/open` shows that card in it, otherwise the thread's latest card is the one written to. */
@@ -2514,15 +2517,34 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** A thread's second line: the agent's last words, else what the person sent and how far it got, else what the card says. */
   const inboxLine = ({ d, tk, last, lastD }) => { const r = last?.reply;
     return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, lastD ?? d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
+  /** The thread the person marked Done from its row, or took back with Undo: a mark beside the board (src/store.ts readThreadDone), no card touched, and the
+   *  row leaves the live list at once. Its key is the thread's own, so the mark holds whichever card of it the agent writes on next. */
+  function threadDone(id, name, on = true) {
+    if (on) (state.done ??= {})[id] = new Date().toISOString(); else delete state.done?.[id];
+    render();
+    call('/api/done', post({ keys: [id], done: on })).catch((e) => say(`Couldn't save: ${e.message}`, 8000));
+    if (!on) return say('Back in the inbox', 3000);
+    buzz('success');
+    say([el('b', {}, 'Done'), ` · ${name}`], 6000, () => threadDone(id, name, false), 'ok');
+  }
+  /** A rail row swiped left marks its thread Done: the row flies off its side, then it leaves the live list, with Undo. */
+  function swipeInbox(row) {
+    row.style.transition = `transform ${calm.matches ? 0 : 200}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
+    row.style.transform = 'translateX(-100%)';
+    setTimeout(() => threadDone(row.dataset.thread, row.querySelector('.t').textContent), calm.matches ? 0 : 190);
+  }
   function inboxRow(th, sel) {
-    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
+    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', 'data-thread': th.id, ...(sel && { 'aria-current': 'true' }) },
       el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTypeTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
       el('span', { class: 'rm' }, d ? el('span', { class: 'ib-ag', dir: 'auto' }, [d.by || 'Agent', th.cards.length > 1 && `${th.cards.length} items`].filter(Boolean).join(' · ')) : '', el('span', { class: 't', dir: 'auto' }, th.name ?? tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
       el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '',
         th.fresh ? el('b', { class: 'ib-n', title: `${th.fresh} unread from ${d ? d.by || 'the agent' : 'the lead'}`, 'aria-label': `${th.fresh} unread from the agent` }, String(th.fresh)) : '',
         th.unread ? el('span', { class: 'ib-nr', title: `${d ? d.by || 'The agent' : 'The lead'} has not read ${th.unread === 1 ? 'your message' : `${th.unread} of your messages`}` }, 'Not read') : '',
         th.fresh || th.unread ? '' : el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
-    return el('li', {}, a);
+    // The row's Done: one tap here, or a swipe on the row itself, marks the thread Done and offers Undo for a few seconds.
+    const done = canDismiss() ? el('button', { type: 'button', class: 'ib-dn', 'aria-label': `Done, ${th.name ?? tk.title}` }, glyph('check')) : '';
+    if (done) done.onclick = () => threadDone(th.id, th.name ?? tk.title);
+    return el('li', {}, a, done);
   }
   /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */
   function inboxList(all, key) {
@@ -2554,8 +2576,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     for (const [s, name] of SECTIONS) {
       const mine = shown.filter((t) => t.st === s).sort((x, y) => time(y) - time(x));
       if (!mine.length) continue;
-      // Done stays out of the rail until its entry is picked or a search looks for it.
-      if (s === 'done' && !inDone && !q) continue;
+      // Done stays out of the rail until its entry is picked or a search looks for it; picked, the rail is the Done view and nothing else.
+      if (s === 'done' ? !inDone && !q : inDone) continue;
       const cap = inMore.has(s) || mine.some((t) => t.id === key) ? Infinity : 8, more = el('button', { type: 'button', class: 'ib-fold' }, `Show ${mine.length - 8} more`);
       more.onclick = () => { inMore.add(s); render(); };
       out.push(el('section', { class: 'ib-sec', 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('span', { class: 'n' }, String(mine.length))),

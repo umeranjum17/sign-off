@@ -1036,6 +1036,16 @@ export function readSigninOpened(decisionsPath: string): Record<string, string> 
   return last;
 }
 export const appendSigninOpened = (decisionsPath: string, key: string) => appendLine(readsPath(decisionsPath), { key, opened: now(), by: 'captain' });
+/** An Inbox thread the person marked Done from the rail, and when: the last line for a thread wins, so Undo is a line with done false. A thread's key is
+ *  its oldest card's key, or `~<ticket id>`; nothing is deleted, and a line older than what landed on the thread does not hold it down. */
+export function readThreadDone(decisionsPath: string): Record<string, string> {
+  const last: Record<string, string> = {};
+  readRaw(readsPath(decisionsPath)).split('\n').forEach((line) => {
+    try { const r = line && JSON.parse(line); if (r && typeof r.key === 'string' && typeof r.done === 'boolean') { if (r.done && typeof r.at === 'string') last[r.key] = r.at; else delete last[r.key]; } } catch {}
+  });
+  return last;
+}
+export const appendThreadDone = (decisionsPath: string, keys: string[], done: boolean) => keys.forEach((key) => appendLine(readsPath(decisionsPath), { key, done, by: 'captain', at: now() }));
 
 /** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
  * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */

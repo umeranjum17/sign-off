@@ -5877,6 +5877,27 @@ test('the inbox rail: a row counts the replies not opened and says when the agen
     await evaluate('location.hash = "#inbox"');
     await until(async () => (await flts())[0][0] === 'Unread from agents0');
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+    // A row's own Done control marks its thread Done: it leaves the live rail, the foot counts it and the toast offers Undo, which puts it back.
+    assert.equal(await evaluate('(() => { const r = document.querySelector(".ib-row[data-thread=sent]"), b = r && r.parentElement.querySelector(".ib-dn"); if (!b) return false; b.click(); return true; })()'), true, 'the row has its own Done control');
+    await until(() => evaluate('!document.querySelector(".ib-row[data-thread=sent]")'));
+    // The reply's thread went Done when it was opened (answered and replied), so Done counts two with this one.
+    assert.equal(await evaluate('document.querySelector(".ib-done").textContent'), 'Done2', 'Done counts the thread it took');
+    assert.match(await evaluate('document.getElementById("toast-text").textContent'), /^Done · Keep the weekly digest\?$/, 'the rail says what it did');
+    assert.equal((await post(url, 'api/done', { keys: ['sent'], done: true })).status, 200, 'the mark is kept beside the board');
+    await evaluate('document.getElementById("undo").click()');
+    await until(async () => (await rows()).some((r) => r[0] === 'Keep the weekly digest?') && await evaluate('document.querySelector(".ib-done").textContent === "Done1"'));
+    // A search under Done reads a thread that was marked Done, and Done picked shows those threads alone.
+    await evaluate('document.querySelector(".ib-row[data-thread=sent]").parentElement.querySelector(".ib-dn").click()');
+    await until(() => evaluate('document.querySelector(".ib-done").textContent === "Done2"'));
+    await evaluate('document.querySelector(".ib-done").click()');
+    await evaluate(`(() => { const b = document.getElementById('ib-find'); b.value = 'digest'; b.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await until(() => evaluate('[...document.querySelectorAll(".ib-sec")].length === 1 && document.querySelectorAll(".ib-row").length === 1'));
+    // The agent writes again on it: the thread is back in the live rail, unread, and Done no longer counts it.
+    assert.equal(run('feedback', 'sent', file, '--reply', 'It goes out Mondays.', '--filer', 'rail-agent').code, 0);
+    await evaluate('location.href = location.origin + "/#inbox"');
+    await until(async () => (await rows()).some((r) => r[0] === 'Keep the weekly digest?' && r[1] === '1'));
+    // Done no longer counts it: the rail's foot is back to the threads that finished on their own.
+    assert.equal(await evaluate('document.querySelector(".ib-done").textContent'), 'Done2', 'Done no longer counts the thread an agent wrote on');
   } finally { await close(); }
 });
 

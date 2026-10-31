@@ -108,6 +108,11 @@ journeys:
   # the rail ends on Agents (the read-only Channels room) and Done; on a desk the rail is about 19rem beside the one open conversation. The required Designs capture rides in the same run.
   inbox-rail:
     command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/inbox-rail-proof.sh'
+  # The Done slice of the Inbox at 390 and 1280 in light and dark: a tap on a row's Done control takes its thread out of the live rail with Undo up
+  # and the rail's foot counting it, Undo puts it back, Done picked is the finished threads alone with a search that reads one there, and a thread an
+  # agent wrote on after it was Done is back under New, unread, counted once. The required Designs capture rides in the same run.
+  inbox-done:
+    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/inbox-done-proof.sh'
   # The Inbox's first phone screen and a thread read as a chat, at 390 and 1280, light and dark: the kind chips and both unread filters in one row that scrolls sideways, Agents and Done as one short row under it,
   # and an open thread (one per agent and topic: two cards of one ticket under one thread named by it) in time order with the agent's words on the left, the person's own as bubbles on the right with Read or Sent and Not read under them, and a pull request inline as a card. The required Designs capture rides in the same run.
   inbox-chat:

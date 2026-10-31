@@ -19,12 +19,15 @@ mkdirSync(records, { recursive: true });
 // done-done's own look measurement, from the install that runs this journey.
 const dd = dirname(realpathSync(spawnSync('which', ['done-done'], { encoding: 'utf8' }).stdout.trim()));
 const { LOOK, SQUASHED_TEXT, lookIssues } = await import(pathToFileURL(join(dd, 'dom.js')));
-const run = (bin, args, options = {}) => {
-  const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options });
+// The node that runs this journey goes first on the PATH, so a host's own version manager never stands between a seeded board and its CLI.
+const run = (bin, args, { env, ...options } = {}) => {
+  const withEnv = { ...process.env, ...env }, where = { ...withEnv, PATH: `${dirname(process.execPath)}:${withEnv.PATH}` };
+  const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options, env: where });
   assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout;
 };
 const session = `so-actions-${process.pid}`;
-const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: session };
+// The session's bridge port is this run's own: a hashed name can land on a port another lane already holds.
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: session, CHROME_DEVTOOLS_AXI_PORT: String(31000 + (process.pid % 2000)) };
 const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv });
 const drive = (script) => run('chrome-devtools-axi', ['run'], { env: browserEnv, input: script });
 const evalIn = (fn) => JSON.parse(drive(`console.log(JSON.stringify(await page.eval(${fn})));`).trim().split('\n').pop());
@@ -100,6 +103,8 @@ function helpers(home, readySel) {
 }
 
 // Every card kind on every tab, with the actions it must offer. A stage with `shot` is captured and looked at before the next one.
+// The cell being driven: its board folder and the CLI's own environment, for a page that has to move the board before it opens.
+let cell = { home: '', cli: {} };
 const KEYS = { plan: 'plan-kind-board', signin: 'npm', ask: 'ship', ask2: 'keep-the-weekly-digest', evidence: 'update-1', design: 'look', review: 'chat-journeys', passed: 'update-2', report: 'new-sign-in', answered: 'digest-old' };
 const PAGES = [
   { name: 'today', hash: '', ready: '.t-up', stages: [{ run: async (h) => {
@@ -147,6 +152,66 @@ const PAGES = [
     h.need('Agents entry', h.board().querySelector('.ib-agents[href="#channels"]'));
     const done = await h.until('the Done entry', () => h.board().querySelector('.ib-done'));
     await h.press('Done entry', done, () => h.board().querySelector('.ib-sec[aria-label="Done"]'));
+  } },
+  // A thread Done from its own row: one tap on the row's control takes it out of the live rail at once, and Undo stays up for a few seconds. A swipe
+  // left on a row does the same. Done, picked, is the finished threads and nothing else, and a search reads one there; a thread an agent wrote on
+  // after it is Done comes back to the live rail, unread (the page after this one).
+  { run: async (h) => {
+    const rail = () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]');
+    // Done off again, so the rail is the live threads this slice leaves.
+    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => rail());
+    const control = h.need('Done on the row itself', rail()?.closest('li')?.querySelector('.ib-dn'));
+    if (!control) return;
+    control.click();
+    await h.until('the thread to leave the live rail', () => !rail());
+    await h.until('the Done toast with its Undo', () => /^Done · /.test(h.toast()));
+    h.has('Done counting it', h.board().querySelector('.ib-done')?.textContent === 'Done2' && h.board().querySelector('.ib-done'));
+    h.did.push('Done from the row');
+  } },
+  { run: async (h) => {
+    // Undo puts the thread back in the live rail.
+    const u = h.need('Undo after Done', !document.getElementById('undo').hidden && document.getElementById('undo'));
+    if (!u) return;
+    u.click();
+    await h.until('the row back in the live rail', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the rail to say it came back', () => /^Back in the inbox$/.test(h.toast()));
+    h.did.push('Undo of Done');
+    // A swipe left on the row is the same gesture: the row flies off its side, then leaves the rail, with Undo.
+    const f = h.board().querySelector('.ib-row[data-thread="ship"]'), r = f.getBoundingClientRect(), y = r.top + 30;
+    const at = (x) => ({ bubbles: true, pointerId: 9, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
+    f.dispatchEvent(new PointerEvent('pointerdown', at(r.left + 40)));
+    for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', at(r.left + 40 - 300 * i / 8))); }
+    f.dispatchEvent(new PointerEvent('pointerup', at(r.left + 40 - 300)));
+    await h.until('the swiped thread to leave the live rail', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the Done toast after the swipe', () => /^Done · /.test(h.toast()));
+    h.did.push('Swipe left: Done');
+    const back = h.need('Undo after the swipe', !document.getElementById('undo').hidden && document.getElementById('undo'));
+    if (!back) return;
+    back.click();
+    await h.until('the swiped row back', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the rail again', () => /^Back in the inbox$/.test(h.toast()));
+    h.did.push('Undo of the swipe');
+  } },
+  // The Done view: the entry picked shows the finished threads and nothing else, a search reads them there, and one opens as the same thread.
+  { shot: 'inbox-done-view', run: async (h) => {
+    await h.press('Done entry', h.board().querySelector('.ib-done'), () => !h.board().querySelector('.ib-sec[aria-label="New"], .ib-sec[aria-label="Decide"], .ib-sec[aria-label="Waiting on agents"]'));
+    h.type(document.getElementById('ib-find'), 'digest');
+    await h.until('the Done search', () => [...h.board().querySelectorAll('.ib-row')].length === 1 && /digest/i.test(h.board().querySelector('.ib-row')?.textContent ?? ''));
+    h.has('the Done thread the search found', h.board().querySelector('.ib-row'));
+    h.did.push('Done view: search');
+  } },
+  { run: async (h) => {
+    // A Done thread opens as a chat, with where it stands; then the search and the Done view are cleared and a thread is marked Done again.
+    h.need('the Done row', h.board().querySelector('.ib-row'))?.click();
+    await h.until('the Done thread open', () => /^#inbox\/digest-old$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-state')?.textContent === 'Answered');
+    h.has('the Done thread\u2019s own word', h.board().querySelector('.ib-thread .ib-state'));
+    location.hash = '#inbox';
+    await h.until('the rail again', () => /^#inbox$/.test(location.hash) && h.board().querySelector('.ib-chip'));
+    h.type(document.getElementById('ib-find'), '');
+    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row'));
+    h.board().querySelector('.ib-row[data-thread="ship"]')?.closest('li')?.querySelector('.ib-dn')?.click();
+    await h.until('the thread marked Done for good', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    h.did.push('Done kept');
   } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
@@ -305,6 +370,27 @@ const PAGES = [
       await h.press('Approve', h.find(/^Approve$/, r(), 'button'), () => status() === 'Approved');
     } },
   ] },
+  // The agent writes again on that Done thread (the reply lands before this page opens): the rail has it back under New, unread and counted once, and
+  // opening it clears the count.
+  { name: 'inbox-return', hash: '#inbox', ready: '.ib-row', fresh: true, prep: async () => {
+    await new Promise((r) => setTimeout(r, 1200));
+    run('node', ['dist/cli.js', 'feedback', KEYS.ask, join(cell.home, 'board.json'), '--reply', 'QA signs off Thursday, so Friday holds.', '--filer', 'verify'], cell.cli);
+  }, stages: [{ run: async (h) => {
+    const row = () => h.board().querySelector('.ib-sec[aria-label="New"] .ib-row[data-thread="ship"]');
+    await h.until('the thread back under New', row);
+    h.has('the count of replies not opened', row()?.querySelector('.ib-n'));
+    h.has('Done no longer holding it', !h.board().querySelector('.ib-sec[aria-label="Done"] .ib-row[data-thread="ship"]') && h.board().querySelector('.ib-done'));
+    row().click();
+    await h.until('the returned thread open with the agent\u2019s words', () => /^#inbox\/ship$/.test(location.hash)
+      && [...h.board().querySelectorAll('.ib-thread .ib-say')].some((p) => /QA signs off Thursday/.test(p.textContent)));
+    h.has('the returned thread', h.board().querySelector('.ib-thread'));
+    // Opening it cleared the count: on a phone the rail is drawn again when the thread is left, and on a desk the rail beside it by the board's next
+    // read (20 seconds), which is where that count has always been refreshed.
+    await h.until('the count to clear once it is open', () => { const r = h.board().querySelector('.ib-row[data-thread="ship"]'); return !r || !r.querySelector('.ib-n'); }, 26000);
+    h.has('the returned thread with no count', h.board().querySelector('.ib-row[data-thread="ship"]') ?? h.board().querySelector('.ib-thread'));
+    location.hash = '#inbox';
+    h.did.push('returned unread, then read');
+  } }] },
 ];
 
 const cliLook = async (base) => {
@@ -327,6 +413,7 @@ try {
     await sent({ kind: 'comment', key: KEYS.ask, text: 'Can QA confirm first?' });
     await sent({ kind: 'comment', key: KEYS.report, text: 'Does this cover the code step?' });
     const cli = { env: { ...process.env, HOME: home, XDG_CONFIG_HOME: `${home}/.config`, XDG_DATA_HOME: `${home}/.local/share`, XDG_STATE_HOME: `${home}/.local/state`, XDG_CACHE_HOME: `${home}/.cache` } };
+    cell = { home, cli };
     run('node', ['dist/cli.js', 'wait', join(home, 'board.json'), '--filer', 'verify', '--timeout', '5'], cli);
     await new Promise((r) => setTimeout(r, 1100));
     run('node', ['dist/cli.js', 'feedback', KEYS.answered, join(home, 'board.json'), '--acted', '--link', 'https://example.com/pr/9', '--filer', 'verify'], cli);
@@ -337,15 +424,22 @@ try {
       // A capture and its look: the page as a user sees it, measured by done-done's own look code.
       const capture = (name, keepToast = false) => {
         // Still: the last step's toast gone and every transition done, so the shot and the measurement see the settled page.
-        evalIn(`async () => { for (let i = 0; i < 120 && ((!${keepToast} && !document.getElementById('toast').hidden) || document.getAnimations().length); i++) await new Promise((r) => setTimeout(r, 50)); return true; }`);
-        const stem = `${name}.${theme}.${width}w`;
+        evalIn(`async () => { for (let i = 0; i < 120 && ((!${keepToast} && !document.getElementById('toast').hidden) || document.getAnimations().length); i++) await new Promise((r) => setTimeout(r, 50));
+          document.activeElement?.blur?.(); for (const b of document.querySelectorAll('.ib-bar, .ib-people')) b.scrollLeft = 0; return true; }`);
+        const stem = `${name}.${theme}.${width}w`, rest = `async () => { document.activeElement?.blur?.(); for (const b of document.querySelectorAll('.ib-bar, .ib-people')) b.scrollLeft = 0; return true; }`;
+        evalIn(rest);
         browser('screenshot', join(out, `${stem}.png`));
+        // The capture is the page at rest, and the record beside it measures that same page: a sideways row starts at its first chip.
+        evalIn(rest);
         const look = evalIn(`async () => ({ url: location.href, ...(${LOOK})(), squashed_text: (${SQUASHED_TEXT})() })`);
         writeFileSync(join(records, `${stem}.dom.json`), JSON.stringify(look));
         failures.push(...lookIssues(look).map((m) => `${theme} ${width}w look: ${m}`));
       };
       browser('open', base); browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1', '--color-scheme', theme);
       for (const page of PAGES) {
+        // A page may need the board moved before it opens, as an agent's reply does (the page then reads it with the rest of the board).
+        if (page.prep) await page.prep();
+        if (page.fresh) browser('open', 'about:blank');
         browser('open', `${base}${page.hash || '#'}`);
         drive(`for (let i = 0; i < 100; i++) { if (await page.eval(${JSON.stringify(`!!document.querySelector(${JSON.stringify(page.ready)})`)})) break; await new Promise((r) => setTimeout(r, 100)); }`);
         capture(page.name);

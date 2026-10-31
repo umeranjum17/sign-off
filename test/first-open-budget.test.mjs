@@ -29,10 +29,13 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Re-recorded on 30 October 2026 in the change that makes an Inbox thread read as a chat: +1,639 B of the whole open over main's 315,842 B (the chat messages, bubbles and inline artifact cards in
 // app-more.js and app.css, the one-row filters, and the thread's placing after a draw in app.js, all after the first paint).
 // Re-recorded again on 31 October 2026 in the change that groups the Inbox's threads by agent and topic: +1,038 B of the whole open over 317,481 B (the thread grouping and its cards in app-more.js, all after the first paint).
+// Re-recorded on 1 November 2026 in the change that gives the Inbox its Done gesture and its Done view: main's recorded 98,571 B and 326,460 B plus this
+// change's own +110 B before the first paint (the rail row's own thread key, the swipe branch and the lists read's `done` field in app.js) and +924 B of the
+// whole open (the row's Done control, the mark, the Done view and the returned thread in app-more.js and app.css, all after the first paint).
 // Re-recorded on 31 October 2026 in the change that ends every report on its Actions block, on main 59c89ea: main's own CI-measured whole open 322,236 B plus this
 // change's +4,224 B (measured +4,217 B on the earlier base, within the open's ~10 B variance) — the block's controls, its Refine and Reject states, the version
 // diff and the phone's foot bar in app-more.js and app.css, all after the first paint. First-paint bytes and the request count are unchanged.
-const baseline = { bytesBeforePaint: 98_571, requestsBeforePaint: 5, bytesWhole: 326_460, paintMs: 900 };
+const baseline = { bytesBeforePaint: 98_681, requestsBeforePaint: 5, bytesWhole: 327_384, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.
