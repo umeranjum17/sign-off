@@ -6,7 +6,7 @@ import { networkInterfaces, tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
-const { readTicketActivity } = await import('../dist/store.js');
+const { readTicketActivity, readTicketWeek } = await import('../dist/store.js');
 // A burst is one row; its earlier changes are events of their own, so a test of what each change says reads them all.
 const unfold = (feed) => feed.flatMap(({ earlier = [], ask, ...e }) => [...earlier, e]);
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-tickets-api-'));
@@ -262,4 +262,21 @@ test('a ticket carries who works on it when a Juggernaut home has its task recor
   assert.ok(Object.values(await assignees(port)).every((a) => a === undefined));
   delete env.SIGN_OFF_FLEET_HOME;
   rmSync(join(scratch, 'config.yaml'));
+});
+
+test('the Tickets view gives every ticket a key from its project and carries the week the history records', async () => {
+  const port = await serve(), body = await (await fetch(`http://127.0.0.1:${port}/api/state?view=tickets`)).json();
+  assert.equal(body.tickets.find((t) => t.id === 'E-1').key, 'SET-1');
+  assert.ok(body.tickets.every((t) => /^[A-Z0-9]+-\d+$/.test(t.key)));
+  assert.equal(body.week.days.length, 7);
+});
+
+test('a week counts a ticket that moves to done from a state it had, never one that first appears done or only gains the state', () => {
+  const file = join(scratch, 'week.json'), at = (days) => new Date(Date.now() - days * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
+  const line = (id, state, days, project) => JSON.stringify({ id, title: id, progress: state === 'done' ? 100 : 0, ...(state && { state }), ...(project && { project }), at: at(days) });
+  writeFileSync(join(scratch, 'week.tickets.jsonl'), [line('A', 'in progress', 3, 'Beacon'), line('A', 'done', 2, 'Beacon'), line('B', 'done', 2), line('C', undefined, 4), line('C', 'done', 1), line('D', 'queued', 12), line('D', 'done', 11)].join('\n') + '\n');
+  const week = readTicketWeek(file);
+  assert.equal(week.done, 1);
+  assert.deepEqual(week.projects, [{ project: 'Beacon', done: 1 }]);
+  assert.equal(week.days.filter((d) => d.done).length, 1);
 });

@@ -503,36 +503,75 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return [el('div', { class: 'ui-desk tk-desk' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), count), el('div', { class: 'acts' }, tkTabs('activity'), filters, themeButton())),
       el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s12' }, out)))];
   }
-  /** The Epics view (#epics): every epic as its own group, its children rolled up into a figure and a bar, then the children themselves under it, each with its own type,
-   *  state and owner. A phone lists the groups; a desk sets them in one wide column beside the open epic's page, as the tickets list does. */
+  /** The Epics view (#epics): an epic is a card only with three or more tickets under it (fewer sit as plain rows in All tickets), each with its real child counts, its owner and its next step;
+   *  a card opens that epic's own page (#epics/<id>), its children under it. */
   function epicsPage(by) {
-    const epics = tkAll().filter((t) => tkUnder(t).length && (!tkProj || tkProject(t) === tkProj))
-      .sort((x, y) => (x.priority ?? 'P9').localeCompare(y.priority ?? 'P9') || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0));
-    const kids = epics.flatMap(tkUnder), done = kids.filter((x) => tkStateOf(x) === 'done').length, desk = !phone();
-    const open = (by === undefined ? '' : by) && tkById(by) && tkUnder(tkById(by)).length ? tkById(by) : epics[0];
-    tkShown = open?.id ?? '';
-    const say = `${epics.length} ${plural(epics.length, 'epic')} · ${done} of ${kids.length} tickets done`;
-    const pick = tkProj ? el('button', { class: 'tk-fpill' }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
-    if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
-    // One epic is one group: its own row, then its children one step in under it. On a phone each group is its own card; on a desk they share one card, divided.
-    const group = (t, card = true) => { const under = tkUnder(t), rows = [tkRow(t), ...under.map((k) => { const li = tkRow(k, true); li.classList.add('tk-kid'); return li; })];
-      const label = `Epic, ${t.title}`;
-      return card ? el('section', { class: 'ui-card tk-epic', 'aria-label': label }, el('ul', { class: 'ui-list tk-epic-list' }, ...rows))
-        : el('section', { class: 'tk-epic', 'aria-label': label }, el('ul', { class: 'ui-list tk-epic-list' }, ...rows)); };
-    const empty = tkNote('epics', 'layers', 'No epics yet', 'An epic is a ticket with tickets under it: it shows here with how far its tickets have got, and they sit under it.');
-    if (!epics.length) {
-      if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('epics'), empty];
-      return [el('div', { class: 'ui-desk tk-desk' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, tkLoad() === 'loading' ? 'Loading tickets…' : 'Nothing tracked yet')), el('div', { class: 'acts' }, tkTabs('epics'), themeButton())), empty)];
-    }
-    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(tkLists()), themeButton()), tkTabs('epics'), pick,
-      el('p', { class: 'tk-count', role: 'status' }, say), ...epics.map(group)];
-    return [el('div', { class: 'ui-desk tk-desk' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, say)),
-      el('div', { class: 'acts' }, pick, tkTabs('epics'), tkFilter(tkLists()), themeButton())),
-      el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s12' }, el('section', { class: 'ui-card tk-card', 'aria-label': 'Epics' }, ...epics.map((t) => group(t, false))))))];
+    const groups = tkAll().filter((t) => tkUnder(t).length && (!tkProj || tkProject(t) === tkProj)), desk = !phone();
+    const open = (e) => tkUnder(e).filter((x) => tkStateOf(x) !== 'done').length;
+    const epics = groups.filter((t) => tkUnder(t).length >= 3).sort((x, y) => open(y) - open(x) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0)), drill = epics.find((t) => t.id === by);
+    tkShown = drill?.id ?? '';
+    const pick = tkProj ? el('button', { class: 'tk-fpill', 'aria-label': `Show every project, not only ${tkProj}` }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
+    if (pick) pick.onclick = () => { tkProj = ''; render(); };
+    const say = `${plural(epics.length, 'epic')} · 3 or more tickets make an epic · ${groups.length - epics.length} smaller ${groups.length - epics.length === 1 ? 'group shows' : 'groups show'} as rows in All tickets`;
+    const card = (e) => {
+      const kids = tkUnder(e), c = tkSplit(kids), next = kids.find((x) => tkStateOf(x) === 'moving') ?? kids.find((x) => tkStateOf(x) === 'todo'), lead = kids.find((x) => x.assignee)?.assignee;
+      return el('a', { class: 'ui-card tk-ecard', href: `#epics/${e.id}`, 'aria-label': `Epic ${e.key ?? ''} ${e.title}, ${c.done} of ${kids.length} done` },
+        el('span', { class: 'tk-ecard-h' }, tkKey(e.key ?? e.id), e.priority ? el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority) : ''), el('span', { class: 'tk-ecard-t', dir: 'auto' }, e.title),
+        el('span', { class: 'tk-ms-v' }, `${c.done} of ${kids.length}`, el('small', {}, ' done')), tkSeg(kids),
+        el('span', { class: 'meta' }, [c.moving && `${c.moving} in progress`, c.hold && `${c.hold} on hold`].filter(Boolean).join(' · ') || 'nothing in progress'),
+        el('span', { class: 'meta tk-ecard-o' }, tkMark(lead ? 'person' : 'no-person'), lead ? [lead.lead, lead.model].filter(Boolean).join(' · ') : 'no owner recorded'),
+        el('span', { class: 'meta tk-ecard-n', dir: 'auto' }, next ? `Next: ${next.key ? next.key + ' ' : ''}${next.title}` : 'Nothing left to do'));
+    };
+    const body = !epics.length ? [tkNote('epics', 'layers', 'No epics yet', 'An epic is a ticket with three or more tickets under it: it shows here as a card with how far they have got.')]
+      : drill ? [el('a', { class: 'tk-back', href: '#epics' }, glyph('left'), 'All epics'), el('section', { class: 'ui-card tk-epic', 'aria-label': `Epic, ${drill.title}` }, el('ul', { class: 'ui-list tk-epic-list' }, tkRow(drill), ...tkUnder(drill).map((k) => { const li = tkRow(k, true); li.classList.add('tk-kid'); return li; })))]
+      : [el('p', { class: 'tk-count', role: 'status' }, say), el('div', { class: 'tk-ecards' }, ...epics.map(card))];
+    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(tkLists()), themeButton()), tkTabs('epics'), pick, ...body];
+    return [el('div', { class: 'ui-desk tk-desk' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets')),
+      el('div', { class: 'acts' }, pick, tkTabs('epics'), tkFilter(tkLists()), themeButton())), el('div', { class: 'tk-story-grid tk-epics-grid' }, el('div', {}, ...body)))];
+  }
+  /* ---- Story: where Tickets opens. What ships (the releases with their progress), what is in flight, what is blocked and why, and what shipped this week; the flat list is one tap away under All tickets.
+     Every figure is the board's own: the roll-up for the counts, the ticket history for the week (state.week), and where the board holds nothing the page says so. ---- */
+  const WEEKDAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  const tkSplit = (list) => ({ done: list.filter((t) => tkStateOf(t) === 'done').length, moving: list.filter((t) => tkStateOf(t) === 'moving').length, hold: list.filter((t) => tkStateOf(t) === 'hold').length });
+  function tkSeg(list) {
+    const c = tkSplit(list), n = list.length || 1, seg = (cls, v) => (v ? el('i', { class: cls, style: `flex: ${v / n}` }) : '');
+    return el('span', { class: 'tk-seg-bar', role: 'img', 'aria-label': `${c.done} of ${list.length} done, ${c.moving} in progress, ${c.hold} on hold` }, seg('d', c.done), seg('m', c.moving), seg('h', c.hold), seg('', list.length - c.done - c.moving - c.hold));
+  }
+  const storyHead = (name, ...rest) => el('h2', { class: 'ui-sec' }, name, ...rest);
+  function storyPage(id) {
+    const all = tkAll(), leaves = all.filter((t) => !tkUnder(t).length), desk = !phone(), picked = id && tkById(id), week = state.week;
+    const open = all.filter((t) => tkStateOf(t) !== 'done'), owned = open.filter((t) => t.assignee).length;
+    const groups = new Map();
+    for (const t of leaves) if (/^v?\d+(\.\d+){1,3}$/.test(t.release ?? '')) { const k = `${tkProject(t) ?? ''}\n${t.release}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
+    const releases = [...groups].map(([k, list]) => ({ project: k.split('\n')[0], release: list[0].release, list, done: tkSplit(list).done, at: Math.max(...list.map((t) => Date.parse(t.at) || 0)) }))
+      .filter((g) => g.list.length >= 3 && g.done < g.list.length).sort((x, y) => y.at - x.at).slice(0, 4);
+    const moving = leaves.filter((t) => tkStateOf(t) === 'moving').sort((x, y) => (y.last_event_at ?? 0) - (x.last_event_at ?? 0));
+    const held = leaves.filter((t) => tkStateOf(t) === 'hold').sort((x, y) => !!y.hold_reason - !!x.hold_reason || (y.last_event_at ?? 0) - (x.last_event_at ?? 0)), why = held.filter((t) => t.hold_reason);
+    const rows = (list) => el('ul', { class: 'ui-card ui-list tk-story-rows' }, ...list.map((t) => tkRow(t, true)));
+    const empty = tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work. The story shows here once they do.');
+    const ms = el('section', { 'aria-label': 'Milestones' }, storyHead('Milestones', el('small', {}, 'recorded releases')), releases.length ? el('div', { class: 'tk-ms-grid' }, ...releases.map((g) => el('div', { class: 'ui-card tk-ms' },
+      el('p', { class: 'tk-ms-n', dir: 'auto' }, [g.project, g.release].filter(Boolean).join(' · ')), el('p', { class: 'tk-ms-v' }, `${g.done} of ${g.list.length}`), tkSeg(g.list),
+      el('p', { class: 'meta' }, [tkSplit(g.list).hold && `${tkSplit(g.list).hold} on hold`, 'no target date recorded'].filter(Boolean).join(' · '))))) : el('p', { class: 'meta tk-note' }, 'No release with open work is recorded yet.'));
+    const fl = el('section', { 'aria-label': 'In flight' }, storyHead('In flight', el('small', {}, `${Math.min(6, moving.length)} of ${moving.length}`)), moving.length ? rows(moving.slice(0, 6)) : el('p', { class: 'meta tk-note' }, 'Nothing is in progress right now.'),
+      el('p', { class: 'meta tk-note' }, `${owned} of ${open.length} open tickets have an owner recorded; the rest show none.`));
+    const stuck = (t) => el('li', {}, el('a', { class: 'ui-row tk-blocked', href: `#ticket/${t.id}` }, tkTypeTile(t), el('span', { class: 'rm' }, el('span', { class: 'l1' }, tkKey(t.key), el('span', { class: 't', dir: 'auto' }, t.title)), el('span', { class: 'tk-why', dir: 'auto' }, t.hold_reason))));
+    const bk = el('section', { 'aria-label': 'Blocked' }, storyHead('Blocked', el('small', {}, String(held.length))), why.length ? el('ul', { class: 'ui-card ui-list tk-story-rows' }, ...why.slice(0, 4).map(stuck)) : '',
+      el('p', { class: 'meta tk-note' }, held.length ? `${held.length - why.length} on hold with no reason recorded.` : 'Nothing is on hold.'));
+    const peak = Math.max(1, ...(week?.days ?? []).map((d) => d.done)), top = (week?.projects ?? []).slice(0, 5), most = Math.max(1, ...top.map((p) => p.done));
+    const wk = el('section', { 'aria-label': 'Shipped this week' }, storyHead('Shipped this week', el('small', {}, week ? String(week.done) : '')), !week ? el('p', { class: 'meta tk-note' }, 'The week is on its way.') : el('div', { class: 'ui-card tk-wk' },
+      el('div', { class: 'tk-days', role: 'img', 'aria-label': `Done each day: ${week.days.map((d) => `${WEEKDAY.format(new Date(d.day))} ${d.done}`).join(', ')}` }, ...week.days.map((d, i) => el('div', { class: i === 6 ? 'today' : '' },
+        el('b', {}, String(d.done)), el('i', { style: `height: ${Math.max(2, (d.done / peak) * 100)}%` }), el('span', {}, i === 6 ? 'Today' : WEEKDAY.format(new Date(d.day)))))),
+      el('ul', { class: 'tk-pbar' }, ...top.map((p) => el('li', {}, el('span', { dir: 'auto' }, p.project || 'No project'), el('i', { style: `--w: ${(p.done / most) * 100}%` }), el('b', {}, String(p.done)))))));
+    const head = el('p', { class: 'tk-total', role: 'status' }, `${all.length} tickets · ${all.length - open.length} done · ${open.length} open`);
+    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('story'), ...(all.length ? [head, wk, ms, fl, bk] : [tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work.')]), picked ? tkSheet(picked) : (tkUp = '')];
+    tkShown = picked?.id ?? '';
+    return [el('div', { class: 'ui-desk tk-desk tk-story' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), head),
+      el('div', { class: 'acts' }, tkTabs('story'), themeButton())), all.length ? el('div', { class: 'tk-story-grid' }, el('div', {}, ms, fl), el('div', {}, wk, bk)) : empty), ...(picked ? [tkSheet(picked)] : [])];
   }
   function tickets(by, id, subpage) {
     if (subpage === 'activity') return activityPage();
     if (subpage === 'epics') return epicsPage(id);
+    if (subpage === 'story' || (!subpage && id && (!ticketBack || ticketBack === '#tickets'))) return storyPage(id);
     const L = tkLists(), desk = !phone(), picked = id && tkById(id);
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
     tkShown = open?.id ?? '';
@@ -551,14 +590,14 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? { loading: 'Loading tickets…', error: 'Couldn’t load tickets', ready: 'Nothing tracked yet' }[tkLoad()] : say)),
         el('div', { class: 'acts' }, pick, whose, tkTabs('tickets'), tkFilter(L), themeButton()));
       if (empty || nothing) return [el('div', { class: 'ui-desk tk-desk' }, head, empty ? none : nomatch)];
-      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(L), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
+      return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
         el('div', { class: 'ui-col s4' }, tkGroup('hold', 'On hold', L.hold, true, 'half'), tkGroup('todo', 'To do', L.todo, true, 'grow')),
         open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, emptyState('empty', { mark: 'pick', title: id ? 'Ticket not found' : 'No ticket open', text: id ? 'It may have been removed. Pick another from the list.' : 'Pick a ticket from the list to read it here.', small: true }))))];
     }
     const stat = (href, mark, lab, n) => el(href ? 'a' : 'div', { class: 'ui-card ui-stat', ...(href && { href }), 'aria-label': `${lab}: ${n}` }, fill(mark), el('span', { class: 'lab' }, lab), ' ', el('b', {}, String(n)));
     const p0 = L.shown.filter((t) => t.priority === 'P0' && tkStateOf(t) !== 'done').length;
     return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), tkFilter(L), themeButton()), tkTabs('tickets'), pick, whose,
-      ...(empty ? [none] : nothing ? [nomatch, ticketActivity()] : [tkHero(L), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
+      ...(empty ? [none] : nothing ? [nomatch, ticketActivity()] : [tkHero(), ticketActivity(), tkGroup('mv', 'In progress', L.moving), tkGroup('hold', 'On hold', L.hold), tkGroup('todo', 'To do', L.todo), tkGroup('done', 'Done', L.done),
         el('div', { class: 'ui-tiles tk-tiles' }, stat('#waiting', 'M5 3h10a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-4.5L6 18.2V15H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3zm1.5 4.2v1.6h7V7.2zm0 3v1.6h5v-1.6z', 'Wait on you', by.asks.length),
           stat('', 'M4 2.5h1.6v1h9.9l-2.1 3.75 2.1 3.75H5.6v6.5H4z', 'Open at P0', p0))]),
       picked ? tkSheet(picked) : (tkUp = '')];
@@ -643,7 +682,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const who = tkOwnerLine(t), chip = link.querySelector('.l1 .ui-pc');
     // The slug is the row's small secondary line, right under the key that names it; whoever owns the ticket and the priority chip follow on the line below.
     // A held row's second line is the reason, which is worth more than the slug there; every other keyed row names its slug on that line.
-    if (t.key && s !== 'hold') l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
+    if (t.key && !t.key_derived && s !== 'hold') l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
     if (chip) who.append(chip);
     link.querySelector('.rm').append(who);
     return el('li', {}, link);
@@ -688,14 +727,14 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     seeReply(t.id, 'ticket');
     return [el('div', { class: 'tk-shd' }, el('p', {}, tkTypeTile(t), ...(t.key ? [tkKey(t.key)] : []), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
-      t.key ? el('p', { class: 'tk-slug', dir: 'ltr' }, t.id) : '',
+      t.key && !t.key_derived ? el('p', { class: 'tk-slug', dir: 'ltr' }, t.id) : '',
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
         s === 'hold' ? prop('pause', 'Hold', el('span', {}, 'On hold'), el('span', { class: 'tk-why' }, t.hold_reason ?? 'No reason recorded')) : '',
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
-      ...(t.description ? [el('p', { class: 'ui-dl' }, 'Description'), el('div', { class: 'tk-desc' }, ...tkDescription(t.description, t.id))] : []),
+      el('p', { class: 'ui-dl' }, 'Description'), t.description ? el('div', { class: 'tk-desc' }, ...tkDescription(t.description, t.id)) : el('p', { class: 'meta tk-note' }, 'No summary recorded. A ticket carries a one-line summary, then Ask, Why and Done when.'),
       ...tkAssignee(t),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `${tkAbove(t).length ? 'Sub-tasks' : 'Tickets in this epic'} · ${done} of ${kids.length} done`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
       el('p', { class: 'ui-dl' }, 'Linked'), cards.length || t.prs?.length ? el('ul', { class: 'ui-list tk-in' }, ...(t.prs ?? []).map(tkPr), ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),

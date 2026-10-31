@@ -1,15 +1,40 @@
 {
   "name": "sign-off-axi",
-  "version": "0.9.14",
+  "version": "0.9.15",
   "description": "Answer your coding agents’ questions and review their work from one board.",
   "type": "module",
-  "bin": { "sign-off-axi": "dist/cli.js" },
-  "files": ["dist", "!dist/skill.js", "web", "fixtures/contract", "fixtures/engagement-v1.json", "skills/sign-off-axi"],
-  "engines": { "node": ">=22.5" },
+  "bin": {
+    "sign-off-axi": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "!dist/skill.js",
+    "web",
+    "fixtures/contract",
+    "fixtures/engagement-v1.json",
+    "skills/sign-off-axi"
+  ],
+  "engines": {
+    "node": ">=22.5"
+  },
   "license": "MIT",
   "homepage": "https://umeranjum17.github.io/sign-off/",
-  "repository": { "type": "git", "url": "git+https://github.com/umeranjum17/sign-off.git" },
-  "keywords": ["coding-agents", "ai-agents", "human-in-the-loop", "approvals", "decisions", "code-review", "cli", "plans", "reports", "evidence"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/umeranjum17/sign-off.git"
+  },
+  "keywords": [
+    "coding-agents",
+    "ai-agents",
+    "human-in-the-loop",
+    "approvals",
+    "decisions",
+    "code-review",
+    "cli",
+    "plans",
+    "reports",
+    "evidence"
+  ],
   "scripts": {
     "build": "tsc",
     "build:skill": "tsc && node dist/skill.js",
@@ -17,6 +42,13 @@
     "prepack": "tsc",
     "test": "tsc && node scripts/slop-lint.mjs && node --test --test-global-setup=test/temp-folder.mjs test/*.test.mjs"
   },
-  "dependencies": { "@toon-format/toon": "2.3.1", "axi-sdk-js": "0.1.13", "jpeg-js": "0.4.4" },
-  "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
+  "dependencies": {
+    "@toon-format/toon": "2.3.1",
+    "axi-sdk-js": "0.1.13",
+    "jpeg-js": "0.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2"
+  }
 }
