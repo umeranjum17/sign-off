@@ -252,9 +252,18 @@ body::after { content: ''; position: fixed; z-index: 1; left: 0; right: 0; botto
 .detail-sequence .position { white-space:nowrap; font-size:12px; font-variant-numeric:tabular-nums; }
 @media(max-width:639px) { :is(.sh-head,.ev-shd,.rp-shd,.tk-shd,.dz-oh):has(.detail-sequence) { flex-wrap:wrap; } }
 
-:is(.sh-head,.ui-pane .ui-shd,#reader .rp-shd):has(.detail-sequence) { height:auto; min-height:44px; flex-wrap:wrap; }
-.sh-head:has(.detail-sequence) .sh-lab, .ui-pane .ui-shd:has(.detail-sequence) > span:not(.ui-icon), #reader .rp-shd:has(.detail-sequence) .rp-what { flex:1 0 auto; flex-wrap:wrap; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
-@media(max-width:374px) { .ask-sheet .sh-head .detail-sequence { flex-basis:100%; justify-content:flex-end; } }
+:is(.ui-pane .ui-shd,#reader .rp-shd):not(.ui-head):has(.detail-sequence) { height:auto; min-height:44px; flex-wrap:wrap; }
+.ui-pane .ui-shd:not(.ui-head):has(.detail-sequence) > span:not(.ui-icon), #reader .rp-shd:has(.detail-sequence) .rp-what { flex:1 0 auto; flex-wrap:wrap; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+/* An icon and its label: a 20px icon, all it holds kept inside, one 8px token from the label and on its line. */
+.ui-lab { display: flex; flex: 1 1 auto; align-items: center; gap: var(--tk-sp-2); min-width: 0; }
+.ui-lab > .ui-icon { width: var(--tk-icon-s); height: var(--tk-icon-s); overflow: hidden; border-radius: 0.3125rem; background: none; box-shadow: none; }
+.ui-lab > .ui-icon > :is(img, .mono, .icon, svg) { width: 100%; height: 100%; border-radius: inherit; }
+.ui-lab > .ui-icon .mono { font-size: 0.5rem; line-height: var(--tk-icon-s); } .ui-lab > .ui-icon .icon svg { width: 0.875rem; height: 0.875rem; }
+.ui-lab > :not(.ui-icon) { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A sheet's header: 44px rows, each part on its row's centre, 44px controls, its own height so the title is never cut. */
+.ui-head { display: flex; flex-wrap: wrap; align-items: center; height: auto; min-height: var(--tk-tap); }
+.ui-head > :not(.ui-lab) { flex: none; } .ui-head > .ui-lab { margin-inline-end: var(--tk-sp-2); } .ui-head > .dl-more { display: flex; align-items: center; height: var(--tk-tap); }
+.ui-head > :is(a, button), .ui-head > .dl-more > summary, .ui-head .detail-sequence button { min-width: var(--tk-tap); height: var(--tk-tap); }
 /* A pair: what the person sent (Your question, Your action) and what the agent sent back (Reply, What was done), the track between them. */
 .ui-trail .tr-you { margin-bottom: 0.75rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-card); box-shadow: inset 0 0 0 1px var(--tk-line); }
 .ui-trail .tr-you p { margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }

@@ -1391,7 +1391,7 @@
   .top > .bulk { margin-top: 0.25rem; }
   /* More: a disc at the top right (or beside Answer) whose menu scales out of it. */
   .dl-more { position: relative; flex: none; }
-  .dl-more > summary { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; list-style: none; cursor: pointer; color: var(--accent); -webkit-tap-highlight-color: transparent; }
+  .dl-more > summary { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; margin: 0; list-style: none; cursor: pointer; color: var(--accent); -webkit-tap-highlight-color: transparent; }
   .dl-more > summary::-webkit-details-marker { display: none; }
   .dl-more > summary > span { display: grid !important; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--sunk); transition: transform 260ms var(--spring); }
   .dl-more > summary:active > span { transform: scale(0.92); transition-duration: 90ms; }
@@ -1633,16 +1633,13 @@
   body:has(.ask-sheet) { overflow: hidden; }
   body:has(.ask-sheet) #toast { z-index: 31; }
   .ask-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto 0.5rem; border-radius: 2px; background: var(--tk-line); }
-  .sh-head { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
-  .sh-head > .ui-icon { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; background: none; box-shadow: none; }
-  .sh-head > .ui-icon :is(img, .mono) { width: 1.25rem; height: 1.25rem; border-radius: 0.3125rem; } .sh-head > .ui-icon .mono { font-size: 0.5rem; line-height: 1.25rem; }
-  .sh-head > .ui-icon svg { width: 1.125rem; height: 1.125rem; }
-  .sh-lab { flex: 1; min-width: 0; overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); white-space: nowrap; text-overflow: ellipsis; }
-  .sh-head > .dl-more > summary { width: 2.75rem; color: var(--tk-text-secondary); }
+  .sh-lab { color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+  .sh-head > .dl-more > summary { color: var(--tk-text-secondary); }
   .sh-head > .dl-more > summary > span { background: var(--tk-inset); }
-  .sh-x { position: relative; display: grid; flex: none; place-items: center; width: 2rem; height: 2rem; border-radius: 1rem; background: var(--tk-inset); color: var(--tk-text-secondary); }
-  .sh-x::after { content: ''; position: absolute; inset: -0.375rem; }
-  .sh-x .glyph { width: 1.125rem; height: 1.125rem; stroke-width: 2; }
+  /* Close: a 32px round face on its 44px target. */
+  .sh-x { position: relative; display: grid; place-items: center; color: var(--tk-text-secondary); }
+  .sh-x::before { content: ''; position: absolute; inset: calc((var(--tk-tap) - 2rem) / 2); border-radius: 50%; background: var(--tk-inset); }
+  .sh-x .glyph { position: relative; width: 1.125rem; height: 1.125rem; stroke-width: 2; }
   .decide { --ring: var(--tk-mid); max-width: 42.5rem; margin: 0 auto; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .decide .lead h2 { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; text-wrap: pretty; outline: none; }
   .decide .since, .decide .why { margin: 0.5rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 400; overflow-wrap: anywhere; }
@@ -1867,7 +1864,7 @@
     /* The open item's head line: what it is, whose and when, then its own controls (More, Mark read, Archive) at its right. */
     .split-bar { display: flex; }
     .ui-pane :is(.two, .pbody) > .split-bar, .ui-pane.two > .split-bar { grid-column: 1 / -1; }
-    .split-bar .dl-more > summary { width: 2rem; height: 2rem; color: var(--tk-ink); } .split-bar .dl-more > summary > span { background: var(--tk-inset); }
+    .split-bar:not(.ui-head) .dl-more > summary { width: 2rem; height: 2rem; } .split-bar .dl-more > summary { color: var(--tk-ink); } .split-bar .dl-more > summary > span { background: var(--tk-inset); }
     /* With nothing to set beside it, the open item takes its whole width. */
     .ui-pane.two:not(:has(> .pside > *)), .ui-pane .pbody:not(:has(> .pside > *)) { grid-template-columns: minmax(0, 1fr); }
     .split-bar .crumb { flex: 1; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } .split-bar .crumb b { color: var(--tk-text-secondary); font-weight: 500; }

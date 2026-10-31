@@ -32,6 +32,8 @@
   --tk-fw-regular: 400; --tk-fw-medium: 500; --tk-fw-semibold: 600; --tk-fw-bold: 700;
   /* A 4px grid (8px between blocks), the 16px page gutter, and the corners: a hero or list card, a tile, an icon tile, a control. */
   --tk-sp-1: 0.25rem; --tk-sp-2: 0.5rem; --tk-sp-3: 0.75rem; --tk-sp-4: 1rem; --tk-sp-6: 1.5rem; --tk-sp-8: 2rem; --tk-gutter: 1rem;
+  /* A 44px tap target; a 20px label icon. */
+  --tk-tap: 2.75rem; --tk-icon-s: 1.25rem;
   --tk-r-card: 1.375rem; --tk-r-tile: 1.25rem; --tk-r-icon: 0.75rem; --tk-r-ctl: 0.625rem;
   /* Elevation: a card's soft lift with a light top edge, a raised control (the pressed segment, the dock's tab), and the dock. */
   --tk-hl: rgba(255, 255, 255, 0.75);
