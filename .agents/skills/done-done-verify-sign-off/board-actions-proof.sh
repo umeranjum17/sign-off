@@ -8,3 +8,5 @@ here=$(cd "$(dirname "$0")" && pwd)
 node "$here/board-actions.mjs" "$out"
 node "$here/report-actions-shots.mjs" "$out"
 node "$here/designs-shots.mjs" "$out" dark 1440
+# The approved requirement names this capture designs.1440.dark.png: the same pixels, under the name the merge card looks for.
+cp "$out/designs.after.dark.1440w.png" "$out/designs.1440.dark.png"
