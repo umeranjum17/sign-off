@@ -38,7 +38,9 @@ const serveBoard = async (file) => {
   return { proc, base };
 };
 const port = await new Promise((ok) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => ok(port)); }); });
-const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-dec-${process.pid}`, CHROME_DEVTOOLS_AXI_PORT: String(port) };
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-dec-${process.pid}`, CHROME_DEVTOOLS_AXI_PORT: String(port),
+  // The bridge's own npx bootstrap is slow on a loaded host: give it a minute and a half rather than fail the proof.
+  CHROME_DEVTOOLS_AXI_BRIDGE_TIMEOUT_MS: '90000' };
 const browser = (...args) => run('chrome-devtools-axi', args, { env: browserEnv });
 const drive = (script) => run('chrome-devtools-axi', ['run'], { env: browserEnv, input: 'const nap = (ms) => new Promise(r=>setTimeout(r,ms));\nconst wait = async (s) => { for (let i=0;i<120;i++) { if (await page.eval(`!!document.querySelector(${JSON.stringify(s)})`)) return; await nap(100); } throw new Error("Not ready: " + s); };\n' + script });
 const evalIn = (fn) => JSON.parse(drive(`console.log(JSON.stringify(await page.eval(${fn})));`).trim().split('\n').pop());
