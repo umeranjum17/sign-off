@@ -138,6 +138,7 @@ try {
     assert.equal(learning.rule, 'We do not need a second server for this.');
     assert.equal(lines(cellTickets).length, 0, 'Reject never starts a build');
     note(`[${theme} ${width}] reject replay: closed -> "${closed.text}"; board.report-actions.jsonl action=reject result=closed reason=${closedLine.reason}; board.report-learnings.jsonl owner=${learning.owner} rule="${learning.rule}"; board.tickets.jsonl absent`);
+    drive("await page.eval(() => { const b = document.querySelector('.rda'), s = document.querySelector('.gd-scroll'); if (s) s.scrollTop += b.getBoundingClientRect().top - s.getBoundingClientRect().top - 40; else b.scrollIntoView({ block: 'center' }); }); await nap(600);");
     shot('closed', `Closed: ${closed.text}`, theme, width);
     // Reopen through the board's own endpoint: the report comes back to its three actions.
     const reopened = await post(base, { key: KEY, action: 'reopen' });
@@ -159,6 +160,8 @@ try {
     const approved = lines(cellActions).at(-1);
     assert.equal(approved.action, 'approve'); assert.equal(approved.result, 'build'); assert.equal(approved.ticket, `build-${KEY}`);
     note(`[${theme} ${width}] approve replay: "${started}"; board.tickets.jsonl id=${minted[0].id} state=queued stage=queued; board.report-actions.jsonl action=approve result=build ticket=${approved.ticket}`);
+    // The frame shows the block itself, at the foot of the report where the tap happened.
+    drive("await page.eval(() => { const b = document.querySelector('.rda'), s = document.querySelector('.gd-scroll'); if (s) s.scrollTop += b.getBoundingClientRect().top - s.getBoundingClientRect().top - 40; else b.scrollIntoView({ block: 'center' }); }); await nap(600);");
     shot('approved', `Approved: "${started}" — the queued ticket build-${KEY} is on the board and no action is left but the result line.`, theme, width);
     } finally { await stop(proc); }
   }
