@@ -274,6 +274,10 @@ journeys:
   # FLASH_REPO=<a built base checkout> drives that build for the before.
   board-flash:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/flash-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${FLASH_THEME:-light}" "${FLASH_WIDTH:-390}" ${FLASH_REPO:+--repo "$FLASH_REPO"}'
+  # Seamless: tap to response (answer, Approve, comment: on screen at once, marked saving), a failed save taken back and said plainly, a design opening without a layout shift, and a new ask
+  # arriving on Decide by itself with the rows under the thumb held, at 390 and 1280, light and dark. SEAMLESS_REPO=<a built base checkout> measures the before.
+  seamless:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/seamless-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${SEAMLESS_THEME:-light}" "${SEAMLESS_WIDTH:-390}" ${SEAMLESS_REPO:+--repo "$SEAMLESS_REPO"}'
   attach:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/attach-journey.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   evidence-guard:

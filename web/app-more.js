@@ -906,7 +906,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       if (/\.html?$/i.test(path)) return deviceFit(guardFrame(el('iframe', { class: 'design-review-preview', src: src(designUrl(d, path)), title: `Design preview: ${d.title}`, sandbox: 'allow-scripts' }), `design ${d.title}`), form, cls);
       const img = el('img', { class: 'design-review-preview', src: src(designUrl(d, path)), alt: `Design preview: ${d.title}` });
       if (path !== d.preview) img.addEventListener('error', () => img.replaceWith(fallback()));
-      return boxed(img);
+      // The box holds its shape, shimmering, until the picture is in, so nothing under it moves as it arrives.
+      const box = boxed(img);
+      if (cls && !img.complete) { box.classList.add('pending'); for (const e of ['load', 'error']) img.addEventListener(e, () => box.classList.remove('pending'), { once: true }); }
+      return box;
     };
     const fullHref = (path) => src(designUrl(d, d.missing?.includes(path) ? d.preview : path));
     // Design 2: the screen's frames in role order, labelled Before and After when they are today and the new look, else by role; each picture opens full size.
@@ -947,24 +950,33 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       note.value = session.drafts.get(session.selected) ?? currentNote()?.note ?? '';
     };
     const status = el('span', { role: 'status' }, saved ? saved.label : d.status === 'draft' ? 'Draft' : 'In review');
-    const err = el('p', { class: 'err', role: 'alert' });
+    const err = el('p', { class: 'err', role: 'alert', id: `dz-err-${d.key}` });
     let saving = false;
     const save = (verdict) => {
       const screen = session.open;
-      if (!screen && d.options?.length && !pick.value) { err.textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
+      if (!screen && d.options?.length && !pick.value) { shown(err).textContent = 'Choose a direction before sending your review.'; pick.focus(); return Promise.resolve(); }
       // A screen save (the viewer) sends no design-wide verdict; a note carries the verdict of the button that saved it, on a screen or at design level.
       const selected = asked ? null : target(), text = note.value.trim(), writes = (selected && screen) || text, live = new Set(screens.map(screenKey));
       const notes = roundNotes().filter((n) => (!n.journey || live.has(`${n.journey}/${n.screen}`)) && (n.journey !== selected?.journey.id || n.screen !== selected?.screen.id));
       if (writes) notes.push({ ...(selected && { journey: selected.journey.id, screen: selected.screen.id }), verdict, note: text });
       saving = true; approve.disabled = change.disabled = true;
-      return sendWithFeedback(`design:${d.key}`, verdict === 'approve' ? approve : change, () => call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
-        notes, ...(pick.value && { pick: pick.value }) }) }, () => { session.drafts.set(screenKey(selected), ''); note.value = ''; }))
+      // The verdict shows at once, marked saving (on the card and in the lists); a save that fails puts the old state back and says so.
+      const mark = !screen && { answer: verdict, notes, ...(pick.value && { pick: pick.value }), label: `${verdict === 'approve' ? 'Approved' : 'Changes requested'} · saving…`, at: new Date().toISOString(), pending: true }, was = answerOf(d.key);
+      const request = sendWithFeedback(`design:${d.key}`, verdict === 'approve' ? approve : change, () => call('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key: d.key, ...(!screen && { verdict }), ...(screen && { requested: verdict === 'change' }),
+        notes, ...(pick.value && { pick: pick.value }) }) }, () => { session.drafts.set(screenKey(selected), ''); note.value = ''; }), () => save(verdict))
+      if (mark) { pending.set(d.key, mark); keepPending(); try { renderKeepingFocus(); } catch {} }
+      return request
+        .then((sent) => {
+          if (sent || !mark) return;
+          pending.delete(d.key); const answers = { ...state.answers }; was ? (answers[d.key] = was) : delete answers[d.key]; state = { ...state, answers }; renderKeepingFocus();
+          say(`Couldn't save: your review of ${d.title} did not save, so nothing changed.`, 8000);
+        })
         .finally(() => { saving = false; approve.disabled = change.disabled = state.readonly; if (session.open) { screenStatus.textContent = screenLine(); stamp(true); } });
     };
     const approve = el('button', { class: 'open-link dz-ink' }, asked ? 'Yes' : 'Approve'), change = el('button', { class: 'dz-change' }, 'Change');
     approve.disabled = change.disabled = state.readonly;
-    approve.onclick = () => save('approve').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; });
-    change.onclick = () => { if (!note.value.trim()) { err.textContent = asked ? 'Say in the note what should change, then tap Change.' : 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { err.textContent = `Couldn't save: ${e.message}`; }); };
+    approve.onclick = () => save('approve').catch((e) => { shown(err).textContent = `Couldn't save: ${e.message}`; });
+    change.onclick = () => { if (!note.value.trim()) { shown(err).textContent = asked ? 'Say in the note what should change, then tap Change.' : 'Add a note describing what should change.'; note.focus(); return; } save('change').catch((e) => { shown(err).textContent = `Couldn't save: ${e.message}`; }); };
     const foot = el('div', { class: 'foot' }, approve, change, sendLine(`design:${d.key}`));
     const controls = el('div', { class: 'dz-ctl' }, d.options?.length ? el('label', {}, 'Pick a direction', pick) : '', el('label', {}, asked ? 'Your note' : screens.length ? 'Screen note' : 'Design note', note));
     const open = el('button', { class: 'open-link dz-full', 'aria-haspopup': 'dialog', 'data-design': d.key }, 'Review full screen');
@@ -1061,14 +1073,15 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     viewer.onclose = () => {
       session.open = false;
       viewer.remove();
+      // The note, the buttons and the line come home first: a board read that landed while the viewer was open is drawn after, and may keep this page as it is.
+      for (const [e, parent, next] of parked.reverse()) try { parent.insertBefore(e, next); } catch {}
+      approve.textContent = 'Approve'; change.textContent = 'Change';
       if (boardStale) {
         boardStale = false;
         render();
         document.querySelector(`[data-design="${CSS.escape(d.key)}"]`)?.focus();
         return;
       }
-      for (const [e, parent, next] of parked.reverse()) parent.insertBefore(e, next);
-      approve.textContent = 'Approve'; change.textContent = 'Change';
       open.focus();
     };
     return root;
@@ -1218,7 +1231,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       if (!box || box.dataset.sig === sig) return;
       box.dataset.sig = sig;
       box.replaceChildren(...mine.flatMap((c) => [E('div', 'gd-cmt', E('span', 'av', 'Y'),
-        E('div', 'hd', E('b', '', 'You'), ...(c.verdict ? [E('span', 'verdict ' + c.verdict, c.verdict === 'agree' ? 'Agree' : 'Disagree')] : []), E('span', '', hhmm(c.at))),
+        E('div', 'hd', E('b', '', 'You'), ...(c.verdict ? [E('span', 'verdict ' + c.verdict, c.verdict === 'agree' ? 'Agree' : 'Disagree')] : []), E('span', '', c.pending ? 'Sending…' : hhmm(c.at))),
         sentOf(c.id) ? trailTrack(sentOf(c.id), true, c.text) : E('p', '', c.text)),
         ...(c.reply && !sentOf(c.id) ? [E('div', 'gd-cmt agent', E('span', 'av', 'A'), E('div', 'hd', E('b', '', 'Agent'), E('span', '', hhmm(c.replied))), E('p', '', c.reply))] : [])]));
     }
@@ -1806,7 +1819,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     function flash(what) { note.replaceChildren(what); note.hidden = false; clearTimeout(flash.t); flash.t = setTimeout(() => { note.hidden = true; }, 7000); }
     const sentLine = (at) => `Sent to the agent ${hhmm(at)}. What it says comes in Activity.`;
     async function say(part, body) {
-      await postJson('/api/annotations', { key, part, ...body });
+      // The comment (or the vote) is under its part at once, marked sending; if the board does not take it, it comes back off and the words are told it did not save.
+      const mark = { id: `pending-${Date.now()}`, key, part, at: new Date().toISOString(), pending: true, ...body };
+      state = { ...state, comments: [...(state.comments ?? []), mark] }; sync();
+      try { await postJson('/api/annotations', { key, part, ...body }); } catch (e) {
+        state = { ...state, comments: state.comments.filter((c) => c !== mark) }; sync();
+        throw new Error(`${e.message} Your ${body.text ? 'comment' : body.verdict} did not save.`);
+      }
       if (part === 'understood' && body.verdict) { S.understood = body.verdict === 'agree' ? 'yes' : 'no'; S.told = !!body.text; syncU(); }
       sync();
     }
@@ -1836,12 +1855,14 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         e.preventDefault(); const text = ta.value.trim(); if (!text || sending.get(id)?.busy) return;
         // Send itself answers at once: a spinner and Sending inside it, the words kept in view but locked. Not sent shows a red line in the box with Retry; Sent closes the box and the comment is a bubble under its part.
         const part = sel.value;
-        err.textContent = ''; ta.readOnly = true; send.replaceChildren(E('i', 'ra-spin'), 'Sending');
-        const sent = await sendWithFeedback(id, send, () => say(part, { text, ...(mode === 'disagree' && { verdict: 'disagree' }) }));
-        if (sent) { sheet.close(); flash(sentLine(new Date())); threads.get(part)?.lastElementChild?.scrollIntoView({ block: 'center', behavior: quick ? 'auto' : 'smooth' }); }
-        else { ta.readOnly = false; send.replaceChildren('Send to the agent'); paint(); }
+        // The comment is under its part and the box is closed at once; a send that fails opens the box again with the words in it and the line that says it did not save.
+        err.textContent = '';
+        const saving = sendWithFeedback(id, send, () => say(part, { text, ...(mode === 'disagree' && { verdict: 'disagree' }) }));
+        sheet.close(); threads.get(part)?.lastElementChild?.scrollIntoView({ block: 'center', behavior: quick ? 'auto' : 'smooth' });
+        if (await saving) flash(sentLine(new Date())); else { openSheet(title, form); ta.focus({ preventScroll: true }); }
       };
-      openSheet(mode === 'disagree' ? (curPart === 'understood' ? 'Not quite' : 'Disagree') : 'Comment', form);
+      const title = mode === 'disagree' ? (curPart === 'understood' ? 'Not quite' : 'Disagree') : 'Comment';
+      openSheet(title, form);
       ta.focus({ preventScroll: true });
     }
     /** Ask: the presets and a question of your own, on the part in view. */
@@ -2842,3 +2863,19 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     commsRoot.querySelector('.ch-list').scrollTop = listSaved;
     if (focused) { const field = commsRoot.querySelector('#ch-query'); field.focus({ preventScroll: true }); field.setSelectionRange?.(caret, caret); }
   }
+
+// The board while it is watched: read quietly every 3 s (a 304 when unchanged), never under a plan, design, report or ticket open for review.
+if (!FROZEN) {
+  const live = () => document.hidden || !reader.hidden || designSession?.open || /^#(?:waiting|designs|reports|ticket)\/[\w.-]+/.test(location.hash) || refresh(true);
+  setInterval(live, 3000);
+  document.addEventListener('visibilitychange', live);
+}
+// Rows arriving above the ones in view must not push them: the first row in view stays put (the page on a phone, the list on a desk).
+holdRows = (open) => {
+  const list = () => document.querySelector('.split-list'), lead = list()?.scrollTop > 0 ? list() : null, edge = () => (lead ? list().getBoundingClientRect().top : 0);
+  const row = (lead || scrollY > 0) && !(open && !open.hidden) ? [...document.querySelectorAll('#board [data-key]')].find((r) => r.getBoundingClientRect().top >= edge()) : null, was = row?.getBoundingClientRect().top;
+  return () => {
+    const moved = row && document.querySelector(`#board [data-key="${CSS.escape(row.dataset.key)}"]`)?.getBoundingClientRect().top - was;
+    if (moved) lead ? (list().scrollTop += moved) : scrollBy(0, moved);
+  };
+};

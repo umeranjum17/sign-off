@@ -2739,7 +2739,7 @@ test('Undo on a card outside Waiting takes the answer back and stays on that are
   const choices = 'document.querySelectorAll("#item-build .choices button").length';
   await until(async () => (await evaluate(choices)) === 2);
   await evaluate('[...document.querySelectorAll("#item-build .choices button")].find((b) => b.textContent.startsWith("Yes")).click()');
-  await until(async () => (await evaluate('!document.querySelector("#toast").hidden')));
+  await until(async () => (await evaluate('!document.querySelector("#toast").hidden && !document.querySelector("#undo").hidden')));
   await evaluate('document.querySelector("#undo").click()');
   await until(async () => (await evaluate('document.getElementById("toast-text").textContent')) === 'Undone: not answered');
   assert.equal(await evaluate('location.hash'), '#evidence');
