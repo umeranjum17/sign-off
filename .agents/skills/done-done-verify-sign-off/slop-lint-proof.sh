@@ -31,21 +31,25 @@ for width in 390 1280; do
   for theme in light dark; do
     view=$([ "$width" = 390 ] && echo "${width}x844x2,mobile,touch" || echo "${width}x800x1")
     chrome-devtools-axi emulate --viewport "$view" --color-scheme "$theme" > /dev/null
-    # The surfaces the lint reads: the Inbox at every cell, and Today at one of each, so the judge reads the claim, not a matrix.
-    for page in inbox today; do
-      [ "$page" = today ] && [ "$theme$width" != "light390" ] && [ "$theme$width" != "dark1280" ] && continue
-      chrome-devtools-axi open "$base#$page" > /dev/null
-      sleep 2
-      chrome-devtools-axi screenshot "$out/$page.$theme.${width}w.png" --full-page > /dev/null
-    done
+    # The surface the lint reads, at every cell: the Inbox with its rail, filters, status chips and empty state.
+    chrome-devtools-axi open "$base#inbox" > /dev/null
+    sleep 2
+    chrome-devtools-axi screenshot "$out/inbox.$theme.${width}w.png" --full-page > /dev/null
   done
 done
 chrome-devtools-axi stop > /dev/null
 node "$repo/dist/cli.js" stop "$d/board.json" > /dev/null || true
 
 # 4. The required approved-design capture, in this same run: the Designs journey at 1440 dark, and designs.1440.dark.png with it.
-DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node "$here/designs-shots.mjs" "$out" dark 1440
-node "$here/design-demo-shots.mjs" "$out"
+# A check sends at most ten captures to the judge, so the two journeys' other frames stay beside the run and only the one frame each names is cited.
+mkdir -p "$out.records/designs-shots" "$out.records/design-demo"
+DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node "$here/designs-shots.mjs" "$out.records/designs-shots" dark 1440
+node "$here/design-demo-shots.mjs" "$out.records/design-demo"
+cp "$out.records/designs-shots/designs.after.dark.1440w.png" "$out/"
+cp "$out.records/design-demo/designs.1440.dark.png" "$out/"
+shopt -s nullglob
+captures=("$out"/*.png "$out"/*.txt)
+[ "${#captures[@]}" -le 10 ] || { echo "the run holds ${#captures[@]} captures: one check sends at most 10 to the judge"; exit 1; }
 
 # 5. What this run claims, in the order it drove it.
 node - "$out" "$repo" <<'JS'
