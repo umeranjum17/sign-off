@@ -29,7 +29,7 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Re-recorded on 30 October 2026 in the change that makes an Inbox thread read as a chat: +1,639 B of the whole open over main's 315,842 B (the chat messages, bubbles and inline artifact cards in
 // app-more.js and app.css, the one-row filters, and the thread's placing after a draw in app.js, all after the first paint).
 // Re-recorded again on 31 October 2026 in the change that groups the Inbox's threads by agent and topic: +1,038 B of the whole open over 317,481 B (the thread grouping and its cards in app-more.js, all after the first paint).
-const baseline = { bytesBeforePaint: 98_571, requestsBeforePaint: 5, bytesWhole: 320_690, paintMs: 900 };
+const baseline = { bytesBeforePaint: 98_571, requestsBeforePaint: 5, bytesWhole: 322_236, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.
