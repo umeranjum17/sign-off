@@ -100,6 +100,7 @@ const summary = { report: { key, title }, cells: {}, checked: 'dark and light, 3
 try {
   const base = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', (c) => no(new Error(`serve exited ${c}`))); });
   browser('open', base);
+  let pageAt = '';
   for (const theme of themes) for (const width of widths) {
     const phone = width < 700, height = phone ? 844 : 800, id = `${theme}.${width}w`;
     // In the board's reader, as the captain reads it: the frame the board draws, its page told the board's light or dark.
@@ -109,6 +110,7 @@ try {
     drive("await wait('#reader .read iframe, .split-detail .read iframe'); await new Promise(r=>setTimeout(r,1500));");
     browser('screenshot', join(out, `reader.${id}.png`), '--full-page');
     const frame = await ask(() => { const f = document.querySelector('#reader .read iframe') ?? document.querySelector('.split-detail .read iframe'); return f ? { src: f.getAttribute('src'), width: Math.round(f.getBoundingClientRect().width) } : {}; });
+    if (!pageAt && frame.src) pageAt = frame.src;
     // The very page the reader's frame holds, at the same width and theme: the board's own address for it.
     browser('open', new URL(frame.src, base).href + (frame.src.includes('?') ? '&' : '?') + `theme=${theme}`);
     drive('await new Promise(r=>setTimeout(r,800));');
@@ -135,10 +137,22 @@ try {
     summary.cells[id].problems = problems.length;
     console.log(`${id}: ground ${m.ground.color}, ${m.fails.length} unreadable, ${m.empties.length} empty`);
   }
+  // The control: the same page as anyone else gets it, with no theme from the board, which is the defect the captain met — the check must still catch it.
+  browser('emulate', '--viewport', '390x844x2,mobile,touch', '--color-scheme', 'dark');
+  browser('open', new URL(String(pageAt).replace(/[?#].*$/, ''), base).href);
+  drive('await new Promise(r=>setTimeout(r,800));');
+  const control = ask(measure);
+  const controlLines = [`${title} — control: the page opened with no theme from the board, dark, 390px (${control.url})`,
+    `${control.checked} words read, the lowest ${control.lowest?.ratio ?? '?'}:1 at ${control.lowest?.element ?? '?'}; ${control.fails.length} unreadable, ${control.empties.length} painted with nothing`,
+    ...control.fails.map((f) => `  unreadable: ${f.element} reads ${f.ratio}:1 — "${f.words}"`)];
+  writeFileSync(join(records, 'contrast-control.txt'), controlLines.join('\n') + '\n');
+  assert.ok(control.fails.length > 0, `${controlLines.join('\n')}\nthe check read no failure on a page handed no theme, so it cannot catch the defect it exists for`);
+  summary.control = { fails: control.fails.length, lowest: control.lowest };
   // Every cell is measured before it fails, so one run names each theme and width that is wrong.
   assert.equal(broken.length, 0, `${title}: ${summary.cells ? Object.values(summary.cells).reduce((n, c) => n + c.problems, 0) : 0} problems in ${themes.length * widths.length} reads\n${broken.join('\n')}`);
   writeFileSync(join(out, 'contrast.json'), JSON.stringify(summary, null, 2) + '\n');
-  writeFileSync(join(out, 'contrast.txt'), [...themes.flatMap((t) => widths.map((w) => readFileSync(join(records, `contrast.${t}.${w}w.txt`), 'utf8')))].join('\n'));
+  writeFileSync(join(out, 'contrast.txt'), [...themes.flatMap((t) => widths.map((w) => readFileSync(join(records, `contrast.${t}.${w}w.txt`), 'utf8'))),
+    readFileSync(join(records, 'contrast-control.txt'), 'utf8')].join('\n'));
   const head = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim();
   const pkg = JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version;
   writeFileSync(join(out, 'steps.json'), JSON.stringify({
