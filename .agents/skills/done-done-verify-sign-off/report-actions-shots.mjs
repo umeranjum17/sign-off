@@ -146,6 +146,20 @@ try {
     const reread = await (await fetch(`${base}api/state`)).json();
     assert.equal(reread.report_actions[KEY].action, 'reopen', 'Reopen puts the report back on its actions');
     note(`[${theme} ${width}] reopen replay: key ${KEY} action reopen result open; the three actions come back`);
+    // And the one tap that starts the work: Approve mints the queued ticket the fleet reads, and the block says who has it and when.
+    await open(base, theme, width);
+    click('.rda-a.approve');
+    drive("await wait('.rda-closed');");
+    const started = evalIn(`() => document.querySelector('.rda').textContent.replace(/\\s+/g, ' ').trim()`);
+    assert.match(started, /Build started/); assert.match(started, /Approved by you/);
+    assert.match(started, /The first pull request lands by Fri 6 Nov\. Its ticket is on Tickets\./);
+    const minted = lines(cellTickets);
+    assert.equal(minted.length, 1, 'one approval, one ticket');
+    assert.equal(minted[0].id, `build-${KEY}`); assert.equal(minted[0].state, 'queued'); assert.equal(minted[0].stage, 'queued');
+    const approved = lines(cellActions).at(-1);
+    assert.equal(approved.action, 'approve'); assert.equal(approved.result, 'build'); assert.equal(approved.ticket, `build-${KEY}`);
+    note(`[${theme} ${width}] approve replay: "${started}"; board.tickets.jsonl id=${minted[0].id} state=queued stage=queued; board.report-actions.jsonl action=approve result=build ticket=${approved.ticket}`);
+    shot('approved', `Approved: "${started}" — the queued ticket build-${KEY} is on the board and no action is left but the result line.`, theme, width);
     } finally { await stop(proc); }
   }
   writeFileSync(join(out, 'replays.log'), `${transcript.join('\n')}\n`);
