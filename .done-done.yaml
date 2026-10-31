@@ -108,6 +108,11 @@ journeys:
   # and an open thread (one per agent and topic: two cards of one ticket under one thread named by it) in time order with the agent's words on the left, the person's own as bubbles on the right with Read or Sent and Not read under them, and a pull request inline as a card. The required Designs capture rides in the same run.
   inbox-chat:
     command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/inbox-chat-proof.sh'
+  # The Inbox as a conversation with everyone: the people rail, a one-to-one thread with sent/read/replied, #fleet muted with
+  # the agents' own talk, a mention that opens the ticket it names, and a search that finds what an agent said; 390 and 1280,
+  # light and dark, then the approved design-pick listing (designs.1440.dark.png) in the same run.
+  fleet-chat:
+    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/fleet-chat-proof.sh'
   # Reopen at 360, 390, 445, 1280 and 1440, light and dark: an answered ask taken back with sign-off-axi reopen waits in Decide again with its choices, Your earlier answer shows the answer and note, its Activity lists the answer then the reopen,
   # reopening an open card is refused, and the next answer names the one it replaces.
   reopen:

@@ -5876,6 +5876,59 @@ test('the inbox rail: a row counts the replies not opened and says when the agen
   } finally { await close(); }
 });
 
+test('the inbox has #fleet: the agents talking to each other, muted by its own control with a banner saying mentions still land, a mention of a ticket or card that reads its title and opens it, and a search that finds what an agent said', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'inbox-fleet'), file = join(dir, 'board.json'), feed = join(dir, 'feed.jsonl'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
+  mkdirSync(dir);
+  assert.equal(run('raise', file, '--key', 'notes', '--title', 'Ship the release notes this week?', '--filer', 'addons-lead').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-9', '--title', 'Move the ticket owner', '--project', 'Settings').code, 0);
+  const sec = Math.floor(Date.now() / 1000);
+  writeFileSync(feed, [
+    { ts: sec - 300, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'sign-off', kind: 'status', text: 'It is parked on #tickets/T-9 until the owner move ships.' },
+    { ts: sec - 240, home: 'Main', channel: 'task:addons', from: 'signoff-worker', to: 'addons-lead', kind: 'status', text: 'Nothing is unowned on the board now.' },
+    { ts: sec - 180, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'signoff-worker', kind: 'steer', text: 'Then #waiting/notes needs the chip before that ships.' },
+  ].map((r) => JSON.stringify(r)).join('\n') + '\n');
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env: { ...env, SIGN_OFF_COMMS_FEED: feed }, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // A one-to-one thread with a reply on it, so its receipt reads Replied rather than Read.
+  assert.equal((await post(url, 'api/answers', { key: 'notes', answer: 'text', note: 'Before the release, please.' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'addons-lead', '--timeout', '5').code, 0);
+  await pause();
+  assert.equal(run('feedback', 'notes', file, '--reply', 'Chip first, then the release.', '--filer', 'addons-lead').code, 0);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
+    await until(() => evaluate('!!document.querySelector(".ib-row")'));
+    // #fleet sits at the rail's foot beside Agents and Done, and it is not the read-only Channels room.
+    const ents = await evaluate('JSON.stringify([...document.querySelectorAll(".ib-ent")].map((e) => [e.textContent.replace(/\\s+/g, " "), e.getAttribute("href")]))').then(JSON.parse);
+    assert.deepEqual(ents.map(([t, h]) => [t.includes('#fleet') ? '#fleet' : t.includes('Agents') ? 'Agents' : t, h]), [['#fleet', '#inbox/fleet'], ['Agents', '#channels'], ['Done0', null]]);
+    await evaluate('document.querySelector(".ib-fleet").click()');
+    await until(() => evaluate('document.querySelectorAll(".ib-msg").length >= 3'));
+    // The agents' own words, the ticket and the card as chips that read a title and open what they name.
+    const chips = await evaluate('JSON.stringify([...document.querySelectorAll(".ib-mention")].map((a) => [a.querySelector("span").textContent, a.querySelector("small").textContent.trim(), a.getAttribute("href")]))').then(JSON.parse);
+    assert.deepEqual(chips, [['Move the ticket owner', '· ticket', '#ticket/T-9'], ['Ship the release notes this week?', '· decision', '#inbox/notes']]);
+    assert.equal(await evaluate('document.body.innerText.includes("T-9")'), false);
+    // Muting is this channel's own control, kept for the next visit, and it says what it does not do.
+    assert.equal(await evaluate('document.querySelector(".ib-mute").getAttribute("aria-pressed")'), 'false');
+    await evaluate('document.querySelector(".ib-mute").click()');
+    await until(() => evaluate('!!document.querySelector(".ib-mutebar")'));
+    assert.equal(await evaluate('document.querySelector(".ib-mute").getAttribute("aria-pressed")'), 'true');
+    assert.match(await evaluate('document.querySelector(".ib-mutebar").textContent'), /Muted · #fleet stays quiet/);
+    assert.equal(await evaluate('localStorage.getItem("so-fleet-muted")'), '1');
+    // A search finds what an agent said, under #fleet, whatever kind of thread it sits in.
+    await evaluate('location.hash = "#inbox"');
+    await until(() => evaluate('!!document.querySelector("#ib-find")'));
+    await evaluate('(() => { const b = document.querySelector("#ib-find"); b.value = "unowned"; b.dispatchEvent(new Event("input", { bubbles: true })); return 1; })()');
+    await until(() => evaluate('!!document.querySelector(\'.ib-sec[aria-label="In #fleet"] .ib-row\')'));
+    assert.equal(await evaluate('document.querySelector(\'.ib-sec[aria-label="In #fleet"] .ib-row .l2\').textContent.includes("Nothing is unowned")'), true);
+    // The one-to-one thread's own receipt: the agent answered, so it reads Replied.
+    await evaluate('location.hash = "#inbox/notes"');
+    await until(() => evaluate('!!document.querySelector(".ib-thread .ib-rcpt")'));
+    assert.match(await evaluate('[...document.querySelectorAll(".ib-thread .ib-rcpt time")].map((t) => t.textContent).join()'), /^Replied /);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  } finally { await close(); }
+});
+
 test('the inbox groups threads by agent and topic: an agent\'s cards on one ticket share one thread named by the ticket, another agent or a card with no ticket is its own, and both unread counts, the filters and a card\'s own address still work', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-groups'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
@@ -6003,7 +6056,7 @@ test('the inbox holds only the threads the person took part in: an ask they neve
     // The answered thread's life: sent, read, acted, and its result named.
     await evaluate('location.hash = "#inbox/answered"');
     await until(() => evaluate('!!document.querySelector(".ib-thread .ib-rcpt")'));
-    assert.deepEqual(await evaluate('JSON.stringify([[...document.querySelectorAll(".ib-thread .ib-rcpt time")].map((t) => t.textContent.replace(/\\d\\d:\\d\\d|\\d+ \\w+$/, "").trim()), [...document.querySelectorAll(".ib-thread .ib-art b")].map((b) => b.textContent), document.querySelectorAll(".ib-thread .ib-nr").length])').then(JSON.parse), [['Read'], ['Send the digest on Mondays?', 'Pull request 9'], 0]);
+    assert.deepEqual(await evaluate('JSON.stringify([[...document.querySelectorAll(".ib-thread .ib-rcpt time")].map((t) => t.textContent.replace(/\\d\\d:\\d\\d|\\d+ \\w+$/, "").trim()), [...document.querySelectorAll(".ib-thread .ib-art b")].map((b) => b.textContent), document.querySelectorAll(".ib-thread .ib-nr").length])').then(JSON.parse), [['Replied'], ['Send the digest on Mondays?', 'Pull request 9'], 0]);
     // A comment the agent has not read says Sent, and Not read beside it; nothing says Read.
     await evaluate('location.hash = "#inbox/chatted"');
     await until(() => evaluate('!!document.querySelector(".ib-thread .ib-rcpt")'));
