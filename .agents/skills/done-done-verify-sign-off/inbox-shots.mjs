@@ -119,18 +119,28 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const footBox = document.querySelector('.ib-foot')?.getBoundingClientRect(), first_screen = footBox ? Math.round(footBox.bottom) <= (dock && dock.width > 0 ? dock.top : window.innerHeight) : false;
   const follow = [...document.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.textContent);
   const notice = [...document.querySelectorAll('.ib-note')].filter(vis).map((n) => n.innerText.replace(/\\n+/g, ' / '));
+  const toast = document.getElementById('toast').hidden ? '' : document.getElementById('toast-text').textContent.trim();
   const thread_answers = thread ? thread.querySelectorAll('.tr-opt, .tr-opts, [role=radio], input[type=radio], .pick-option, .answer').length : 0;
   const menu = [...document.querySelectorAll('#tabs a, #nav a:not(.sfind)')].filter(vis).map((a) => (a.getAttribute('aria-label') || a.textContent).replace(/,.*$|\\d+$/g, '').trim()), search = [...document.querySelectorAll('a[href="#find"]')].some(vis);
   for (const e of document.querySelectorAll('#tabs, .dock-find')) { const r = e.getBoundingClientRect(); if (r.width > 0 && (r.left < 0 || r.right > w)) fail.push('the dock leaves the screen'); }
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', msgs, rcpts, arts, sides, bar, first_screen, ags, arts_view, latest_clear, opts_clear, page_scroll: Math.round(scrollY), scrollers, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', msgs, rcpts, arts, sides, bar, first_screen, ags, arts_view, latest_clear, opts_clear, page_scroll: Math.round(scrollY), scrollers, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, toast, thread_answers, fail }; })()`;
 const results = [];
+// The same measurement the captures take, for a step whose assertion is the point and not its picture.
+const checkPage = async (hash, before) => {
+  if (hash !== null) await go(hash);
+  if (before) { await evaluate(before); await wait(700); }
+  const m = await evaluate(MEASURE);
+  if (m.fail.length) throw new Error(m.fail.join('; '));
+  return m;
+};
 // RECEIPTS_ONLY=1 captures just the relayed answer's thread (journey `answer-receipts`).
 const capture = async (state, hash, before, check) => {
   if (process.env.RECEIPTS_ONLY && state !== 'relayed') return;
-  if (process.env.RAIL_ONLY && !['rail', 'unread'].includes(state)) return;
+  if (process.env.RAIL_ONLY && !['rail', 'unread', 'done', 'undo', 'doneview', 'returned'].includes(state)) return;
+  if (process.env.DONE_ONLY && !['done', 'undo', 'doneview', 'returned'].includes(state)) return;
   if (process.env.CHAT_ONLY && !['list', 'chat', 'pr', 'group', 'groupend'].includes(state)) return;
   errors.length = 0;
   if (hash !== null) await go(hash);
@@ -145,13 +155,22 @@ const capture = async (state, hash, before, check) => {
 };
 const heads = (m) => m.sections.map((s) => s.head.replace(/\s*\d+$/, ''));
 const tap = (sel) => `(() => { const b = [...document.querySelectorAll(${JSON.stringify(sel)})].find((e) => e.getBoundingClientRect().width > 0); b.scrollIntoView({ block: 'center' }); b.click(); })()`;
+// The Done control on the row whose title holds `title`, once the rail has drawn it: a tap, and the rail redraws with that thread gone.
+const markDone = (title) => `(async () => { for (let i = 0; i < 100 && !document.querySelector('.ib-dn'); i++) await new Promise((ok) => setTimeout(ok, 100));
+  const li = [...document.querySelectorAll('.ib-list > li')].find((l) => l.querySelector('.t')?.textContent.includes(${JSON.stringify(title)})); li.querySelector('.ib-dn').click(); })()`;
+const searchDone = (text) => `(() => { const b = document.getElementById('ib-find'); b.value = ${JSON.stringify(text)}; b.dispatchEvent(new Event('input', { bubbles: true })); })()`;
+// A step, then the wait for the toast a mark put up to go by itself, so what is captured is the page it left, not the notice over it.
+const settle = (steps, ms = 6300) => `(async () => { ${steps}; await new Promise((ok) => setTimeout(ok, ${ms})); })()`;
+// The rail's unread filters back off, whichever one the last capture left on.
+const anyFilter = `(() => { document.querySelector('.ib-flt[aria-pressed=true]')?.click(); })()`;
 try {
   // RAIL_ONLY=1 (journey `inbox-rail`): the rail as the conversation's neighbour. One ask got a comment no agent has read; the rows carry the unread counts, the two unread filters count the threads, Agents and Done close the rail.
-  if (process.env.RAIL_ONLY) {
+  if (process.env.RAIL_ONLY || process.env.DONE_ONLY) {
     await api('/api/messages', { kind: 'comment', key: 'digest', text: 'Can you hold the digest until Monday?' });
     const check = (m) => {
       assert.deepEqual(m.flts.map((f) => f.replace(/^\[|\]$/g, '').replace(/\d+$/, '')), ['Unread from agents', 'Not read by agents'], 'both unread filters: ' + m.flts.join(', '));
-      assert.deepEqual(m.entries.map((e) => e.replace(/\d+$/, '').trim()), ['Agentsread-only', 'Done'], 'the rail ends with Agents and Done: ' + m.entries.join(', '));
+      // The rail's foot: the agents' own group channel, the read-only room, then Done.
+      assert.deepEqual(m.entries.map((e) => e.replace(/\d+$/, '').trim()), ['#fleetagents', 'Agentsread-only', 'Done'], 'the rail ends with #fleet, Agents and Done: ' + m.entries.join(', '));
     };
     await capture('rail', '#inbox', '', (m) => {
       check(m);
@@ -165,6 +184,48 @@ try {
       assert.ok(m.flts[1].startsWith('['), 'Not read by agents is on: ' + m.flts.join(', '));
       assert.deepEqual(m.marks.map((r) => r[0]), ['Keep the weekly digest?'], 'only the thread its agent has not read: ' + JSON.stringify(m.marks));
     });
+    // The Done gesture: one tap on the row's own control takes the thread out of the live rail at once, with Undo for a few seconds; nothing is deleted.
+    const doneCount = (m) => +(m.entries.at(-1) ?? '').replace(/\D/g, '');
+    await capture('done', '#inbox', `${anyFilter}; ${markDone('Keep the weekly digest')}`, (m) => {
+      check(m);
+      assert.ok(!m.marks.some((r) => r[0].startsWith('Keep the weekly digest')), 'the Done thread is still in the live rail: ' + JSON.stringify(m.marks));
+      assert.match(m.toast, /^Done · Keep the weekly digest\?$/, 'the rail says what it did: ' + m.toast);
+      assert.equal(doneCount(m), 2, 'Done counts the thread it took: ' + m.entries.join(', '));
+    });
+    await capture('undo', null, tap('#undo'), (m) => {
+      check(m);
+      assert.ok(m.marks.some((r) => r[0].startsWith('Keep the weekly digest') && r[2] === 'Not read'), 'Undo did not put the thread back: ' + JSON.stringify(m.marks));
+      assert.match(m.toast, /^Back in the inbox$/, 'the rail says it came back: ' + m.toast);
+      assert.equal(doneCount(m), 1, 'Done no longer counts it: ' + m.entries.join(', '));
+    });
+    // The Done view: the rail's Done entry, picked, is the finished threads and nothing else, and a search reads them there.
+    await capture('doneview', null, settle(`${markDone('Keep the weekly digest')}; ${tap('.ib-done')}; ${searchDone('digest')}`), (m) => {
+      assert.deepEqual(heads(m), ['Done'], 'the Done view lists the live rail too: ' + heads(m).join(', '));
+      assert.deepEqual(m.marks.map((r) => r[0]).sort(), ['Keep the weekly digest?', 'Send the digest on Mondays?'], 'the search does not read the Done threads: ' + JSON.stringify(m.marks));
+      assert.ok(m.entries.at(-1).startsWith('Done'), 'Done is the entry that was picked: ' + m.entries.join(', '));
+    });
+    // The mark is the rail's own state, kept beside the board, so a reload reads it back: the thread is still Done and out of the live rail.
+    const kept = await checkPage('#inbox');
+    assert.ok(!kept.marks.some((r) => r[0].startsWith('Keep the weekly digest')), 'the Done mark did not survive a reload: ' + JSON.stringify(kept.marks));
+    assert.equal(doneCount(kept), 2, 'Done still counts it after a reload: ' + kept.entries.join(', '));
+    // A Done thread reads as any thread does, with the same chat and the agent's own words.
+    const doneThread = await checkPage('#inbox/digest');
+    assert.equal(doneThread.thread, 'Keep the weekly digest?', 'the Done thread opens: ' + doneThread.thread);
+    assert.equal(doneThread.status, 'Done', 'the thread says where it stands: ' + doneThread.status);
+    assert.deepEqual(doneThread.msgs.map((x) => x.split(':')[0]), ['agent', 'you'], 'the thread is the one the person wrote to: ' + doneThread.msgs.join(' | '));
+    // The agent writes again on that thread: it is back in the live rail, unread, counted, and opening it clears the count.
+    await wait(1100);
+    cli('feedback', 'digest', board, '--reply', 'The digest now goes out on Mondays.', '--filer', 'release-agent');
+    await capture('returned', '#inbox', '', (m) => {
+      check(m);
+      assert.ok(m.sections.find((s) => s.head.startsWith('New'))?.rows.some((r) => r.startsWith('* Keep the weekly digest')), 'the thread an agent wrote on is not back under New and unread: ' + JSON.stringify(m.sections));
+      assert.deepEqual(m.marks.find((r) => r[0] === 'Keep the weekly digest?'), ['Keep the weekly digest?', '1', ''], 'the returned thread is counted once: ' + JSON.stringify(m.marks));
+      assert.equal(doneCount(m), 1, 'Done no longer holds it: ' + m.entries.join(', '));
+    });
+    const opened = await checkPage('#inbox/digest');
+    assert.ok(opened.msgs.some((x) => x.startsWith('agent: The digest now goes out on Mondays.')), 'the thread holds the agent\u2019s words: ' + opened.msgs.join(' | '));
+    const read = await checkPage('#inbox');
+    assert.deepEqual(read.marks.find((r) => r[0] === 'Keep the weekly digest?'), ['Keep the weekly digest?', '', ''], 'opening it did not clear the count: ' + JSON.stringify(read.marks));
   }
   if (process.env.CHAT_ONLY) {
     // One person, three screens: the Inbox list with nothing open, the thread with a long question and an agent's two choices (and a line the agent has not read) that scrolls on a phone, and the one an agent answered with a pull request.
@@ -218,7 +279,7 @@ try {
       assert.ok(m.arts.some((a) => /^Pull request 245/.test(a)), 'the pull request sits in the thread: ' + m.arts.join(' | '));
     });
   }
-  if (!process.env.RAIL_ONLY && !process.env.CHAT_ONLY) {
+  if (!process.env.RAIL_ONLY && !process.env.CHAT_ONLY && !process.env.DONE_ONLY) {
   await capture('inbox', '#inbox', (m) => {
     const want = phone ? ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Tickets'] : ['Today', 'Inbox', 'Decide', 'Evidence', 'Reports', 'Designs', 'Tickets', 'Channels'];
     assert.deepEqual(m.menu, want, 'every menu and the Inbox: ' + m.menu.join(', '));
@@ -287,7 +348,12 @@ const receipts = process.env.RECEIPTS_ONLY ? {
   result: 'the kind chips and the two unread filters are one row that scrolls sideways, Agents and Done are one short row under it above the first thread, and a thread reads as a chat in time order: the agent on the left, the person\u2019s own words as bubbles on the right with Read or Sent and Not read under them, the card and the pull request as inline cards' }
   : process.env.RAIL_ONLY ? {
   steps: ['The person answers two asks and writes on a third; the lead\u2019s wait takes the first answer and replies, and nobody reads the comment', 'The person opens the Inbox', 'The person taps Not read by agents'],
-  result: 'each thread row carries the count of replies not opened and a Not read mark where its agent has not read what was sent, the two filters count the threads they list, the rail ends on Agents (read-only) and Done, and Not read by agents narrows the rail to the one thread' } : null;
+  result: 'each thread row carries the count of replies not opened and a Not read mark where its agent has not read what was sent, the two filters count the threads they list, the rail ends on Agents (read-only) and Done, and Not read by agents narrows the rail to the one thread' }
+  : process.env.DONE_ONLY ? {
+  steps: ['The person writes on an ask whose agent has not read it yet', 'The person opens the Inbox and taps the Done control on that row: it leaves the live rail at once and the rail\u2019s Done entry counts it, with Undo up for a few seconds',
+    'The person taps Undo and the thread is back in the live rail, still Not read', 'The person marks it Done again, picks the rail\u2019s Done entry and searches for it',
+    'The agent writes again on that Done thread, and the person opens the Inbox, then the thread'],
+  result: 'a row\u2019s Done control marks its thread Done without a reload: the row leaves the live rail, the toast reads Done with Undo, and the rail\u2019s foot counts one more Done; Undo puts the thread back; Done, picked, shows only the finished threads, a search finds one there and opens the same chat, and a thread an agent wrote on after it was Done is back under New, unread, counted once, the count gone once it is opened' } : null;
 writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
   start: 'A new board with five asks from two agents, a plan, a guided report and a ticket, served by sign-off-axi serve',
   steps: [...(prior?.steps ?? []), ...(receipts?.steps ?? [

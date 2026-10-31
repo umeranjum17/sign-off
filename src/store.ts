@@ -1036,6 +1036,17 @@ export function readSigninOpened(decisionsPath: string): Record<string, string> 
   return last;
 }
 export const appendSigninOpened = (decisionsPath: string, key: string) => appendLine(readsPath(decisionsPath), { key, opened: now(), by: 'captain' });
+/** An Inbox thread the person marked Done from the rail, and what that mark covered: `since` is the thread's own last activity when it was marked, so the
+ *  thread comes back when anything lands after it and never loses an agent's words to the moment a request happened to land. The last line for a thread
+ *  wins, so Undo is a line with done false; a thread's key is its oldest card's key, or `~<ticket id>`, and nothing is deleted. */
+export function readThreadDone(decisionsPath: string): Record<string, string> {
+  const last: Record<string, string> = {};
+  readRaw(readsPath(decisionsPath)).split('\n').forEach((line) => {
+    try { const r = line && JSON.parse(line); if (r && typeof r.key === 'string' && typeof r.done === 'boolean') { const since = typeof r.since === 'string' ? r.since : r.at; if (r.done && typeof since === 'string') last[r.key] = since; else delete last[r.key]; } } catch {}
+  });
+  return last;
+}
+export const appendThreadDone = (decisionsPath: string, keys: string[], done: boolean, since?: string) => keys.forEach((key) => appendLine(readsPath(decisionsPath), { key, done, ...(done && since && { since }), by: 'captain', at: now() }));
 
 /** Go deeper: the person asks the agent about one part of a guided page; the agent answers in pieces that the board streams into that spot.
  * One line each: an ask (id, key, part, what it is about, an optional question), the agent reading it, a piece of the answer (`more` while it goes on), and its end. */

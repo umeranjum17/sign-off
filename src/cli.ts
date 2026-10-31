@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -3004,6 +3004,9 @@ const state = () => {
     seen_at: Object.fromEntries(Object.values(answers).flatMap((a) => { const t = seenAt(file)(a); return t ? [[a.key, t]] : []; })),
     reads: readReads(file),
     opened: readOpened(file),
+    // The threads the person marked Done in the Inbox's rail, and when: the rail keeps them at that mark's time, and a thread something landed on
+    // after it is back in the live list (its own unread, never the mark's).
+    done: readThreadDone(file),
     // A sign-in the person opened waits for approval until its poster runs `signin done`; a new link on that key is a new sign-in, so an earlier open does not count.
     signin_opened: Object.fromEntries(Object.entries(readSigninOpened(file)).filter(([key, at]) => { const d = items.find((x) => x.key === key); return d?.type === 'signin' && !!d.filed && Date.parse(at) >= Date.parse(d.filed); })),
     deeper: readDeeper(file),
@@ -3109,7 +3112,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
   } else if (view.name === 'lists') {
     // The board's own lists, read once the first screen has painted: every answer, dismissal and read mark is the board's truth about cards a page
     // of rows may not name, and the screens that list those (Answered, Archived) need all of it. No rows: those come with their own pages.
-    body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded,
+    body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded, done: s.done,
       dismissed: s.dismissed, promoted: s.promoted, reopened: s.reopened, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
@@ -3389,12 +3392,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
   if (tickets) return tickets;
-  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
+  if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/done', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
   // Dismiss only hides an item on this page and sends nothing to the feeding program, a reply opened (/api/trail) is only the person's own mark, and Go deeper and a comment
   // on a part of a guided page go to the page's own author through its wait, so an answers-only board takes them all; a comment on a mock, a round and a prompt are for the feeding program, below.
-  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/opened', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations', '/api/leash'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
+  if (!['/api/answers', '/api/dismiss', '/api/signin', '/api/opened', '/api/reads', '/api/trail', '/api/deeper', '/api/engagement', '/api/engagement/seen', '/api/annotations', '/api/leash', '/api/done'].includes(req.url!) && answersOnly()) return [403, { error: 'This board takes answers only' }];
   if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
   let body = '';
   for await (const chunk of req) body += chunk;
@@ -3494,6 +3497,16 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const input = JSON.parse(body);
     if (req.url.endsWith('/seen')) markEngagementSeen(file, input.id, input.answerRevision);
     else askEngagement(file, input);
+    return [200, state()];
+  }
+  if (req.url === '/api/done') {
+    // The person marked an Inbox thread Done, or took it back with Undo: a mark beside the board, in the file the rail's read state lives in. No card is
+    // touched, the thread is not deleted, and its key is a card's key or `~<ticket id>`. `since` is the thread's last activity the page saw, so the mark
+    // covers what the person looked at and the thread comes back for anything that lands after it, however late this request itself arrives.
+    const { keys, done, since } = JSON.parse(body) ?? {};
+    if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof done !== 'boolean' || !keys.every((k: unknown) => typeof k === 'string' && /^~?[A-Za-z0-9._-]{1,128}$/.test(k))
+      || (since !== undefined && (typeof since !== 'string' || since.length > 40 || Number.isNaN(Date.parse(since))))) return [400, { error: 'Send 1 to 200 thread keys, done true or false, and the activity the mark covers' }];
+    appendThreadDone(file, [...new Set<string>(keys)], done, since);
     return [200, state()];
   }
   if (req.url === '/api/trail') {

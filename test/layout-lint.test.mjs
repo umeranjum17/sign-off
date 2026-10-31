@@ -14,7 +14,12 @@ import { lint } from './support/layout-lint.mjs';
 const cli = new URL('../dist/cli.js', import.meta.url).pathname, baseline = new URL('./layout-baseline.json', import.meta.url);
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-layout-')), env = { ...process.env, HOME: scratch };
 const procs = [];
-after(async () => { await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill()))); rmSync(scratch, { recursive: true, force: true }); });
+// The run's own Chrome may still hold its profile in this folder for a moment after it is killed, so the sweep asks again rather than leaving the folder
+// the suite's temp folder guard names on both the pass and the failure path.
+after(async () => {
+  await Promise.allSettled(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill())));
+  rmSync(scratch, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+});
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
 // Chrome's socket path must stay under 107 characters, so its TMPDIR is a short one of its own.
 const chromeTmp = chrome && mkdtempSync('/tmp/so-');

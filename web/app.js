@@ -84,9 +84,9 @@
     state = { ...state, ...board, decisions: [...rows.values()], page,
       tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
       ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])),
-      // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was.
+      // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was. 'done' is the rail's own marks, kept like them so a thread stays Done after a reload.
       ...Object.fromEntries(['dismissed', 'promoted', 'seen', 'deeper'].filter(had).map((name) => [name, listed(name)])),
-      ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened'].filter(had).map((name) => [name, kept(name)])),
+      ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened', 'done'].filter(had).map((name) => [name, kept(name)])),
       ...(had('reads') && { reads: kept('reads', (k) => k.split('/')[0]) }),
       ...(had('delivery') && { delivery: { ...state.delivery, ...body.delivery } }) };
   }
@@ -2285,7 +2285,7 @@
   // The swipe follows the finger; the action under the row grows once it would commit, with a tick on Android.
   let sw = null, swiped = false;
   addEventListener('pointerdown', (e) => {
-    const face = !selecting && !state.readonly && !FROZEN && e.isPrimary && e.target.closest?.('.dl-row:not(.leaving, .g-done) > .dl-face');
+    const face = !selecting && !state.readonly && !FROZEN && e.isPrimary && e.target.closest?.('.dl-row:not(.leaving, .g-done) > .dl-face, .ib-list .ib-row');
     if (!face) return;
     face.classList.add('down');
     sw = { face, row: face.parentElement, x: e.clientX, y: e.clientY, id: e.pointerId, dx: 0, on: false, armed: false, t: e.timeStamp, v: 0, lx: e.clientX };
@@ -2328,10 +2328,12 @@
   addEventListener('pointerup', endSwipe);
   addEventListener('pointercancel', endSwipe);
   // The tap that ends a drag does not open the row.
-  addEventListener('click', (e) => swiped && e.target.closest?.('.dl-face') && e.preventDefault(), true);
+  addEventListener('click', (e) => swiped && e.target.closest?.('.dl-face, .ib-row') && e.preventDefault(), true);
   /** Past the line the row flies off its side, then folds away; a right swipe saves the recommended pick, a left one shelves the ask. */
   async function swipeDone(s) {
     const key = s.row.dataset.key, d = state.decisions.find((x) => x.key === key), yes = s.dx > 0;
+    // An Inbox rail row swiped left marks its thread Done (app-more.js owns the mark and its Undo).
+    if (s.face.classList.contains('ib-row')) return swipeInbox(s.face);
     if (s.row.dataset.list === 'reports') return reportSwiped(s, d, yes);
     s.face.style.transition = `transform ${calm.matches ? 0 : 200}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
     s.face.style.transform = `translateX(${yes ? '' : '-'}100%)`;
