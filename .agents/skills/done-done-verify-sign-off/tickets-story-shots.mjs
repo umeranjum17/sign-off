@@ -38,7 +38,7 @@ try {
   const kids = (id) => api.tickets.filter((t) => t.parent === id), epic = api.tickets.find((t) => kids(t.id).length >= 3 && kids(t.id).length < 60 && kids(t.id).some((k) => k.progress < 100)), detail = process.env.TICKETS_STORY_DETAIL ?? api.tickets.find((t) => t.description)?.id;
   assert.ok(epic && detail, 'the board has an epic of three or more tickets and a ticket with a description');
   assert.equal(api.week.days.length, 7);
-  const states = [['story', 'tickets', 'Shipped this week'], ['epics', 'epics', '3 or more tickets'], ['drill', `epics/${epic.id}`, 'All epics'], ['all', 'tickets/all', 'Tickets done'], ['detail', `ticket/${detail}`, 'Description']];
+  const states = [['story', 'tickets', 'Shipped this week'], ['epics', 'epics', '3 or more tickets'], ['drill', `epics/${epic.id}`, 'All epics'], ['all', 'tickets/all', 'tickets ·'], ['detail', `ticket/${detail}`, 'Description']];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) for (const [name, hash, wait] of states) {
     browser('open', `${base}#${hash}`);
     browser('resize', String(width), width === 390 ? '844' : '800');
