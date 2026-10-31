@@ -57,6 +57,7 @@ function helpers(home, readySel) {
     b.click();
     await until(`${what} to take effect`, gone);
     await until(`toast "${say}" after ${what}`, () => say.test(toast()));
+    await until(`Undo after ${what} to be offered`, () => !document.getElementById('undo').hidden);
     const u = need(`Undo after ${what}`, !document.getElementById('undo').hidden && document.getElementById('undo'));
     if (!u) return;
     u.click();

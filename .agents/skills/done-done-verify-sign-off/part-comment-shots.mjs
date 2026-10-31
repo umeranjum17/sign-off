@@ -123,18 +123,17 @@ try {
   // Hold the real request at the browser boundary, as on a slow connection. The first attempt loses its connection.
   drive(`await page.eval(() => { const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '/api/annotations' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
   const feedback = `[data-send-feedback="bar:${KEY}"]`;
-  // Send itself changes in the frame it is tapped: a spinner and Sending inside it; the words stay in view, locked; no grey line outside the box.
-  const instant = page(`() => { const b = document.querySelector('#sheet .ra-send'); b.click(); const t = document.querySelector('#sheet .ra-form textarea'); return { label: b.textContent, spin: !!b.querySelector('.ra-spin'), busy: b.getAttribute('aria-busy'), locked: t.readOnly, kept: t.value, line: getComputedStyle(document.querySelector('${feedback}')).display }; }`);
-  assert.deepEqual(instant, { label: 'Sending', spin: true, busy: 'true', locked: true, kept: TEXT, line: 'none' }, 'Send must answer in the same frame');
-  capture('comment-sending', 'Send answers at once: a spinner and Sending inside the button, the words kept in view but locked.');
-  drive(`await page.eval(() => window.failComment()); await nap(200);`);
-  // Not sent: a red-tinted line in the box with the cause, and Retry is a button (not an underlined link); the words are kept and editable.
-  const failed = page(`() => { const l = document.querySelector('${feedback}'), r = l.querySelector('button'), t = document.querySelector('#sheet .ra-form textarea'); return { text: l.textContent, retry: r?.tagName, underline: r && getComputedStyle(r).textDecorationLine, tint: getComputedStyle(l).backgroundColor, kept: t.value, locked: t.readOnly, label: document.querySelector('#sheet .ra-send').textContent }; }`);
-  assert.match(failed.text, /Not sent · Connection interrupted.*Retry/); assert.equal(failed.retry, 'BUTTON'); assert.equal(failed.underline, 'none');
-  assert.ok(failed.tint !== 'rgba(0, 0, 0, 0)', 'the line is tinted'); assert.deepEqual([failed.kept, failed.locked, failed.label], [TEXT, false, 'Send to the agent']);
-  capture('comment-not-sent', 'Not sent: a red-tinted line in the box with the cause and Retry as a button, the words kept.');
+  const bubbleOf = `() => { const c = document.querySelector('[data-part="${PART}"] .gd-thread .gd-cmt'); return { open: !!document.querySelector('#sheet[open]'), text: c?.querySelector('p')?.textContent, mark: c?.querySelector('.hd span:last-child')?.textContent }; }`;
+  const instant = page(`() => { document.querySelector('#sheet .ra-send').click(); return (${bubbleOf})(); }`);
+  assert.deepEqual(instant, { open: false, text: TEXT, mark: 'Sending…' }, 'Send must answer in the same frame');
+  capture('comment-sending', 'Send answers at once: the box closes and the comment is under its part, marked Sending….');
+  drive(`await page.eval(() => window.failComment()); await nap(300);`);
+  const failed = page(`() => { const l = document.querySelector('${feedback}'), r = l.querySelector('button'), t = document.querySelector('#sheet .ra-form textarea'); return { text: l.textContent, retry: r?.tagName, underline: r && getComputedStyle(r).textDecorationLine, tint: getComputedStyle(l).backgroundColor, kept: t?.value, bubble: (${bubbleOf})() }; }`);
+  assert.match(failed.text, /Not sent · Connection interrupted.*did not save.*Retry/); assert.equal(failed.retry, 'BUTTON'); assert.equal(failed.underline, 'none');
+  assert.ok(failed.tint !== 'rgba(0, 0, 0, 0)', 'the line is tinted'); assert.deepEqual([failed.kept, failed.bubble], [TEXT, { open: true }]);
+  capture('comment-not-sent', 'Not saved: the box is open again with the words kept and a red-tinted line that says it did not save, with Retry as a button.');
   click(`${feedback} button`);
-  assert.equal(page(`() => document.querySelector('#sheet .ra-send').textContent`), 'Sending');
+  assert.deepEqual(page(bubbleOf), { open: false, text: TEXT, mark: 'Sending…' });
   drive(`await page.eval(() => window.releaseComment()); await wait('[data-part="${PART}"] .gd-thread .gd-cmt'); await nap(400);`);
   // Sent: the box closes and the comment is a bubble under its part, in view, with Sent under it; Activity has it too.
   const bubble = page(`() => { const c = document.querySelector('[data-part="${PART}"] .gd-thread .gd-cmt'), r = c.getBoundingClientRect(); return { text: c.querySelector('p').textContent, track: [...c.querySelectorAll('.ui-trail li.on b')].map((b) => b.textContent).join(), inView: r.top >= 0 && r.bottom <= innerHeight, boxOpen: !!document.querySelector('#sheet[open]') }; }`);
@@ -160,12 +159,13 @@ try {
       drive(`await wait('${field}'); await page.eval(() => { document.querySelectorAll('details.other.comment, details.more-menu').forEach(e => e.open = true); document.querySelector('.pick-option')?.click(); const t = document.querySelector('${field}'); t.value = 'Umer needs the settings checked'; t.dispatchEvent(new Event('input', { bubbles: true })); t.scrollIntoView({ block: 'center' }); const real = window.realCommentFetch ??= window.fetch; window.fetch = (url, options) => url === '${path}' ? new Promise((ok, no) => { window.releaseComment = () => ok(real(url, options)); window.failComment = () => no(new Error('Connection interrupted')); }) : real(url, options); });`);
       if (process.env.SEND_FEEDBACK_BEFORE) { capture(name, name + ': before sending, the note is typed.'); continue; }
       const line = `[data-send-feedback="${id}"]`;
-      assert.equal(page(`() => { document.querySelector('${button}').click(); return document.querySelector('${line}').textContent; }`), 'Sending…', name);
-      drive('await page.eval(() => window.failComment()); await nap(200);');
+      const sending = name === 'answer-note' ? `document.getElementById('toast-text').textContent.includes('Saving…') ? 'Sending…' : 'no toast'` : `document.querySelector('${line}').textContent`;
+      assert.equal(page(`() => { document.querySelector('${button}').click(); return ${sending}; }`), 'Sending…', name);
+      drive(`await page.eval(() => window.failComment()); await wait('${line}'); await nap(200);`);
       assert.match(page(`() => document.querySelector('${line}').textContent`), /Not sent.*Retry/, name);
       assert.equal(page(`() => document.querySelector('${field}').value`), 'Umer needs the settings checked', name);
       click(`${line} button`);
-      assert.equal(page(`() => document.querySelector('${line}').textContent`), 'Sending…', name);
+      assert.equal(page(`() => ${name === 'answer-note' ? `document.getElementById('toast-text').textContent.includes('Saving…') ? 'Sending…' : 'no toast'` : `document.querySelector('${line}').textContent`}`), 'Sending…', name);
       drive(`await page.eval(() => window.releaseComment()); await nap(800);`);
       if (name === 'answer-note') { browser('open', `${base}#decide/send-answer`); drive(`await wait('${line}');`); }
       drive(`for (let i = 0; i < 100; i++) { if (await page.eval(() => document.querySelector('${line}')?.textContent.startsWith('Sent ·'))) break; await nap(100); }`);
