@@ -2115,7 +2115,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     if (read) read.onclick = () => readToggle(d);
     const gone = canDismiss() ? el('button', { class: 'rp-archive', 'data-kbd': 'E', 'aria-keyshortcuts': 'E' }, glyph('archive'), 'Archive') : '';
     if (gone) gone.onclick = () => archiveReport(d);
-    const url = d.guided ? '' : src(mockUrl(d.key, '', d.view)), found = d.guided ? d.visual?.heading : d.decided;
+    const url = d.guided ? '' : reportUrl(d), found = d.guided ? d.visual?.heading : d.decided;
     const what = [d.group, d.filed ? day(d.filed) : ''].filter(Boolean).join(' · ');
     const full = (part) => { rpFull = d.key; render(); const at = part && document.getElementById(`gd-${part.replace(/\W/g, '-')}`); at ? at.scrollIntoView({ block: 'start' }) : reader.querySelector('h1')?.focus({ preventScroll: true }); };
     // A guided report's key points, as the prototype's open report shows them: what you asked and when it is done, its own chart (a bar per row, longest full), and what it found
