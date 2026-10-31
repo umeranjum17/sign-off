@@ -2181,14 +2181,16 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /* ---- One thread: everything the person and an agent said on a card (or a ticket), oldest first, in pairs: Asked then Your answer, Your action then What was done,
      Your question then Reply, each with how far it got. Only the last three pairs show until Show earlier. ---- */
   const inEarlier = new Set();
-  /** Opening a thread marks every reply on it seen with one mark, and a report or proof not read yet as read. */
-  function seeThread(th, sent) {
-    const key = th.d?.key ?? th.tk.id, fresh = sent.filter(unseen);
-    if (th.d && unread(th.d) && ['report', 'proof'].includes(th.kind) && !FROZEN && !state.readonly) setTimeout(() => markRead([key], true));
-    if (!fresh.length || FROZEN || state.readonly) return;
-    const at = new Date().toISOString();
-    fresh.forEach((t) => (t.seen = at));
-    postJson('/api/trail', { key }).catch(() => fresh.forEach((t) => (t.seen = undefined)));
+  /** Opening a thread marks every reply on it seen (one mark per card, as the board keeps them), and a report or proof not read yet as read. */
+  function seeThread(th) {
+    const live = !FROZEN && !state.readonly, at = new Date().toISOString();
+    for (const c of th.cards ?? [th.d ?? th.tk]) {
+      const key = c.key ?? c.id, sent = th.cards ? trailOf(key) : trailOf(key, 'ticket'), fresh = sent.filter(unseen);
+      if (th.cards && unread(c) && ['report', 'proof'].includes(threadKind(c)) && live) setTimeout(() => markRead([key], true));
+      if (!fresh.length || !live) continue;
+      fresh.forEach((t) => (t.seen = at));
+      postJson('/api/trail', { key }).catch(() => fresh.forEach((t) => (t.seen = undefined)));
+    }
   }
   /** An open ask with up to four answers is answered in its thread, one tap, the first answer set apart; anything else is answered in its own place. */
   function askOpts(d) {
@@ -2222,38 +2224,43 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   }
   /** beside: the item is open next to the thread, so the thread leaves answering and opening it to the item. */
   function threadView(th, desk, mark = true, beside = false) {
-    const { d, tk } = th, key = d?.key ?? tk.id, sent = d ? trailOf(key) : trailOf(key, 'ticket');
-    const who = d ? d.by || 'Agent' : 'Lead', name = KIND_NAMES[th.kind].toLowerCase(), open = `#inbox/${th.id}/open`;
-    const word = { new: 'New', turn: 'Waiting on you', agent: th.last ? `With ${who} · ${stepWord(th.last, stepOf(th.last) - 1)}` : `With ${who}`, done: d && Object.hasOwn(state.answers, key) ? 'Answered' : 'Done' }[th.st];
-    const simple = !beside && d && th.st !== 'done' && area(d) === 'waiting' && inPlace(d) && d.type !== 'signin' && !exchanging(d) && !Object.hasOwn(state.answers, key) && d.options.length && d.options.length <= 4 && !FROZEN && !state.readonly;
-    // A chat: everything said on the card in time order. The agent's first words are the card's own; each thing the person sent is a bubble on the right, and the agent's replies, links and follow-ups come back on the left.
+    const { d, tk } = th, key = th.id, cards = th.cards ?? [], who = d ? d.by || 'Agent' : 'Lead', name = th.name ?? tk.title;
+    const word = { new: 'New', turn: 'Waiting on you', agent: th.last ? `With ${who} · ${stepWord(th.last, stepOf(th.last) - 1)}` : `With ${who}`, done: d && Object.hasOwn(state.answers, d.key) ? 'Answered' : 'Done' }[th.st];
+    // A chat: everything said on the thread's cards in time order. Each card is the agent's first words with the card itself inline; each thing the person sent is a bubble on the right, and the agent's replies, links and follow-ups come back on the left.
     const msgs = [], add = (at, rank, node) => msgs.push({ at: ibSec(at), rank, node });
-    const card = beside ? '' : artCard(d ? cardTile(d) : tkTypeTile(tk), d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title, [KIND_NAMES[th.kind], th.st === 'turn' ? 'Waiting on you' : ''].filter(Boolean).join(' · '), open, false, th.st === 'turn' && !simple ? 'Answer' : 'Open');
-    // The agent's first words are the card's own; its title is already on the card, so only what the card says besides is a line of its own.
-    const said = d ? d.about ?? d.detail : '';
-    add(d ? d.filed : tk.at, -1, agentMsg(who, d ? d.filed : tk.at, false, said ? el('p', { class: 'ib-say', dir: 'auto' }, plain(said)) : '', card, simple ? askOpts(d) : ''));
-    msgs[0].at = -Infinity;
-    for (const t of sent) {
-      add(t.at, 1, youMsg(t, d, who));
-      const rs = (t.replies ?? (t.reply ? [t.reply] : [])).filter((x) => x.text || x.link || x.acted);
-      rs.forEach((x, i) => add(x.at, 2, agentMsg(x.by || who, x.at, unseen(t), x.text || x.acted ? el('p', { class: 'ib-say', dir: 'auto' }, x.text ?? 'Posted a new version') : '', x.link ? linkCard(x.link) : '', i === rs.length - 1 && !beside ? followUp(t, true) : '')));
+    for (const c of d ? cards : [tk]) {
+      const ck = c.key ?? c.id, sent = d ? trailOf(ck) : trailOf(ck, 'ticket'), kind = d ? threadKind(c) : 'ticket', cst = th.states?.[ck] ?? th.st, shut = beside && d && c.key === d.key, open = `#inbox/${ck}/open`;
+      const simple = !beside && d && cst !== 'done' && area(c) === 'waiting' && inPlace(c) && c.type !== 'signin' && !exchanging(c) && !Object.hasOwn(state.answers, ck) && c.options.length && c.options.length <= 4 && !FROZEN && !state.readonly;
+      const card = shut ? '' : artCard(d ? cardTile(c) : tkTypeTile(tk), d ? (c.type === 'evidence' ? headline(c) : title(c)) : tk.title, [KIND_NAMES[kind], cst === 'turn' ? 'Waiting on you' : ''].filter(Boolean).join(' · '), open, false, cst === 'turn' && !simple ? 'Answer' : 'Open');
+      // The card's own words come first; its title is already on the card, so only what the card says besides is a line of its own.
+      const said = d ? c.about ?? c.detail : '', at = d ? c.filed : tk.at;
+      // A card posted again carries a later time than what was sent on it before, so its first words never sort after its own sends.
+      const first = Math.min(ibSec(at) || Infinity, ...sent.map((t) => ibSec(t.at)));
+      add(at, -1, agentMsg(c.by || who, at, false, said ? el('p', { class: 'ib-say', dir: 'auto' }, plain(said)) : '', card, simple ? askOpts(c) : ''));
+      msgs.at(-1).at = Number.isFinite(first) ? first : -Infinity;
+      for (const t of sent) {
+        add(t.at, 1, youMsg(t, c, who));
+        const rs = (t.replies ?? (t.reply ? [t.reply] : [])).filter((x) => x.text || x.link || x.acted);
+        rs.forEach((x, i) => add(x.at, 2, agentMsg(x.by || who, x.at, unseen(t), x.text || x.acted ? el('p', { class: 'ib-say', dir: 'auto' }, x.text ?? 'Posted a new version') : '', x.link ? linkCard(x.link) : '', i === rs.length - 1 && !beside ? followUp(t, true) : '')));
+      }
+      // An answer the agent reopened is told in the order it happened: the person answered, then the agent asked again.
+      for (const r of d ? reopened(ck) : []) add(r.at, 3, el('p', { class: 'ib-sys' }, `${who} reopened this question to ask again. Your answer above stays.`));
     }
-    // An answer the agent reopened is told in the order it happened: the person answered, then the agent asked again.
-    for (const r of d ? reopened(key) : []) add(r.at, 3, el('p', { class: 'ib-sys' }, `${who} reopened this question to ask again. Your answer above stays.`));
     msgs.sort((x, y) => x.at - y.at || x.rank - y.rank);
-    if (mark) seeThread(th, sent);
+    if (mark) seeThread(th);
     const hide = inEarlier.has(key) ? 0 : Math.max(0, msgs.length - 8), shown = msgs.slice(hide);
     const earlier = el('button', { type: 'button', class: 'ib-fold' }, `Show ${hide} earlier`);
     earlier.onclick = () => { inEarlier.add(key); render(); };
-    const answered = d && isAnswered(d) && state.answers[key], end = el('i', { class: 'ib-end' });
+    const answered = d && isAnswered(d) && state.answers[d.key], end = el('i', { class: 'ib-end' });
     // A thread opens at its latest message, and a new message brings it back to the end; a redraw of the same thread on a desk (its scroller is the thread itself) keeps where it was, unless it was at the end.
     const cur = desk && mark ? document.querySelector('.ib-thread.desk') : null, same = !!cur && cur.dataset.key === String(key), stamp = `${key}:${msgs.length}`, moved = mark && ibAt !== stamp;
     if (mark) ibAt = stamp;
     ibWant = mark ? { desk, toEnd: moved || (desk && (!same || cur.scrollHeight - cur.scrollTop - cur.clientHeight < 64)), top: same ? cur.scrollTop : 0 } : null;
+    const grouped = cards.length > 1;
     const art = el('article', { class: `ib-thread${desk ? ' desk' : ''}`, 'data-key': key, 'aria-labelledby': 'ib-title' },
       el('div', { class: 'ib-head' }, desk && !beside ? '' : el('a', { class: 'ui-rb', href: beside ? `#inbox/${th.id}` : '#inbox', 'aria-label': 'Back to the inbox' }, glyph('left')),
-        el('span', { class: 'ib-crumb' }, el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind]), el('span', { dir: 'auto' }, [d ? projectName(d) : tkProject(tk), who].filter(Boolean).join(' · ')))),
-      el('h1', { class: 'ib-ttl', id: 'ib-title', tabindex: '-1', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title),
+        el('span', { class: 'ib-crumb' }, el('span', { class: 'ib-kind' }, grouped ? `${cards.length} items` : KIND_NAMES[th.kind]), el('span', { dir: 'auto' }, [d ? projectName(d) : tkProject(tk), who].filter(Boolean).join(' · ')))),
+      el('h1', { class: 'ib-ttl', id: 'ib-title', tabindex: '-1', dir: 'auto' }, name),
       el('div', { class: 'ib-meta' }, el('span', { class: `ib-state ${th.st}` }, word)),
       el('div', { class: 'ib-chat', role: 'log', 'aria-label': `Conversation with ${who}` }, hide ? earlier : '', ...shown.map((m) => m.node)),
       answered ? el('p', { class: 'ib-closed' }, el('b', {}, 'Answered'), ` · ${saidOf(d, answered)}`, el('br'), 'Writing below goes to the agent; your answer stands.') : '',
@@ -2314,19 +2321,31 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const unreadByAgent = (sent) => sent.filter((t) => t.kind !== 'discard' && !t.taken && !t.read && !t.reply).length;
   /** Every thread the person took part in, with where it stands (st) and when it last moved (at); a card or ticket they never touched is none. A card an open ask merges is that ask's thread. */
   function inboxThreads(merged = new Set()) {
-    const gone = new Set(state.dismissed ?? []), out = [];
+    const gone = new Set(state.dismissed ?? []), out = [], groups = new Map(), rank = SECTIONS.map(([s]) => s), sec = (t) => Date.parse(t) || 0;
+    // One thread per agent and per topic, read from the cards themselves: the agent is the card's filer (shown as `by`), the topic is its ticket when it has one, else the card. An agent's proof, report and plan on one ticket share a thread.
     for (const d of state.decisions) {
       if (gone.has(d.key) || merged.has(d.key) || (d.type === 'evidence' && ['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result))) continue;
-      const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d);
-      if (!tookPart(sent)) continue;
+      const sent = trailOf(d.key), last = sent.at(-1), a = area(d), kind = threadKind(d), took = tookPart(sent);
       // On an answered card a reply with no words (the link, or the card posted again) is the card acted on, not news: only the agent's words, or a send it has not answered, are.
-      const answered = d.type !== 'signin' && sent.some((t) => t.kind === 'answer');
-      const st = sent.some((t) => unseen(t) && !(answered && !t.reply.text)) ? 'new'
-        : a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply)) ? 'turn'
+      const answered = d.type !== 'signin' && sent.some((t) => t.kind === 'answer'), waits = a === 'waiting' || (a === 'evidence' && (d.options.length || d.reply));
+      // A card the person never touched only says what waits on them; it takes no other part in where its thread stands.
+      const st = !took ? (waits ? 'turn' : 'done') : sent.some((t) => unseen(t) && !(answered && !t.reply.text)) ? 'new'
+        : waits ? 'turn'
         // A design review a lead posted is Main's until promoted: it waits on its agents, never in Decide.
         : (last && !last.reply) || (a === 'designs' && dzOpen(d)) ? 'agent' : 'done';
-      // needs (the Inbox badge): a reply to the person not opened yet.
-      out.push({ id: d.key, d, kind, st, last, needs: st === 'new', fresh: sent.filter((t) => unseen(t) && !(answered && !t.reply.text)).length, unread: unreadByAgent(sent), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+      const gk = `${d.by ?? ''}\n${d.ticket || d.key}`;
+      if (!groups.has(gk)) groups.set(gk, []);
+      groups.get(gk).push({ d, kind, st, last, took, sent, fresh: sent.filter((t) => unseen(t) && !(answered && !t.reply.text)).length, unread: unreadByAgent(sent), at: last?.reply?.at ?? last?.at ?? d.filed ?? '' });
+    }
+    for (const m of groups.values()) {
+      // A thread exists once the person took part in one of its cards; the rest of its cards then sit in it, oldest first.
+      if (!m.some((x) => x.took)) continue;
+      m.sort((x, y) => sec(x.d.filed) - sec(y.d.filed));
+      const head = m[0].d, latest = m.at(-1), st = m.reduce((s, x) => (rank.indexOf(x.st) < rank.indexOf(s) ? x.st : s), 'done');
+      const lastOf = m.filter((x) => x.last).sort((x, y) => bySecond(x.last, y.last)).at(-1);
+      out.push({ id: head.key, cards: m.map((x) => x.d), states: Object.fromEntries(m.map((x) => [x.d.key, x.st])), d: latest.d, kind: latest.kind, st, last: lastOf?.last, lastD: lastOf?.d,
+        name: ticketOf(head)?.title ?? (head.type === 'evidence' ? headline(head) : title(head)), needs: st === 'new', fresh: m.reduce((n, x) => n + x.fresh, 0), unread: m.reduce((n, x) => n + x.unread, 0),
+        at: m.map((x) => x.at).sort((x, y) => sec(y) - sec(x))[0] });
     }
     // A ticket is a thread once the person commented on it.
     for (const t of state.tickets ?? []) {
@@ -2337,13 +2356,15 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     }
     return out;
   }
+  /** The thread a key opens: a card's own key (or the thread's) finds its thread; `/open` shows that card in it, otherwise the thread's latest card is the one written to. */
+  const threadFor = (all, key, open) => { const t = all.find((x) => x.cards?.some((d) => d.key === key)) ?? all.find((x) => x.id === key); return t?.cards && open ? { ...t, d: t.cards.find((d) => d.key === key) ?? t.d } : t; };
   /** A thread's second line: the agent's last words, else what the person sent and how far it got, else what the card says. */
-  const inboxLine = ({ d, tk, last }) => { const r = last?.reply;
-    return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
+  const inboxLine = ({ d, tk, last, lastD }) => { const r = last?.reply;
+    return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, lastD ?? d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
   function inboxRow(th, sel) {
     const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', ...(sel && { 'aria-current': 'true' }) },
       el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTypeTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
-      el('span', { class: 'rm' }, el('span', { class: 't', dir: 'auto' }, d ? (d.type === 'evidence' ? headline(d) : title(d)) : tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
+      el('span', { class: 'rm' }, d ? el('span', { class: 'ib-ag', dir: 'auto' }, [d.by || 'Agent', th.cards.length > 1 && `${th.cards.length} items`].filter(Boolean).join(' · ')) : '', el('span', { class: 't', dir: 'auto' }, th.name ?? tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
       el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '',
         th.fresh ? el('b', { class: 'ib-n', title: `${th.fresh} unread from ${d ? d.by || 'the agent' : 'the lead'}`, 'aria-label': `${th.fresh} unread from the agent` }, String(th.fresh)) : '',
         th.unread ? el('span', { class: 'ib-nr', title: `${d ? d.by || 'The agent' : 'The lead'} has not read ${th.unread === 1 ? 'your message' : `${th.unread} of your messages`}` }, 'Not read') : '',
@@ -2353,7 +2374,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */
   function inboxList(all, key) {
     const q = inFind.trim().toLowerCase(), time = (t) => Date.parse(t.at) || 0, out = [];
-    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0) && (!q || [t.d ? title(t.d) : t.tk.title, t.d?.about ?? '', (t.d && projectName(t.d)) ?? ''].join(' ').toLowerCase().includes(q)));
+    const shown = all.filter((t) => (inKind === 'all' || t.kind === inKind) && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0) && (!q || [t.name ?? t.tk.title, ...(t.cards ?? []).flatMap((c) => [title(c), c.about ?? '', projectName(c) ?? ''])].join(' ').toLowerCase().includes(q)));
     const count = (k) => all.filter((t) => t.st !== 'done' && (k === 'all' || t.kind === k)).length;
     const box = el('input', { type: 'search', id: 'ib-find', 'aria-label': 'Search the inbox', placeholder: 'Search', autocomplete: 'off', enterkeyhint: 'search' });
     box.value = inFind;
@@ -2409,11 +2430,11 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The inbox. A phone shows the list, and a thread over it once a row is opened; a desk shows the list beside the open thread (the first, until a row is picked),
    *  and an item opened from its thread beside that thread. The thread and the item draw from app-more.js. */
   function inboxScreen(all, key, open) {
-    const th = all.find((t) => t.id === key);
+    const th = threadFor(all, key, open);
     // The address #find opens Search over the inbox.
     if (location.hash === '#find' && !searchSheet.open) openSearch();
     if (phone() && !th) ibAt = '';
-    if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, key)];
+    if (phone()) return th && moreReady ? threadScreen(th, open) : [el('header', { class: 'ui-top' }, el('h1', { tabindex: '-1' }, 'Inbox'), themeButton()), ...inboxList(all, th?.id ?? key)];
     const order = SECTIONS.map(([s]) => s), first = [...all].filter((t) => t.st !== 'done' && (!inFlt || (inFlt === 'fresh' ? t.fresh : t.unread) > 0)).sort((x, y) => order.indexOf(x.st) - order.indexOf(y.st) || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0))[0];
     const shown = th ?? first;
     deskSel = shown?.id ?? '';

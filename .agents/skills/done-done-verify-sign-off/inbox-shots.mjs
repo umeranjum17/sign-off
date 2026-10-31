@@ -24,7 +24,7 @@ const name = (state) => `${state}.${theme}.${width}w`;
 
 // The board: asks from two agents, a plan, a guided report, a design and a ticket.
 writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
-const ask = (filer, key, title, why, yes, no) => cli('post', board, '--filer', filer, '--ask-ref', 'message-demo', '--key', key, '--title', title, '--why', why,
+const ask = (filer, key, title, why, yes, no, ticket) => cli('post', board, ...(ticket ? ['--ticket', ticket] : []), '--filer', filer, '--ask-ref', 'message-demo', '--key', key, '--title', title, '--why', why,
   '--outcome', `yes=${yes}`, '--outcome', `no=${no}`, '--recommend', 'yes', '--recommend-reason', 'It is the safer pick.', '--default', 'yes');
 ask('release-agent', 'digest', 'Keep the weekly digest?', 'The paid plan renews Monday.', 'It keeps going out.', 'It stops this week.');
 ask('release-agent', 'export', 'Turn on the CSV export?', 'Two teams asked for it this month.', 'It ships Friday.', 'It waits a release.');
@@ -112,6 +112,8 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   const lastMsg = thread ? [...thread.querySelectorAll('.ib-msg')].filter(vis).at(-1)?.getBoundingClientRect() : null, cw = thread?.querySelector('.ib-cw')?.getBoundingClientRect(), scrollers = thread ? [thread, thread.parentElement, document.scrollingElement, document.body].map((e) => [e.tagName + '.' + e.className, Math.round(e.scrollTop), e.scrollHeight, e.clientHeight, getComputedStyle(e).overflowY, Math.round(scrollY)]) : null;
   const optBox = thread ? [...thread.querySelectorAll('.tr-opt')].filter(vis).map((b) => b.getBoundingClientRect()) : [], opts_clear = optBox.length && cw ? optBox.every((r) => r.top >= 0 && r.bottom <= cw.top + 1) : null;
   const latest_clear = lastMsg && cw ? lastMsg.bottom <= cw.top + 1 && lastMsg.bottom <= window.innerHeight : null;
+  const ags = [...document.querySelectorAll('.ib-row')].filter(vis).map((r) => (r.querySelector('.ib-ag')?.textContent ?? '') + ' / ' + r.querySelector('.t').textContent);
+  const arts_view = thread ? [...thread.querySelectorAll('.ib-art')].filter((a) => { const r = a.getBoundingClientRect(); return r.width > 0 && r.top >= (thread.matches('.desk') ? thread.getBoundingClientRect().top : 0) && r.bottom <= (cw ? cw.top : window.innerHeight); }).map((a) => a.querySelector('.ib-at b').textContent + ' / ' + a.querySelector('.ib-at span').textContent) : [];
   const barEl = document.querySelector('.ib-bar'), barTops = [...new Set([...document.querySelectorAll('.ib-chip, .ib-flt')].filter(vis).map((b) => Math.round(b.getBoundingClientRect().top)))];
   const bar = barEl ? { rows: barTops.length, scrolls: barEl.scrollWidth > barEl.clientWidth, height: Math.round(barEl.getBoundingClientRect().height) } : null;
   const footBox = document.querySelector('.ib-foot')?.getBoundingClientRect(), first_screen = footBox ? Math.round(footBox.bottom) <= (dock && dock.width > 0 ? dock.top : window.innerHeight) : false;
@@ -123,13 +125,13 @@ const MEASURE = `(async () => { await document.fonts.ready; const fail = [], w =
   if (document.documentElement.scrollWidth > w) fail.push('sideways overflow');
   const words = document.body.innerText, bad = words.match(/\\b(?:answer|round|comment):[\\w.-]+:|\\btrail\\.jsonl\\b|undefined|NaN|\\[object/g) ?? [];
   if (bad.length) fail.push('raw words: ' + bad.join(', '));
-  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', msgs, rcpts, arts, sides, bar, first_screen, latest_clear, opts_clear, page_scroll: Math.round(scrollY), scrollers, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
+  return { url: location.href, viewport_width: window.innerWidth, flts, entries, marks, rail: Math.round(rail), title: document.title, menu, search, sections, chips, thread: thread?.querySelector('.ib-ttl')?.textContent ?? '', status: thread?.querySelector('.ib-state')?.textContent ?? '', msgs, rcpts, arts, sides, bar, first_screen, ags, arts_view, latest_clear, opts_clear, page_scroll: Math.round(scrollY), scrollers, follow, closed: document.querySelector('.ib-closed')?.innerText.replace(/\\n+/g, ' / ') ?? '', badge: [...document.querySelectorAll('#tabs a[href="#inbox"] .bd, #nav a[href="#inbox"] .n')].filter(vis).map((b) => b.textContent).join(''), notice, thread_answers, fail }; })()`;
 const results = [];
 // RECEIPTS_ONLY=1 captures just the relayed answer's thread (journey `answer-receipts`).
 const capture = async (state, hash, before, check) => {
   if (process.env.RECEIPTS_ONLY && state !== 'relayed') return;
   if (process.env.RAIL_ONLY && !['rail', 'unread'].includes(state)) return;
-  if (process.env.CHAT_ONLY && !['list', 'chat', 'pr'].includes(state)) return;
+  if (process.env.CHAT_ONLY && !['list', 'chat', 'pr', 'group', 'groupend'].includes(state)) return;
   errors.length = 0;
   if (hash !== null) await go(hash);
   if (before) { await evaluate(before); await wait(700); }
@@ -169,11 +171,26 @@ try {
     // Trail times are whole seconds: a second goes by first, so the line is plainly after the reply it follows and that reply does not count as answering it.
     await wait(1100);
     await api('/api/messages', { kind: 'comment', key: 'ship', text: 'Is QA booked for Thursday?' });
+    // One agent, one topic, two cards: export-agent asks which teams get the export first (the person answers in words and gets a reply), then asks about its copy (the person answers in words, and the agent's wait reads it).
+    // Each step waits a second, so the two cards and what was said on them read in the order they happened.
+    cli('ticket', board, '--id', 'T-5', '--title', 'Roll out the export to every team', '--project', 'Settings', '--progress', '20');
+    ask('export-agent', 'teams', 'Which teams get the export first?', 'Two teams asked for it this month.', 'Settings goes first.', 'Everyone at once.', 'T-5');
+    await wait(1100);
+    await api('/api/answers', { key: 'teams', answer: 'text', note: 'Start with Settings, then Billing.' });
+    cli('wait', board, '--filer', 'export-agent', '--timeout', '5');
+    await wait(1100);
+    cli('feedback', 'teams', board, '--reply', 'Settings first, then Billing a week later.', '--filer', 'export-agent');
+    await wait(1100);
+    ask('export-agent', 'copy', 'Is the export copy approved?', 'The button and the empty state say Download.', 'It is approved.', 'It needs another pass.', 'T-5');
+    await wait(1100);
+    await api('/api/answers', { key: 'copy', answer: 'text', note: 'Keep it to one word.' });
+    cli('wait', board, '--filer', 'export-agent', '--timeout', '5');
     await capture('list', '#inbox', '', (m) => {
       assert.equal(m.bar.rows, 1, 'the filters are one row, not ' + m.bar.rows + ': ' + JSON.stringify(m.bar));
       assert.deepEqual(m.flts.map((f) => f.replace(/\d+$/, '')), ['Unread from agents', 'Not read by agents']);
       assert.deepEqual(m.entries.map((e) => e.replace(/\d+$/, '').trim()), ['Agentsread-only', 'Done']);
       if (phone) assert.ok(m.first_screen, 'Agents and Done are on the first phone screen');
+      assert.ok(m.ags.includes('export-agent · 2 items / Roll out the export to every team'), 'one row for the two cards of one topic, named by its ticket: ' + m.ags.join(' | '));
     });
     await capture('chat', '#inbox/ship', '', (m) => {
       assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent', 'you'], 'time order, agent first: ' + m.msgs.join(' | '));
@@ -184,6 +201,17 @@ try {
       assert.equal(m.latest_clear, true, 'the latest message is in view above the box: ' + JSON.stringify(m.scrollers));
       assert.equal(m.opts_clear, true, 'the choice buttons are whole and above the box: ' + JSON.stringify(m.scrollers));
       if (phone) assert.ok(m.page_scroll > 0, 'the phone thread is longer than the screen and opened at its end: ' + m.page_scroll);
+    });
+    // The thread from near its top (a phone scrolled just under its back button), so both of its cards are on the screen together with its last message whole above the box, then at its end like any thread: the last message clear of the box.
+    await capture('group', '#inbox/teams', `window.scrollTo(0, ${phone ? 40 : 0}); document.querySelector('.ib-thread.desk')?.scrollTo(0, 120)`, (m) => {
+      assert.equal(m.latest_clear, true, 'the last message is whole above the box: ' + JSON.stringify(m.scrollers));
+      assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent', 'agent', 'you'], 'two cards of one topic in one thread, in time order: ' + m.msgs.join(' | '));
+      assert.equal(m.thread, 'Roll out the export to every team', 'the thread is named by the ticket: ' + m.thread);
+      assert.deepEqual(m.arts_view, ['Which teams get the export first? / Decision', 'Is the export copy approved? / Decision'], 'both cards are on the screen at once: ' + JSON.stringify(m.arts_view));
+    });
+    await capture('groupend', '#inbox/teams', '', (m) => {
+      assert.equal(m.latest_clear, true, 'the latest message is in view above the box: ' + JSON.stringify(m.scrollers));
+      assert.deepEqual(m.rcpts.slice(-1), ['Read']);
     });
     await capture('pr', '#inbox/beta', '', (m) => {
       assert.deepEqual(m.msgs.map((x) => x.split(':')[0]), ['agent', 'you', 'agent'], 'time order: ' + m.msgs.join(' | '));

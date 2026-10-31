@@ -2251,6 +2251,8 @@
   .ib-row .t { overflow: hidden; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); white-space: nowrap; text-overflow: ellipsis; }
   .ib-row.unread .t { color: var(--tk-ink); font-weight: 600; }
   .ib-row .l2 { height: auto; color: var(--tk-text-secondary); }
+  /* The agent a thread is with, and how many items it holds, as a small label above its name. */
+  .ib-row .ib-ag { overflow: hidden; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); white-space: nowrap; text-overflow: ellipsis; }
   .ib-row[aria-current] { background: var(--tk-inset); box-shadow: 0 0 0 0.75rem var(--tk-inset); clip-path: inset(0 -0.75rem); }
   .ib-tile { position: relative; flex: none; }
   .ib-tile .dot { position: absolute; top: -0.1875rem; right: -0.1875rem; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: var(--tk-ink); box-shadow: 0 0 0 2px var(--tk-card); }

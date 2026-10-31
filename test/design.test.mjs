@@ -2476,7 +2476,8 @@ test('report kinds and their workflows: post names what a report is for and hold
   assert.ok(await evaluate('(() => { const r = document.querySelector("#item-k-retro"); return r.querySelector(".rp-progress").getBoundingClientRect().top - r.querySelector(".rp-meta").getBoundingClientRect().bottom >= 6; })()'), "unread progress leaves six pixels below the kind and ticket");
   assert.equal(await evaluate('document.querySelector("#item-k-plan .rp-ticket").textContent'), 'T-29');
   assert.equal(await evaluate('!!document.querySelector("#item-k-plan .l1 .ui-tb") && !!document.querySelector("#item-k-plan .l2 .rkc")'), true);
-  assert.equal(await evaluate('document.querySelector("#item-k-plan .ui-icon img").naturalWidth > 0'), true);
+  // The row's picture is requested once the row is drawn, so it is waited for like every other picture here; it must still load, with a width, or the test times out.
+  await until(() => evaluate('document.querySelector("#item-k-plan .ui-icon img")?.naturalWidth > 0'));
   assert.equal(await evaluate('!!document.querySelector("#item-k-research .rp-ticket")'), false);
   // Filter by kind lists each kind with its count; a kind picked leaves only its reports under its pill, and the pill's close lists them all again.
   await evaluate('document.querySelector(".rp-fb").click()');
@@ -5871,6 +5872,51 @@ test('the inbox rail: a row counts the replies not opened and says when the agen
     await until(() => evaluate('!!document.querySelector(".ib-thread")'));
     await evaluate('location.hash = "#inbox"');
     await until(async () => (await flts())[0][0] === 'Unread from agents0');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
+  } finally { await close(); }
+});
+
+test('the inbox groups threads by agent and topic: an agent\'s cards on one ticket share one thread named by the ticket, another agent or a card with no ticket is its own, and both unread counts, the filters and a card\'s own address still work', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+  const dir = join(scratch, 'inbox-groups'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
+  mkdirSync(dir);
+  assert.equal(run('ticket', file, '--id', 'T-7', '--title', 'Ship the CSV export', '--project', 'Settings').code, 0);
+  // Two cards of one agent on T-7, one card of another agent on T-7, and one lone ask of the first agent.
+  for (const [key, title, filer, ticket] of [['plan', 'Which columns does the export have?', 'csv-agent', 'T-7'], ['proof', 'Is the export tested?', 'csv-agent', 'T-7'], ['other', 'Who reviews the export?', 'review-agent', 'T-7'], ['lone', 'Rename the export button?', 'csv-agent', '']]) {
+    assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer, ...(ticket ? ['--ticket', ticket] : [])).code, 0);
+  }
+  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
+  procs.push(proc);
+  const url = /url: "(\S+)"/.exec(await served(proc))[1];
+  // The person wrote on both cards of csv-agent (neither read), answered the other agent's, and the lone one; csv-agent replies on the first.
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'plan', text: 'Include the owner column.' })).status, 200);
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'proof', text: 'Which browsers?' })).status, 200);
+  assert.equal((await post(url, 'api/answers', { key: 'other', answer: 'text', note: 'Who reviews it?' })).status, 200);
+  assert.equal((await post(url, 'api/messages', { kind: 'comment', key: 'lone', text: 'Call it Download.' })).status, 200);
+  assert.equal(run('wait', file, '--filer', 'review-agent', '--timeout', '5').code, 0);
+  await pause();
+  assert.equal(run('feedback', 'other', file, '--reply', 'Dana reviews it.', '--filer', 'review-agent').code, 0);
+  const { evaluate, close } = await browse(join(dir, 'b'), 390, 844, true);
+  try {
+    const rows = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-row")].map((r) => [r.querySelector(".ib-ag").textContent, r.querySelector(".t").textContent, r.querySelector(".ib-n")?.textContent ?? "", r.querySelector(".ib-nr")?.textContent ?? ""]).sort())').then(JSON.parse);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
+    await until(async () => (await rows()).length === 3);
+    // csv-agent's two cards on T-7 are one thread named by the ticket, with both unsent-reads counted; the other agent's card on the same ticket and the lone ask are their own.
+    assert.deepEqual(await rows(), [['csv-agent · 2 items', 'Ship the CSV export', '', 'Not read'], ['csv-agent', 'Rename the export button?', '', 'Not read'], ['review-agent', 'Ship the CSV export', '1', '']]);
+    assert.equal(await evaluate('document.querySelector(".ib-flt:last-of-type b").textContent'), '2');
+    // The thread holds both cards, each as an inline card, and both comments as bubbles on the right (everything here happened in one second, so each card's first words come before what was sent).
+    await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("2 items")).click()');
+    await until(() => evaluate('!!document.querySelector(".ib-thread")'));
+    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ib-art .ib-at b")].map((b) => b.textContent))').then(JSON.parse), ['Which columns does the export have?', 'Is the export tested?']);
+    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ib-msg")].map((m) => [m.classList.contains("you") ? "you" : "agent", m.querySelector(".ib-say")?.textContent ?? ""]))').then(JSON.parse), [['agent', ''], ['agent', ''], ['you', 'Include the owner column.'], ['you', 'Which browsers?']]);
+    assert.equal(await evaluate('document.querySelector(".ib-thread .ib-ttl").textContent'), 'Ship the CSV export');
+    assert.equal(await evaluate('document.querySelector(".ib-thread .ib-crumb").textContent.includes("csv-agent")'), true);
+    // A card's own address opens the same thread, and its Open link names that card.
+    assert.deepEqual(await evaluate('JSON.stringify([...document.querySelectorAll(".ib-thread .ib-art .ib-open")].map((a) => a.getAttribute("href")))').then(JSON.parse), ['#inbox/plan/open', '#inbox/proof/open']);
+    await evaluate('location.hash = "#inbox/proof"');
+    await until(() => evaluate('document.querySelector(".ib-thread .ib-ttl")?.textContent === "Ship the CSV export" && document.querySelectorAll(".ib-thread .ib-art").length === 2'));
+    // Writing in the thread goes to its latest card (proof), as a comment.
+    await evaluate('{ const b = document.querySelector(".ib-compose textarea"); b.value = "And Safari?"; b.dispatchEvent(new Event("input")); document.querySelector(".ib-send").click(); }');
+    await until(async () => ((await (await fetch(`${url}api/decisions`)).json()).messages ?? []).some((m) => m.text === 'And Safari?' && m.key === 'proof'));
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
   } finally { await close(); }
 });
