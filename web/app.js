@@ -1491,24 +1491,16 @@
     const of = (s) => shown.filter((t) => tkStateOf(t) === s).sort(byPrio);
     return { roots, both, kind, asked: asked.length, ofKind, shown, done: of('done'), moving: of('moving'), hold: of('hold'), todo: of('todo') };
   }
-  /** The done dot grid: one square per ticket, done in ink, moving in the middle tone, the rest light; as many columns (24 to 30) as leave the fewest empty squares. */
-  function tkDots(L) {
-    const n = L.shown.length;
-    if (!n) return '';
-    let cols = 27, best = Infinity;
-    for (let c = 24; c <= 30; c++) { const waste = Math.ceil(n / c) * c - n; if (waste < best || (waste === best && c === 27)) [best, cols] = [waste, c]; }
-    return el('div', { class: 'tk-dots', role: 'img', style: `--cols:${cols};--rows:${Math.ceil(n / cols)}`, 'aria-label': `${L.done.length} done, ${L.moving.length} in progress, ${n - L.done.length - L.moving.length} on hold or to do` },
-      ...[...L.done, ...L.moving, ...L.hold, ...L.todo].map((t) => el('i', { class: { done: 'd', moving: 'm' }[tkStateOf(t)] ?? '' })));
-  }
-  function tkHero(L) {
-    const week = L.done.filter((t) => Date.now() - Date.parse(t.at) < 7 * 864e5).length;
-    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'Tickets done'), week ? el('span', { class: 'chip' }, el('i', { class: 'up', 'aria-hidden': 'true' }), `${week} this week`) : ''),
-      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(L.done.length), el('small', {}, ` of ${L.shown.length}`)), L.moving.length ? el('span', { class: 'vs' }, el('i', { 'aria-hidden': 'true' }), `${L.moving.length} moving`) : ''), tkDots(L));
+  /** The head of All tickets says the board's one total, the same words the Story's head says: every ticket, how many are done and how many are open. */
+  function tkHero() {
+    const all = tkAll(), open = all.filter((t) => tkStateOf(t) !== 'done').length;
+    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'All tickets')),
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(all.length), el('small', {}, ` tickets · ${all.length - open} done · ${open} open`))));
   }
   /** The tabs at the top of Tickets: every ticket, the epics with their children, and Activity, the timeline of what moved on them. */
   function tkTabs(on) {
-    const b = (v, name) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = `#${v}`; }; return x; };
-    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('tickets', 'All tickets'), b('epics', 'Epics'), b('activity', 'Activity'));
+    const b = (v, name, hash = `#${v}`) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = hash; }; return x; };
+    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('story', 'Story', '#tickets'), b('epics', 'Epics'), b('tickets', 'All tickets', '#tickets/all'), b('activity', 'Activity'));
   }
   /** Who asked for a ticket: the ones the board's owner asked for, and the fleet's own upkeep. */
   const TK_WHO = { asks: 'From you', system: 'Fleet upkeep' };
@@ -2789,7 +2781,7 @@
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const th = inboxAt && threadFor(all, key, !!opening), inboxRead = th?.d && opening && !inPlace(th.d) && (phone() || th.d.type !== 'evidence') ? th.d : undefined;
-    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' ? key : '', ['activity', 'epics'].includes(at) ? at : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
+    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' || at === 'epics' ? key : '', at === 'tickets' ? (key === 'all' ? 'all' : 'story') : ['activity', 'epics'].includes(at) ? at : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.asks, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.asks, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];

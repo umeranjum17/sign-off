@@ -733,6 +733,23 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
   });
   return oneOfEach([...latest.values()]);
 }
+/** What was finished in the last seven days (today and the six before, UTC): a ticket whose line moves its state to done from a state it had. A ticket that first appears done, or whose
+ *  state is only filled in as done, was not finished that day, so a bulk import is never counted as a week's work. */
+export function readTicketWeek(decisionsPath: string, nowMs = Date.now()) {
+  const last = new Map<string, Ticket>(), hits: { at: string; id: string }[] = [];
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
+    let t: Ticket;
+    try { t = line && JSON.parse(line); } catch { return; }
+    if (!t || ticketFault(t)) return;
+    const had = last.get(t.id);
+    if (had?.state && had.state !== 'done' && t.state === 'done') hits.push({ at: t.at, id: t.id });
+    last.set(t.id, t);
+  });
+  const days = Array.from({ length: 7 }, (_, i) => new Date(nowMs - (6 - i) * 864e5).toISOString().slice(0, 10)), byProject = new Map<string, number>();
+  const done = days.map((day) => hits.filter((h) => h.at.startsWith(day)).length);
+  for (const h of hits) if (days.includes(h.at.slice(0, 10))) { const p = last.get(h.id)?.project ?? ''; byProject.set(p, (byProject.get(p) ?? 0) + 1); }
+  return { days: days.map((day, i) => ({ day, done: done[i] })), done: done.reduce((a, b) => a + b, 0), projects: [...byProject].map(([project, n]) => ({ project, done: n })).sort((a, b) => b.done - a.done) };
+}
 /** One move on a ticket. Beside what the feed always said it carries what a row and its expanded view show: the ticket's project, priority and pull requests as it has them now
  *  (so every row has its tags), its stage and state as that line wrote them, the changed field's before and after (stage, progress, state, hold) and, only when the line named one, who wrote it. */
 export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string;

@@ -112,6 +112,10 @@ journeys:
   # and an open thread (one per agent and topic: two cards of one ticket under one thread named by it) in time order with the agent's words on the left, the person's own as bubbles on the right with Read or Sent and Not read under them, and a pull request inline as a card. The required Designs capture rides in the same run.
   inbox-chat:
     command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/inbox-chat-proof.sh'
+  # Tickets opens on the Story at 390 and 1280, light and dark: the week by day and by project, the releases with their progress, what is in flight, what is blocked and why; Epics lists cards only for epics
+  # of three or more tickets (count, owner, next step) and a card opens that epic; the flat list is behind All tickets; a ticket page leads with its key and shows its summary. TICKETS_STORY_BOARD serves a copy of a real board.
+  tickets-story:
+    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-story-proof.sh'
   # The Inbox as a conversation with everyone: the people rail, a one-to-one thread with sent/read/replied, #fleet muted with
   # the agents' own talk, a mention that opens the ticket it names, and a search that finds what an agent said; 390 and 1280,
   # light and dark, then the approved design-pick listing (designs.1440.dark.png) in the same run.

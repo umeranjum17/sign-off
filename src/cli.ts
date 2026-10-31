@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
@@ -1433,6 +1433,24 @@ const withRecords = <T extends { id: string; type?: string; key?: string; hold?:
     const reason = t.hold_reason ?? (ticketHeld(t) ? rec.hold_reason : undefined);
     return { ...t, ...(rec.assignee && { assignee: rec.assignee }), ...(type && { type }), ...(t.key ?? rec.key ? { key: t.key ?? rec.key } : {}), ...(reason && { hold_reason: reason }) };
   }) : tickets;
+};
+/** A ticket no key was given reads PROJECT-n: the project's short name and its place among that project's tickets, counted in the order they were first written, so a key never moves. */
+const withKeys = <T extends { id: string; key?: string; project?: string }>(tickets: T[]): (T & { key_derived?: boolean })[] => {
+  const prefix = new Map<string, string>(), count = new Map<string, number>(), used = new Set<string>(), taken = new Set(tickets.flatMap((t) => (t.key ? [t.key] : [])));
+  const short = (p: string) => {
+    const w = p.split(/[^A-Za-z0-9]+/).filter(Boolean), base = (w.length > 1 ? w.map((x) => x[0]).join('') : w[0] ?? 'TKT').toUpperCase();
+    for (let n = Math.min(3, base.length); n <= base.length; n++) if (!used.has(base.slice(0, n))) return base.slice(0, n);
+    let n = 2; while (used.has(`${base}${n}`)) n++; return `${base}${n}`;
+  };
+  return tickets.map((t) => {
+    if (t.key) return t;
+    const p = t.project ?? '';
+    if (!prefix.has(p)) { const k = short(p); used.add(k); prefix.set(p, k); }
+    let n = (count.get(p) ?? 0) + 1;
+    while (taken.has(`${prefix.get(p)}-${n}`)) n++;
+    count.set(p, n);
+    return { ...t, key: `${prefix.get(p)}-${n}`, key_derived: true };
+  });
 };
 /** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
  * `ticket --json` and the board's /api/tickets say it the same way. */
@@ -3017,7 +3035,7 @@ const state = () => {
     promoted: readPromoted(file, warn),
     // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
-    tickets: withRecords(rollUp(readTickets(file, warn)), file),
+    tickets: withKeys(withRecords(rollUp(readTickets(file, warn)), file)),
     projects: readProjects(file, warn),
     // A report's own three actions, as the person took them, and the rules their rejections left on the owners.
     report_actions: readReportActions(file),
@@ -3114,7 +3132,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), trail: [], rounds: [], messages: [], annotations: [], comments: [],
+    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), week: readTicketWeek(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
       page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);

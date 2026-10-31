@@ -2016,9 +2016,6 @@
   .tk-hero .chip { display: inline-flex; align-items: center; gap: 0.25rem; }
   .tk-hero .chip .up { width: 0; height: 0; border-right: 4.5px solid transparent; border-bottom: 7px solid var(--tk-up); border-left: 4.5px solid transparent; }
   .tk-hero .vs i { display: inline-block; width: 0.5rem; height: 0.5rem; margin-right: 0.375rem; border-radius: 2px; background: var(--tk-mid); }
-  .tk-dots { --cell: calc((100cqw - (var(--cols) - 1) * 2px) / var(--cols)); display: grid; grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell); gap: 2px; align-content: start;
-    height: round(up, calc(var(--rows) * (var(--cell) + 2px) - 2px), 4px); margin-top: 0.75rem; }
-  .tk-dots i { border-radius: 2px; background: var(--tk-track); } .tk-dots i.d { background: var(--tk-fill); } .tk-dots i.m { background: var(--tk-mid); }
   /* A section's See all, at the card's right edge. */
   body.tickets .ui-sec .see { min-height: 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; }
   .tk-tiles .si svg { fill: currentColor; stroke: none; }
@@ -2381,3 +2378,45 @@ dialog.ch-full{position:fixed;margin:auto 1rem auto auto;max-height:calc(100dvh 
 .dl-dz { height: 4.25rem; margin: 0.5rem 0 0.75rem; padding: 0 1rem; box-shadow: var(--tk-elev-card), inset 3px 0 0 var(--tk-ink), inset 0 1px 0 var(--tk-hl); }
 .dl-dz .rm .meta { color: var(--tk-text-secondary); }
 .ui-hero .hs { margin: 0.25rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: 1.25rem; font-variant-numeric: tabular-nums; }
+/* Story, where Tickets opens: the week and what ships as cards, in flight and blocked as rows, every figure the board's own. A bar's segments say done (ink), moving (mid), on hold (hatched) and to do (empty). */
+.tk-total { margin: var(--tk-sp-1) var(--tk-sp-1) var(--tk-sp-2); color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tk-note { margin: var(--tk-sp-2) var(--tk-sp-1) 0; color: var(--tk-text-tertiary); }
+.tk-ms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--tk-sp-3); }
+.tk-ms { display: flex; flex-direction: column; gap: var(--tk-sp-2); margin: 0; padding: var(--tk-sp-4); }
+.tk-ms p { margin: 0; }
+.tk-ms-n { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); overflow-wrap: anywhere; }
+.tk-ms-v { color: var(--tk-ink); font-size: var(--tk-fs-big); line-height: var(--tk-lh-big); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tk-seg-bar { display: flex; gap: 2px; height: var(--tk-sp-2); overflow: hidden; border-radius: var(--tk-sp-1); background: var(--tk-track); }
+.tk-seg-bar i { min-width: 0; background: var(--tk-track); } .tk-seg-bar .d { background: var(--tk-fill); } .tk-seg-bar .m { background: var(--tk-mid); }
+.tk-seg-bar .h { background: repeating-linear-gradient(135deg, var(--tk-mid) 0 2px, var(--tk-track) 2px 4px); }
+.tk-story-rows { margin: 0; padding: var(--tk-sp-1) var(--tk-sp-3); }
+.tk-wk { margin: 0; padding: var(--tk-sp-4); }
+.tk-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: var(--tk-sp-2); height: 8rem; }
+.tk-days > div { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: var(--tk-sp-1); min-width: 0; }
+.tk-days b { color: var(--tk-ink); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tk-days i { width: 100%; max-width: 2.5rem; border-radius: var(--tk-sp-1); background: var(--tk-fill); }
+.tk-days span { color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); }
+.tk-days .today span { color: var(--tk-ink); font-weight: 600; }
+.tk-pbar { display: grid; gap: var(--tk-sp-2); margin: var(--tk-sp-4) 0 0; padding: 0; list-style: none; }
+.tk-pbar li { display: grid; grid-template-columns: minmax(0, 6.5rem) 1fr 2rem; align-items: center; gap: var(--tk-sp-2); color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); }
+.tk-pbar span { overflow-wrap: anywhere; } .tk-pbar i { height: var(--tk-sp-2); border-radius: var(--tk-sp-1); background: linear-gradient(var(--tk-fill) 0 0) left / var(--w) 100% no-repeat var(--tk-track); }
+.tk-pbar b { color: var(--tk-ink); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+@media (min-width: 64rem) {
+  .tk-story-grid { display: grid; flex: 1; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; gap: var(--tk-sp-4); min-height: 0; overflow: auto; scrollbar-width: none; }
+  .tk-story-grid::-webkit-scrollbar { display: none; }
+  .tk-story-grid .tk-ms-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.tk-desk .ui-row.tk-blocked, .ui-row.tk-blocked { height: auto; min-height: 3.5rem; align-items: flex-start; padding-block: var(--tk-sp-3); }
+.tk-blocked .l1 { flex-wrap: wrap; align-items: baseline; height: auto; } .tk-blocked .l1 .t { display: block; white-space: normal; -webkit-line-clamp: unset; }
+.tk-blocked .tk-why { display: block; margin-top: var(--tk-sp-1); color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); overflow-wrap: anywhere; }
+/* An epic as a card: its key and priority, its title in full, how far its tickets are, who owns it and what comes next. */
+.tk-ecards { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: var(--tk-sp-3); }
+.tk-ecard { display: flex; flex-direction: column; gap: var(--tk-sp-2); min-width: 0; padding: var(--tk-sp-4); color: var(--tk-text); text-decoration: none; }
+.tk-ecard-h { display: flex; align-items: center; justify-content: space-between; gap: var(--tk-sp-2); }
+.tk-ecard-t { color: var(--tk-ink); font-size: var(--tk-fs-title); line-height: var(--tk-lh-title); font-weight: 500; overflow-wrap: anywhere; }
+.tk-ecard .tk-ms-v small { color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-weight: 500; }
+.tk-ecard-o { display: flex; align-items: center; gap: var(--tk-sp-2); } .tk-ecard-n { overflow-wrap: anywhere; }
+.tk-back { display: inline-flex; align-items: center; gap: var(--tk-sp-1); min-height: 2.75rem; margin: 0 0 var(--tk-sp-1); color: var(--tk-ink); font-size: var(--tk-fs-row); font-weight: 500; text-decoration: none; }
+.tk-back .glyph { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; }
+.tk-ecards { margin-top: var(--tk-sp-3); }
+@media (min-width: 64rem) { .tk-story-grid.tk-epics-grid { grid-template-columns: minmax(0, 1fr); } }
