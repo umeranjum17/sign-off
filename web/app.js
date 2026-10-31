@@ -2382,7 +2382,7 @@
     sheetUp = d.key;
     return el('div', { class: `ask-over${rise ? ' up' : ''}`, 'data-key': d.key }, el('a', { class: 'ask-scrim', href: close, tabindex: '-1', 'aria-hidden': 'true' }),
       el('section', { class: 'ask-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ask-title' }, el('div', { class: 'grab', 'aria-hidden': 'true' }),
-        el('header', { class: 'sh-head' }, cardTile(d), el('span', { class: 'sh-lab', dir: 'auto' }, `${isPick(d) ? plain(d.title) : whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`), bar.more,
+        el('header', { class: 'sh-head ui-head' }, el('span', { class: 'ui-lab' }, cardTile(d), el('span', { class: 'sh-lab', dir: 'auto' }, `${isPick(d) ? plain(d.title) : whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`)), bar.more,
           el('a', { class: 'sh-x', href: close, 'aria-label': 'Close' }, glyph('x'))), page));
   }
   /** An ask's kind as Decide names it over the question, as in "Pick one · Release agent · 08:01". */
@@ -2456,7 +2456,7 @@
       el('a', { class: 'see', href: `#reports/${r.key}` }, 'Open report'))];
   };
   /** The open item's head line on a desk: its tile, what it is, whose and when, and its More. */
-  const askHead = (d, sink) => el('div', { class: 'ui-shd split-bar' }, cardTile(d), sink.crumb, sink.more ?? '');
+  const askHead = (d, sink) => el('div', { class: 'ui-shd split-bar ui-head' }, el('span', { class: 'ui-lab' }, cardTile(d), sink.crumb), sink.more ?? '');
   /** An open item on a desk that is not an ask's own pane: one card with its head line over it. */
   const pane = (head, ...body) => el('section', { class: 'ui-card ui-pane s8 split-detail' }, head, ...body);
   /** Desk: list beside the selected ask; answering folds its row and selects the next. */

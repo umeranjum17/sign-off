@@ -211,6 +211,10 @@ journeys:
   # each measured in the browser and paired with the prototype's frame (vs-proto/), and the phone's motion recorded (decide-flow.light.390w.mp4).
   decide:
     command: 'npm run build > /dev/null && DECIDE_RECORD=1 node .agents/skills/done-done-verify-sign-off/decide-newlook-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${SIGN_OFF_PROTO:-}"'
+  # Decide's ask header on one grid at 360, 390 and 445 (the sheet) and 1280 and 1440 (the pane), light and dark, with the layout lint (test/support/layout-lint.mjs) on every frame:
+  # this build's after.decide.<width>.<theme>.png must have no fault; SIGN_OFF_REPO=<built base checkout> records the base's before.* beside them.
+  layout:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/layout-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Agree, Disagree and Comment on a part and its Ask menu, per theme and width: the foot row at 44 px tap targets, Disagree's What is off? box, a sent comment taken by wait --filer and answered with deeper, and a short phone recording. PART_COMMENT_BEFORE=1 SIGN_OFF_REPO=<base checkout, built> records the same page without them.
   part-comment:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/part-comment-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${PART_COMMENT_THEME:-light}" "${PART_COMMENT_WIDTH:-390}"'
