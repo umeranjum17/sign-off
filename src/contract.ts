@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { accessSync, constants, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
+import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_ACTIONS, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 import { nestedCard, ownColours } from './pagestyle.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
@@ -34,7 +34,7 @@ const DESIGN_1 = [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 
 export const FRAME_ROLES = ['today', 'proposed', 'built', 'target'];
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', 'actions', 'version', 'changes', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -480,7 +480,52 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (m.schema >= 5 && !Object.hasOwn(m, 'purpose')) throw bad('purpose', 'is required: the kind of report, which the board shows on its row and head', set);
     if (Object.hasOwn(m, 'purpose') && !REPORT_PURPOSES.includes(m.purpose)) throw bad('purpose', `${show(m.purpose)} is not one of ${REPORT_PURPOSES.join(', ')}`, set);
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
-    if (g) { guide(1); return { kind: m.kind, schema: m.schema }; }
+    if (g) {
+      // A report 5 is a guided page, so its own parts are checked first; then the Actions block it ends on, by its key.
+      guide(1);
+    // The Actions block: a report 5 says what the person can do with it - who owns the build, when the first pull request comes, and which
+    // of Approve, Refine and Reject is recommended. A report that declares none cannot end on an action, so it fails here by its key.
+    const ACTIONS_HELP = 'Add "actions": {"role":"addons lead","owner":"Ada","first_pull_request":"2026-11-06","recommended":"approve"}: the role that does the work, its name when it has one, the day the first pull request lands, and the action this report recommends';
+    if (m.schema >= 5 && !Object.hasOwn(m, 'actions')) throw bad('actions', 'is required: what the person can do with this report, the owner and the recommended action', ACTIONS_HELP);
+    if (Object.hasOwn(m, 'actions')) {
+      const a = m.actions, KEYS = ['role', 'owner', 'first_pull_request', 'recommended', 'reasons'];
+      if (!a || typeof a !== 'object' || Array.isArray(a)) throw bad('actions', 'must be one object', ACTIONS_HELP);
+      const unknown = Object.keys(a).find((k) => !KEYS.includes(k));
+      if (unknown) throw bad(`actions.${escaped(unknown)}`, 'is not a field of the Actions block', `Use ${KEYS.join(', ')}`);
+      text('actions.role', a.role, 40, 'the role that does the work when the report names no owner, such as "addons lead"');
+      if (Object.hasOwn(a, 'owner')) text('actions.owner', a.owner, 40, 'the name of who does the work, in 40 characters or fewer, or leave it out');
+      if (Object.hasOwn(a, 'first_pull_request')) {
+        const when = typeof a.first_pull_request === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.first_pull_request) ? new Date(`${a.first_pull_request}T00:00:00Z`) : undefined;
+        if (!when || Number.isNaN(when.getTime()) || when.toISOString().slice(0, 10) !== a.first_pull_request) {
+          throw bad('actions.first_pull_request', Object.hasOwn(a, 'first_pull_request') ? `${show(a.first_pull_request)} is not a date such as 2026-11-06` : 'is required', 'Set it to the day the first pull request lands, as YYYY-MM-DD');
+        }
+      }
+      if (!REPORT_ACTIONS.includes(a.recommended)) throw bad('actions.recommended', `${show(a.recommended)} is not one of ${REPORT_ACTIONS.join(', ')}`, `Set "recommended" to the action this report recommends: ${REPORT_ACTIONS.join(', ')}`);
+      if (Object.hasOwn(a, 'reasons')) {
+        if (!Array.isArray(a.reasons) || a.reasons.length < 2 || a.reasons.length > 4) throw bad('actions.reasons', 'must list 2 to 4 reasons a report can be rejected for', 'Set "reasons" to two to four short lines such as ["Wrong direction","Too expensive","Not now"], or leave it out for the four the board shows');
+        a.reasons.forEach((r: unknown, n: number) => text(`actions.reasons[${n}]`, r, 30, 'a reason a report can be rejected for, in 30 characters or fewer'));
+        if (new Set(a.reasons).size !== a.reasons.length) throw bad('actions.reasons', 'must not repeat a reason', 'Give each reason once');
+      }
+    }
+    // A version 2 report says what changed: same key, one version higher, with the lines the person reads as the diff.
+    if (Object.hasOwn(m, 'version') && !(Number.isInteger(m.version) && m.version >= 1)) throw bad('version', 'must be a whole number from 1', 'Set "version" to 2 when the owner redoes a report, or leave it out for a first version');
+    if (Object.hasOwn(m, 'changes')) {
+      if (!Array.isArray(m.changes) || !m.changes.length || m.changes.length > 8) throw bad('changes', 'must list 1 to 8 lines of what changed', 'Set "changes" to [{"kind":"added","text":"The rollback step"},{"kind":"rewritten","text":"One server","was":"Two servers"}]');
+      m.changes.forEach((c: any, n: number) => {
+        const at = `changes[${n}]`;
+        if (!['added', 'rewritten', 'removed'].includes(c?.kind)) throw bad(`${at}.kind`, `${show(c?.kind)} is not added, rewritten or removed`, 'Set "kind" to added, rewritten or removed');
+        text(`${at}.text`, c.text, 120, 'the new wording, in 120 characters or fewer');
+        if (c.kind === 'rewritten') {
+          if (!Object.hasOwn(c, 'was')) throw bad(`${at}.was`, 'is required on a rewritten line: the wording it replaces', 'Add "was": the earlier wording, in 120 characters or fewer');
+          text(`${at}.was`, c.was, 120, 'the wording it replaces, in 120 characters or fewer');
+        } else if (Object.hasOwn(c, 'was')) throw bad(`${at}.was`, 'is only for a rewritten line', 'Remove "was", or set "kind" to rewritten');
+      });
+    }
+    if (m.version > 1 && !Object.hasOwn(m, 'changes')) throw bad('changes', `is required on version ${m.version}: what changed since version ${m.version - 1}`, 'Add "changes": one line per change, each added, rewritten (with "was") or removed');
+    if (Object.hasOwn(m, 'changes') && !(m.version > 1)) throw bad('changes', 'is only for a version after the first', 'Leave "changes" out of a first version, or post it as "version": 2');
+
+      return { kind: m.kind, schema: m.schema };
+    }
     const need = 'a report is a page to tap through, not text';
     page('view', /\.html$/i, '.html', '"mocks/<key>/index.html"', need);
     page('preview', /\.(svg|png|jpe?g|webp)$/i, '.svg, .png, .jpg, .jpeg or .webp', '"mocks/<key>/preview.svg"', need);

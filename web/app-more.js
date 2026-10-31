@@ -1623,6 +1623,118 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const sendSlot = E('div', ''), err = E('p', 'gd-err');
     err.setAttribute('role', 'alert');
     const nextCard = d.next ? card('next', 'next', head(d.next.heading, undefined, undefined, 'next', 'heading'), E('ul', 'gd-checks', ...d.next.lines.map((l, n) => E('li', '', E('span', 'tk', gic('check')), fld('next', `lines.${n}`, mdSpan('span', '', l))))), ...(plan ? [sendSlot, sendLine(`plan:${key}`), err] : []), ...(d.engagement || live ? acts('next') : []), rc('next')) : null;
+    // ---- The Actions block: what a report ends on. The report declares it (role, owner, the day of the first pull request and which
+    // action it recommends); the person approves, refines with a note typed or spoken, or rejects with a reason. Each records one line the
+    // fleet side reads, so the same report can be approved once and its result is never guessed by the page.
+    const declared = d.actions ?? null, acted = () => (state.report_actions ?? {})[key] ?? null;
+    const whoActs = declared ? plain(declared.owner?.trim() || declared.role || '') : '';
+    const dayWords = (iso) => { const t = Date.parse(`${iso}T00:00:00Z`); return Number.isNaN(t) ? iso : new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); };
+    const resultOf = (a) => a === 'approve' ? `Starts the build. ${whoActs} opens the first PR${declared?.first_pull_request ? ` by ${dayWords(declared.first_pull_request)}` : ''}.`
+      : a === 'refine' ? `Sends it back with a note. ${whoActs} posts version ${(d.version ?? 1) + 1} here.`
+      : `Closes it, starts nothing. ${whoActs} keeps your reason as a rule.`;
+    const decBox = el('section', { class: 'rda', 'aria-labelledby': `ra-dec-${key}` });
+    let actMode = '', actErr = '', actNote = '';
+    /** Sends one action; the board records it and the block redraws from what came back. */
+    async function takeAction(action, extra, btn) {
+      if (btn) btn.disabled = true;
+      actErr = '';
+      try { await postJson('/api/report-action', { key, action, ...extra }); actMode = ''; sync(); paintActions(); }
+      catch (e) { actErr = e.message; if (btn) btn.disabled = false; paintActions(); }
+    }
+    function paintActions() {
+      if (!declared) return;
+      let got = acted();
+      // A note sent on version 1 is answered by the owner's version 2: the three actions come back for the new version, with the diff above them.
+      if (got?.action === 'refine' && (got.version ?? 1) < (d.version ?? 1)) got = null;
+      const learning = (state.report_learnings ?? []).filter((l) => l.key === key).at(-1);
+      const back = (mode) => { const b = el('button', { class: 'rda-text', type: 'button' }, 'Cancel'); b.onclick = () => { actMode = ''; actErr = ''; paintActions(); decBox.scrollIntoView({ block: 'nearest', behavior: quick ? 'auto' : 'smooth' }); }; return b; };
+      if (got && got.action === 'reject') {
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Closed'),
+          el('p', { class: 'rda-closed' }, `Closed by you · ${hhmm(got.at)} · ${got.reason}`),
+          ...(got.note ? [el('p', { class: 'rda-said' }, `You told ${whoActs}: “${got.note}”`)] : []),
+          el('p', { class: 'rda-none' }, `No build started. ${whoActs}'s rule now: ${learning?.rule ?? `${got.reason}.`}`),
+          (() => { const b = el('button', { class: 'rda-text', type: 'button' }, 'Reopen'); b.onclick = () => takeAction('reopen', {}, b); return b; })());
+        return;
+      }
+      if (got && got.action === 'approve') {
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Build started'),
+          el('p', { class: 'rda-closed' }, `Approved by you · ${hhmm(got.at)} · ${got.who} has it`),
+          el('p', { class: 'rda-none' }, `The first pull request lands by ${declared?.first_pull_request ? dayWords(declared.first_pull_request) : 'the day ' + whoActs + ' names'}. Its ticket is on Tickets.`));
+        return;
+      }
+      if (actMode === 'refine') {
+        const note = el('textarea', { class: 'rda-note', id: `ra-note-${key}`, rows: '3', maxlength: '500', 'aria-label': 'What should change', placeholder: 'What should change? One line is enough.' });
+        note.value = actNote;
+        note.oninput = () => { actNote = note.value; };
+        const heard = el('p', { class: 'rda-heard', 'aria-live': 'polite' });
+        const send = el('button', { class: 'rda-go', type: 'button' }, `Send back to ${whoActs}`);
+        send.onclick = () => { if (note.value.trim()) { actNote = ''; takeAction('refine', { note: note.value.trim() }, send); } };
+        const mic = el('button', { class: 'rda-mic', type: 'button' }, 'Speak the note');
+        mic.onclick = () => speak(note, mic, heard);
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Refine'),
+          el('p', { class: 'rda-sub' }, `${whoActs} redoes it and posts version ${(d.version ?? 1) + 1} here.`),
+          el('label', { class: 'rda-lab', for: `ra-note-${key}` }, 'What should change? ', el('small', {}, 'One line is enough.')),
+          note, el('div', { class: 'rda-microw' }, mic, heard),
+          el('div', { class: 'rda-foot' }, send, back()),
+          ...(actErr ? [el('p', { class: 'gd-err' }, actErr)] : []));
+        note.focus({ preventScroll: true });
+        return;
+      }
+      if (actMode === 'reject') {
+        const reasons = declared.reasons?.length ? declared.reasons : ['Wrong direction', 'Too expensive', 'Not now', 'Already handled'];
+        let picked = reasons[0];
+        const chips = el('div', { class: 'rda-chips', role: 'radiogroup', 'aria-label': 'Why' }, ...reasons.map((r) => {
+          const b = el('button', { class: 'rda-chip', type: 'button', role: 'radio', 'aria-checked': String(r === picked) }, r);
+          b.onclick = () => { picked = r; [...chips.children].forEach((x) => x.setAttribute('aria-checked', String(x === b))); line.focus({ preventScroll: true }); };
+          return b;
+        }));
+        const line = el('input', { class: 'rda-line', id: `ra-why-${key}`, type: 'text', maxlength: '500', 'aria-label': `One line for ${whoActs}, optional`, placeholder: 'One line for ' + whoActs + ' (optional)' });
+        const close = el('button', { class: 'rda-go ra-close', type: 'button' }, 'Reject and close');
+        close.onclick = () => takeAction('reject', { reason: picked, ...(line.value.trim() && { note: line.value.trim() }) }, close);
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Reject'),
+          el('p', { class: 'rda-sub' }, 'Closes it and starts nothing. You can reopen it later.'),
+          el('p', { class: 'rda-lab' }, 'Why?'), chips, line,
+          el('div', { class: 'rda-foot' }, close, back()),
+          ...(actErr ? [el('p', { class: 'gd-err' }, actErr)] : []));
+        line.focus({ preventScroll: true });
+        return;
+      }
+      if (got && got.action === 'refine') {
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Sent back'),
+          el('p', { class: 'rda-closed' }, `Sent to ${whoActs} · ${hhmm(got.at)}`),
+          el('p', { class: 'rda-said' }, `Your note: “${got.note}”`),
+          el('p', { class: 'rda-none' }, `${whoActs} posts version ${(d.version ?? 1) + 1} on this same report. Until then nothing is built.`),
+          (() => { const b = el('button', { class: 'rda-text', type: 'button' }, 'Reject instead'); b.onclick = () => { actMode = 'reject'; decBox.scrollIntoView({ block: 'start', behavior: quick ? 'auto' : 'smooth' }); paintActions(); }; return b; })());
+        return;
+      }
+      const action = (name, label, rec) => {
+        const b = el('button', { class: `rda-a ${name}`, type: 'button' }, el('span', { class: 'lab' }, label, ...(rec ? [el('span', { class: 'rec' }, 'Recommended')] : [])), el('span', { class: 'res' }, resultOf(name)));
+        b.onclick = () => { if (name === 'approve') takeAction('approve', {}, b); else { actMode = name; paintActions(); decBox.scrollIntoView({ block: 'start', behavior: quick ? 'auto' : 'smooth' }); } };
+        return b;
+      };
+      const rec = declared.recommended;
+      decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Your decision'),
+        el('div', { class: 'rda-as' }, action('approve', 'Approve', rec === 'approve'), action('refine', 'Refine', rec === 'refine'), action('reject', 'Reject', rec === 'reject')),
+        el('p', { class: 'rda-none' }, 'Do nothing and it stays open, unread — no build starts.'),
+        ...(actErr ? [el('p', { class: 'gd-err' }, actErr)] : []));
+    }
+    /** Speak the note: the browser's own recognition when it has one, and a plain word when it has not. The words land in the field, so a
+     * misheard line can be fixed before it is sent. */
+    function speak(note, mic, heard) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) { heard.textContent = 'This browser cannot listen. Type the note instead.'; mic.disabled = true; return; }
+      if (mic.dataset.on === '1') { mic.__rec?.stop(); return; }
+      const rec = new SR(); mic.__rec = rec;
+      rec.lang = navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = false;
+      mic.dataset.on = '1'; mic.textContent = 'Listening — tap to stop'; mic.classList.add('on');
+      const end = () => { mic.dataset.on = '0'; mic.classList.remove('on'); mic.textContent = 'Speak the note'; };
+      rec.onresult = (e) => { let said = ''; for (const r of e.results) said += r[0].transcript; heard.textContent = `Just heard: “${said.trim()}”`; note.value = (note.value ? note.value.replace(/\s*$/, ' ') : '') + said.trim(); actNote = note.value; };
+      rec.onerror = () => { heard.textContent = 'Could not hear that. Type the note instead.'; };
+      rec.onend = end; rec.onstart = () => {};
+      try { rec.start(); } catch { end(); }
+    }
+    if (declared) paintActions(); else decBox.remove();
+
     async function go(b) {
       if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
@@ -1820,10 +1932,37 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const nowPart = E('div', 'now-part'); nowPart.hidden = plan;
     const progress = E('div', 'gd-progress', now, segs, nowPart);
-    const main = el('div', { class: 'gd-main' }, top, ...stageBlocks);
+    // A report the owner redid says so before its first part: the version, whose it is and when, then what changed, marked.
+    const versionAt = (d.versions ?? []).at(-1);
+    const diffLines = d.changes ?? versionAt?.changes ?? [];
+    const versionFig = !plan && (d.version ?? 1) > 1 ? el('section', { class: 'rda-ver' },
+      el('p', { class: 'rda-vmeta' }, `Version ${d.version} · ${declared?.owner?.trim() || declared?.role || d.by || 'its owner'} · ${versionAt ? hhmm(versionAt.at) : when(d.filed)}`),
+      el('h2', {}, 'What changed'),
+      el('ul', { class: 'rda-diff' }, ...diffLines.map((c) => {
+        const mark = c.kind === 'added' ? '+' : c.kind === 'rewritten' ? '~' : '\u2013';
+        return el('li', { class: `rda-d ${c.kind}` },
+          el('span', { class: 'm', 'aria-label': c.kind }, mark),
+          el('span', { class: 'tx' }, c.kind === 'removed' ? el('del', {}, c.text) : c.text,
+            ...(c.was ? [el('span', { class: 'was' }, `was ${c.was}`)] : [])));
+      })),
+      el('p', { class: 'rda-vmark' }, 'Marked: added, rewritten, removed.')) : '';
+    const main = el('div', { class: 'gd-main' }, top, ...(versionFig ? [versionFig] : []), ...stageBlocks, ...(declared ? [decBox] : []));
     cols.append(rail, main, ...(plan ? [] : [actBox]));
     const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, cols));
-    const root = E('div', plan ? '' : 'ra-root', scroll, ...(plan ? [bar] : live ? [reportBar] : []));
+    // On a phone the three actions become one bar at the foot of the screen once the person has scrolled past Next step, so the decision is a
+    // thumb away wherever they stop; the bar hands over to the real block the moment it is on screen.
+    const stick = !plan && live && declared ? el('div', { class: 'rda-stick', role: 'group', 'aria-label': 'Your decision' },
+      ...['approve', 'refine', 'reject'].map((name) => {
+        const b = el('button', { class: `rda-sb ${name}`, type: 'button' }, name === 'approve' ? 'Approve' : name === 'refine' ? 'Refine' : 'Reject');
+        b.onclick = () => {
+          if (name === 'approve') { takeAction('approve', {}, b); return; }
+          actMode = name; paintActions();
+          decBox.scrollIntoView({ block: 'start', behavior: quick ? 'auto' : 'smooth' });
+          setTimeout(() => decBox.querySelector('textarea, input')?.focus({ preventScroll: true }), 300);
+        };
+        return b;
+      })) : '';
+    const root = E('div', plan ? '' : 'ra-root', scroll, ...(plan ? [bar] : live ? [reportBar] : []), ...(stick ? [stick] : []));
     if (!plan) root.tools = [viewBtn, actBtn];
     root.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0';
     const answerTimers = new WeakMap();
@@ -1850,6 +1989,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     // must name the part the person is looking at rather than the one that was there before they moved.
     const onScroll = () => requestAnimationFrame(() => {
       if (!scroll.isConnected) return;
+      // The actions bar is the foot of the screen from Next step on, and gives way to the real block when the person reaches it.
+      if (stick) {
+        const nextStage = stageEl.get('next'), block = decBox.isConnected ? decBox : null;
+        const passed = !!nextStage && nextStage.getBoundingClientRect().top < (phone.matches ? innerHeight - 24 : 40);
+        const shown = !!block && block.getBoundingClientRect().top < innerHeight - 8;
+        root.classList.toggle('rda-on', phone.matches && passed && !shown);
+      }
       // The band is the middle of what the person can see: the report's own scroller where it scrolls, the screen where the page carries it.
       const box = scroll.getBoundingClientRect();
       const top = Math.max(box.top, 0), bottom = Math.min(box.bottom, innerHeight || box.bottom);
@@ -1863,8 +2009,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       setStage(hit.dataset.stage);
       if (!plan && hit.dataset.part && hit.dataset.part !== curPart) { curPart = hit.dataset.part; paintBar(); }
     });
-    // A scroll of either kind counts, wherever it happened in the reader.
+    // A scroll of either kind counts, wherever it happened in the reader, and so does the moment Next step or the block crosses the fold.
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    if (stick) {
+      const fold = new IntersectionObserver(() => onScroll(), { root: scroll, threshold: [0, 0.01, 0.99, 1] });
+      if (stageEl.get('next')) fold.observe(stageEl.get('next'));
+      fold.observe(decBox);
+    }
     document.fonts?.ready.then(onScroll);
     onScroll();
 
@@ -1873,6 +2024,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     function sync() {
       if (!root.isConnected && timer) { clearInterval(timer); timer = undefined; return; }
       root.querySelector('.gd-activity')?.replaceChildren(thread(d));
+      if (declared && !actMode) paintActions();
       syncU(); paintOpts(); paintSummary(); paintRc(); paintRail(); if (!plan) { paintBar(); paintAct(); } threads.forEach((_, part) => paintTalk(part));
       panels.forEach((_, part) => { paintAns(part); if (asksOf(part).length && (d.engagement || (deeps.get(part).getAttribute('aria-expanded') === 'false' && !deeps.get(part).dataset.shut))) { deeps.get(part)?.setAttribute('aria-expanded', 'true'); panels.get(part).hidden = false; } });
       const need = live && (unfinished() || (state.comments ?? []).some((c) => c.key === key && c.text && !c.reply) || (plan && sent() && !state.seen_at?.[key]));

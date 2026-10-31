@@ -1030,6 +1030,52 @@
   .gd-corner .ic { position: absolute; top: 0.5rem; right: 0.5rem; box-sizing: content-box; width: 1rem; height: 1rem; padding: 0.375rem; border-radius: 999px; background: var(--tk-raised); box-shadow: var(--tk-elev-raised); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .gd-corner .vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .gd-dg .gd-dgbox { position: relative; }
+  /* The Actions block: three controls, each with its plain result line, one recommended, and the line on doing nothing. */
+  .rda { margin: 1.25rem 0 0.5rem; padding-top: 1rem; border-top: 1px solid var(--tk-line); }
+  .rda h2 { margin: 0 0 0.625rem; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
+  .rda-as { display: grid; gap: 0.5rem; }
+  .rda-a { display: grid; gap: 0.375rem; width: 100%; min-height: 3rem; padding: 0.75rem 1rem; border: 1px solid var(--tk-idle); border-radius: var(--tk-r-ctl); background: var(--tk-card); color: var(--tk-text); text-align: left; font: inherit; cursor: pointer; }
+  .rda-a .lab { display: flex; align-items: center; gap: 0.5rem; color: var(--tk-text); font-size: var(--tk-fs-title); line-height: var(--tk-lh-title); font-weight: 600; }
+  .rda-a .rec { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); line-height: 1rem; font-weight: 400; }
+  .rda-a .res { color: var(--tk-text-secondary); font-size: var(--tk-fs-secondary); line-height: 1.25rem; }
+  .rda-a.approve { border-color: var(--tk-ink); background: var(--tk-ink); }
+  .rda-a.approve .lab { color: var(--tk-canvas); }
+  .rda-a.approve .rec, .rda-a.approve .res { color: var(--tk-canvas); opacity: 0.8; }
+  .rda-none, .rda-sub { margin: 0.625rem 0 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-secondary); line-height: 1.25rem; }
+  .rda-sub { margin: 0 0 0.625rem; }
+  .rda-lab { display: block; margin: 0 0 0.375rem; color: var(--tk-text); font-size: var(--tk-fs-secondary); line-height: 1.25rem; font-weight: 500; }
+  .rda-lab small { color: var(--tk-text-tertiary); font-weight: 400; }
+  .rda-note, .rda-line { display: block; width: 100%; padding: 0.625rem; border: 1px solid var(--tk-idle); border-radius: var(--tk-r-ctl); background: var(--tk-inset); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-body); resize: vertical; }
+  .rda-microw { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; margin: 0.5rem 0 0; }
+  .rda-mic { min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--tk-idle); border-radius: 999px; background: var(--tk-card); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-secondary); cursor: pointer; }
+  .rda-mic.on { border-color: var(--tk-critical); color: var(--tk-critical); }
+  .rda-heard { flex: 1; min-width: 11rem; margin: 0; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
+  .rda-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 0.625rem; }
+  .rda-chip { min-height: 2.75rem; padding: 0 0.875rem; border: 1px solid var(--tk-idle); border-radius: 999px; background: var(--tk-card); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-secondary); cursor: pointer; }
+  .rda-chip[aria-checked=true] { border-color: var(--tk-ink); background: var(--tk-ink); color: var(--tk-canvas); }
+  .rda-foot { display: flex; align-items: center; gap: 0.625rem; flex-wrap: wrap; margin: 0.875rem 0 0; }
+  .rda-go { min-height: 2.75rem; padding: 0 1rem; border: 0; border-radius: var(--tk-r-ctl); background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-size: var(--tk-fs-title); font-weight: 600; cursor: pointer; }
+  .rda-go:disabled { opacity: 0.5; }
+  .rda-text { min-height: 2.75rem; padding: 0 0.5rem; border: 0; background: none; color: var(--tk-text-secondary); font: inherit; font-size: var(--tk-fs-secondary); cursor: pointer; }
+  .rda-closed, .rda-said { margin: 0 0 0.375rem; color: var(--tk-text); font-size: var(--tk-fs-secondary); line-height: 1.25rem; }
+  .rda-said { color: var(--tk-text-secondary); }
+  .rda-a:focus-visible, .rda-chip:focus-visible, .rda-go:focus-visible, .rda-text:focus-visible, .rda-mic:focus-visible, .rda-sb:focus-visible, .rda-note:focus-visible, .rda-line:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
+  .rda-ver { margin: 1.25rem 0 0; }
+  .rda-vmeta { margin: 0 0 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  .rda-ver h2 { margin: 0.25rem 0 0.5rem; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
+  .rda-diff { list-style: none; margin: 0; padding: 0; }
+  .rda-d { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr); gap: 0.25rem; padding: 0.5rem 0; border-top: 1px solid var(--tk-line); color: var(--tk-text); font-size: var(--tk-fs-secondary); line-height: 1.25rem; }
+  .rda-d:first-child { border-top: 0; }
+  .rda-d .m { color: var(--tk-text-secondary); font-weight: 600; }
+  .rda-d .was { display: block; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  .rda-vmark { margin: 0.375rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+  /* A phone: the three become one bar at the foot of the screen from Next step on, and give way to the real block. */
+  .rda-stick { display: none; }
+  .rda-on .rda-stick { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; box-sizing: border-box; width: calc(100% - 2rem); max-width: 26rem; margin: 0.5rem auto calc(1rem + env(safe-area-inset-bottom)); padding: 0.5rem; border-radius: 1.5rem; background: var(--tk-raised); box-shadow: var(--tk-elev-dock); }
+  .rda-on .ra-bar { display: none; }
+  .rda-sb { min-height: 3rem; border: 1px solid var(--tk-idle); border-radius: 1rem; background: var(--tk-card); color: var(--tk-text); font: inherit; font-size: var(--tk-fs-secondary); font-weight: 600; cursor: pointer; }
+  .rda-sb.approve { border-color: var(--tk-ink); background: var(--tk-ink); color: var(--tk-canvas); }
+  @media (min-width: 64rem) { .rda-as { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; } .rda-a { padding: 0 0.75rem 0.75rem; align-content: start; } .rda-a .lab { min-height: 2.75rem; } }
   .gd-act { color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
   .gd-act[hidden] { display: none; }
   .gd-act h2 { margin: 0; font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }

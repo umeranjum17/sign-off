@@ -14,6 +14,7 @@
   "title": "Where the 0.6 release stands",
   "project": "Beacon",
   "purpose": "status",
+  "actions": {"role": "addons lead", "owner": "Ada", "first_pull_request": "2026-11-06", "recommended": "approve"},
   "group": "Release",
   "about": "Four of five parts are done; the last waits on one review.",
   "sections": [
