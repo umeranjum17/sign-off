@@ -240,6 +240,8 @@ async function seed(out) {
   } finally { browser.stop(); }
   const blind = ['filler', 'emoji', 'internal-id', 'wall', 'blank-block', 'low-contrast'].filter((rule) => !found.some((f) => f.rule === rule));
   const verdict = blind.length ? `slop lint seed: BLIND to ${blind.join(', ')}` : `slop lint seed: ${found.length} failures, every rule fired`;
+  // SLOP_LINT_GREEN is the same command's verdict on the board this repo ships, so one frame carries both halves: fails here, passes there.
+  const green = process.env.SLOP_LINT_GREEN ? `\n${process.env.SLOP_LINT_GREEN}` : '';
   for (const f of found) console.log(line(f));
   console.log(verdict);
   if (out) {
@@ -252,7 +254,7 @@ async function seed(out) {
       frame.emulate('390x844x2,mobile,touch', 'light');
       frame.open(page);
       frame.write(`const v = document.createElement('pre'); v.style.cssText = 'all:initial;display:block;white-space:pre-wrap;font:12px/1.4 ui-monospace,monospace;background:#121210;color:#f4f2ef;padding:12px';
-        v.textContent = ${JSON.stringify([...found.map(line), verdict].join('\n'))}; document.body.prepend(v);`);
+        v.textContent = ${JSON.stringify([...found.map(line), verdict, green].filter(Boolean).join('\n'))}; document.body.prepend(v);`);
       frame.shot(join(out, 'slop-seed.png'));
     } finally { frame.stop(); }
   }

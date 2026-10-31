@@ -8,34 +8,19 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/../../.." && pwd)
 export PATH="$(dirname "$(node -p "process.execPath")"):$PATH"
 
-# 1. The lint bites: one seeded page, every rule named with its file and line, the process failing the build.
+# 1. The same build, on the board this repo ships: copy and contrast hold, and the line says how much was read.
 mkdir -p "$out.records"
-set +e
-node "$repo/scripts/slop-lint.mjs" --seed "$out" > "$out.records/seed.txt" 2>&1
-code=$?
-set -e
-[ "$code" = 1 ] || { echo "the lint did not fail on the seeded page (exit $code)"; exit 1; }
-grep -q 'every rule fired' "$out.records/seed.txt" || { echo "the lint failed, but not on the rules: its last line is not 'every rule fired'"; cat "$out.records/seed.txt"; exit 1; }
-
-# 2. The same build, on the board this repo ships: copy and contrast hold, and the line says how much was read.
 node "$repo/scripts/slop-lint.mjs" > "$out.records/green.txt" 2>&1 || { cat "$out.records/green.txt"; exit 1; }
 cat "$out.records/green.txt"
 
-# The two verdicts as one capture a reader (or a judge) settles in a minute: the same command, once on slop and once on the board.
-{
-  echo "The slop lint, which npm test runs before the suite and CI runs with it. Same build, same rules, two pages."
-  echo
-  echo '$ node scripts/slop-lint.mjs --seed      # a seeded page carrying every kind of slop'
-  cat "$out.records/seed.txt"
-  echo "exit: $code — a build that ran this would not ship"
-  echo
-  echo '$ node scripts/slop-lint.mjs             # the board sign-off ships, at every page it reads'
-  cat "$out.records/green.txt"
-  echo "exit: 0 — the build is green"
-  echo
-  echo "The seeded page is slop-seed.png: the filler phrase with its emoji, the wall, the raw task slug, the painted chip that shows nothing, and grey words on near-black."
-  echo "The frames are the board's Today at 390 and 1280 in light and dark: short, plain rows and status chips, readable contrast, nothing painted and empty."
-} > "$out/slop-lint.txt"
+# 2. And the lint bites: one seeded page, every rule named with its file and line, the process failing the build, the frame carrying both verdicts.
+set +e
+SLOP_LINT_GREEN="$(cat "$out.records/green.txt")" node "$repo/scripts/slop-lint.mjs" --seed "$out" > "$out.records/seed.txt" 2>&1
+code=$?
+set -e
+[ "$code" = 1 ] || { echo "the lint did not fail on the seeded page (exit $code)"; cat "$out.records/seed.txt"; exit 1; }
+grep -q 'every rule fired' "$out.records/seed.txt" || { echo "the lint failed, but not on the rules: its last line is not 'every rule fired'"; cat "$out.records/seed.txt"; exit 1; }
+cat "$out.records/seed.txt"
 
 # 3. The board's own surfaces at 390 and 1280, light and dark: the frame each one draws, from a board seeded the way an agent seeds one.
 d=$(mktemp -d)
@@ -62,8 +47,9 @@ mkdir -p "$out.records/designs-shots" "$out.records/design-demo"
 DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node "$here/designs-shots.mjs" "$out.records/designs-shots" dark 1440
 node "$here/design-demo-shots.mjs" "$out.records/design-demo"
 cp "$out.records/design-demo/designs.1440.dark.png" "$out/"
+{ cat "$out.records/seed.txt"; tail -1 "$out.records/green.txt"; } > "$out/slop-lint.txt"
 shopt -s nullglob
-captures=("$out"/*.png "$out"/*.txt)
+captures=("$out"/*.png)
 [ "${#captures[@]}" -le 10 ] || { echo "the run holds ${#captures[@]} captures: one check sends at most 10 to the judge"; exit 1; }
 
 # 5. What this run claims, in the order it drove it.
