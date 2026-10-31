@@ -2518,11 +2518,12 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const inboxLine = ({ d, tk, last, lastD }) => { const r = last?.reply;
     return r ? `${d ? d.by || 'Agent' : 'Lead'}: ${r.text ?? (r.link ? linkName(r.link) : 'Posted a new version')}` : last ? `You: ${youSaid(last, lastD ?? d)} · ${stepWord(last, stepOf(last) - 1)}` : d ? plain(d.about ?? kind(d)) : TK_WORDS[tkStateOf(tk)]; };
   /** The thread the person marked Done from its row, or took back with Undo: a mark beside the board (src/store.ts readThreadDone), no card touched, and the
-   *  row leaves the live list at once. Its key is the thread's own, so the mark holds whichever card of it the agent writes on next. */
-  function threadDone(id, name, on = true) {
-    if (on) (state.done ??= {})[id] = new Date().toISOString(); else delete state.done?.[id];
+   *  row leaves the live list at once. Its key is the thread's own, so the mark holds whichever card of it the agent writes on next, and `since` is the
+   *  last activity the person saw, so an agent's next words bring it back however late the mark's own request lands. */
+  function threadDone(id, name, on = true, since = '') {
+    if (on) (state.done ??= {})[id] = since || new Date().toISOString(); else delete state.done?.[id];
     render();
-    call('/api/done', post({ keys: [id], done: on })).catch((e) => say(`Couldn't save: ${e.message}`, 8000));
+    call('/api/done', post({ keys: [id], done: on, ...(on && since && { since }) })).catch((e) => say(`Couldn't save: ${e.message}`, 8000));
     if (!on) return say('Back in the inbox', 3000);
     buzz('success');
     say([el('b', {}, 'Done'), ` · ${name}`], 6000, () => threadDone(id, name, false), 'ok');
@@ -2531,10 +2532,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   function swipeInbox(row) {
     row.style.transition = `transform ${calm.matches ? 0 : 200}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
     row.style.transform = 'translateX(-100%)';
-    setTimeout(() => threadDone(row.dataset.thread, row.querySelector('.t').textContent), calm.matches ? 0 : 190);
+    setTimeout(() => threadDone(row.dataset.thread, row.querySelector('.t').textContent, true, row.dataset.at ?? ''), calm.matches ? 0 : 190);
   }
   function inboxRow(th, sel) {
-    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', 'data-thread': th.id, ...(sel && { 'aria-current': 'true' }) },
+    const { d, tk } = th, a = el('a', { class: `ui-row ib-row${th.st === 'new' ? ' unread' : ''}`, href: `#inbox/${th.id}`, 'data-row': '', 'data-thread': th.id, 'data-at': th.at ?? '', ...(sel && { 'aria-current': 'true' }) },
       el('span', { class: 'ib-tile' }, d ? cardTile(d) : tkTypeTile(tk), th.st === 'turn' || (th.st === 'new' && !th.fresh) ? el('i', { class: `dot${th.st === 'turn' ? ' red' : ''}` }) : ''),
       el('span', { class: 'rm' }, d ? el('span', { class: 'ib-ag', dir: 'auto' }, [d.by || 'Agent', th.cards.length > 1 && `${th.cards.length} items`].filter(Boolean).join(' · ')) : '', el('span', { class: 't', dir: 'auto' }, th.name ?? tk.title), el('span', { class: 'l2 meta', dir: 'auto' }, inboxLine(th))),
       el('span', { class: 'ib-side' }, th.at ? el('time', { datetime: th.at }, trailWhen(th.at)) : '',
@@ -2543,7 +2544,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         th.fresh || th.unread ? '' : el('span', { class: 'ib-kind' }, KIND_NAMES[th.kind])));
     // The row's Done: one tap here, or a swipe on the row itself, marks the thread Done and offers Undo for a few seconds.
     const done = canDismiss() ? el('button', { type: 'button', class: 'ib-dn', 'aria-label': `Done, ${th.name ?? tk.title}` }, glyph('check')) : '';
-    if (done) done.onclick = () => threadDone(th.id, th.name ?? tk.title);
+    if (done) done.onclick = () => threadDone(th.id, th.name ?? tk.title, true, th.at ?? '');
     return el('li', {}, a, done);
   }
   /** The inbox's list: the search box, a chip per kind with what is open of it, then the sections; Archived is folded until asked for. */

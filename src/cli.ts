@@ -3501,10 +3501,12 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   }
   if (req.url === '/api/done') {
     // The person marked an Inbox thread Done, or took it back with Undo: a mark beside the board, in the file the rail's read state lives in. No card is
-    // touched, the thread is not deleted, and its key is a card's key or `~<ticket id>`.
-    const { keys, done } = JSON.parse(body) ?? {};
-    if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof done !== 'boolean' || !keys.every((k: unknown) => typeof k === 'string' && /^~?[A-Za-z0-9._-]{1,128}$/.test(k))) return [400, { error: 'Send 1 to 200 thread keys and done true or false' }];
-    appendThreadDone(file, [...new Set<string>(keys)], done);
+    // touched, the thread is not deleted, and its key is a card's key or `~<ticket id>`. `since` is the thread's last activity the page saw, so the mark
+    // covers what the person looked at and the thread comes back for anything that lands after it, however late this request itself arrives.
+    const { keys, done, since } = JSON.parse(body) ?? {};
+    if (!Array.isArray(keys) || !keys.length || keys.length > 200 || typeof done !== 'boolean' || !keys.every((k: unknown) => typeof k === 'string' && /^~?[A-Za-z0-9._-]{1,128}$/.test(k))
+      || (since !== undefined && (typeof since !== 'string' || since.length > 40 || Number.isNaN(Date.parse(since))))) return [400, { error: 'Send 1 to 200 thread keys, done true or false, and the activity the mark covers' }];
+    appendThreadDone(file, [...new Set<string>(keys)], done, since);
     return [200, state()];
   }
   if (req.url === '/api/trail') {
