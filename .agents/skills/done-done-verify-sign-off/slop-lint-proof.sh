@@ -34,7 +34,7 @@ cat "$out.records/green.txt"
   echo "exit: 0 — the build is green"
   echo
   echo "The seeded page is slop-seed.png: the filler phrase with its emoji, the wall, the raw task slug, the painted chip that shows nothing, and grey words on near-black."
-  echo "The frames are the board's Inbox at 390 and 1280 in light and dark: short, plain rows and chips, readable contrast, nothing painted and empty."
+  echo "The frames are the board's Today at 390 and 1280 in light and dark: short, plain rows and status chips, readable contrast, nothing painted and empty."
 } > "$out/slop-lint.txt"
 
 # 3. The board's own surfaces at 390 and 1280, light and dark: the frame each one draws, from a board seeded the way an agent seeds one.
@@ -47,10 +47,10 @@ for width in 390 1280; do
   for theme in light dark; do
     view=$([ "$width" = 390 ] && echo "${width}x844x2,mobile,touch" || echo "${width}x800x1")
     chrome-devtools-axi emulate --viewport "$view" --color-scheme "$theme" > /dev/null
-    # The surface the lint reads, at every cell: the Inbox with its rail, filters, status chips and empty state.
-    chrome-devtools-axi open "$base#inbox" > /dev/null
+    # The surface the lint reads, at every cell: Today, its status chips, its short plain rows and its counts.
+    chrome-devtools-axi open "$base#today" > /dev/null
     sleep 2
-    chrome-devtools-axi screenshot "$out/inbox.$theme.${width}w.png" --full-page > /dev/null
+    chrome-devtools-axi screenshot "$out/today.$theme.${width}w.png" --full-page > /dev/null
   done
 done
 chrome-devtools-axi stop > /dev/null
@@ -61,7 +61,6 @@ node "$repo/dist/cli.js" stop "$d/board.json" > /dev/null || true
 mkdir -p "$out.records/designs-shots" "$out.records/design-demo"
 DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node "$here/designs-shots.mjs" "$out.records/designs-shots" dark 1440
 node "$here/design-demo-shots.mjs" "$out.records/design-demo"
-cp "$out.records/designs-shots/designs.after.dark.1440w.png" "$out/"
 cp "$out.records/design-demo/designs.1440.dark.png" "$out/"
 shopt -s nullglob
 captures=("$out"/*.png "$out"/*.txt)
@@ -80,7 +79,7 @@ writeFileSync(join(out, 'steps.json'), JSON.stringify({
   steps: [
     'A seeded page carrying a filler phrase, an emoji, a raw task slug, a wall, a painted chip showing nothing and grey words on near-black is read by the same rules, and every failure names its rule, its file and line, the ratio or the box and the words: the process exits 1, so `npm test` would fail the build.',
     `The same build on the board this repo ships is green: ${verdict.split('\n').find((l) => l.startsWith('slop lint: clean')) ?? verdict}.`,
-    'The frames are the surfaces that pass: the Inbox (its rail, filters, empty state) and Today (its status chips and rows) at 390 and 1280, light and dark.',
+    'The frames are the surface that passes: Today, with its status chips, short rows and counts, at 390 and 1280 in light and dark.',
     'The Designs capture the approved design-pick-listing requirement names rides in this run (designs.1440.dark.png).',
   ],
   result: 'Slop in the board\'s copy or its contrast fails the build by rule, file and line; the board as it ships passes every rule at 390 and 1280 in light and dark.',
