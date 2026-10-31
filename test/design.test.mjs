@@ -1115,9 +1115,13 @@ test('each card has one place to type: Add a comment holds the note sent with th
     await until(async () => (open = await evaluate(`(() => { const f = reader.querySelector('iframe').getBoundingClientRect(); return { hidden: reader.hidden, title: document.activeElement.textContent,
       inert: document.querySelector('main').inert, src: reader.querySelector('iframe').getAttribute('src'), sandbox: reader.querySelector('iframe').getAttribute('sandbox'),
       frame: [f.x, Math.round(f.width) === reader.querySelector('.read').clientWidth - 32], back: reader.querySelector('.rp-x').getAttribute('aria-label'), what: reader.querySelector('.rp-what').textContent,
-      decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src === '/mock/local/how~/index.html');
-    // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, other), its title and what it decided.
-    assert.deepEqual(open, { hidden: false, title: 'How it ships', inert: true, src: '/mock/local/how~/index.html', sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
+      decided: [...reader.querySelectorAll('.ui-dl, .rp-found')].map((e) => e.textContent) }; })()`))?.src?.startsWith('/mock/local/how~/index.html'));
+    // The page sits in a tile inside the sheet's 16px gutters, under its kind (an older report's, other), its title and what it decided. Its address carries
+    // the board's own light or dark (`?report=1&theme=`), which is how the page draws in the board's theme and not the system's (web/point.js).
+    const picked = await evaluate('localStorage.getItem("so-theme") ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")');
+    assert.equal(open.src, `/mock/local/how~/index.html?report=1&theme=${picked}`);
+    const { src: _src, ...sheet } = open;
+    assert.deepEqual(sheet, { hidden: false, title: 'How it ships', inert: true, sandbox: 'allow-scripts', frame: [16, true], back: 'Close',
       what: `Other reportHow it works · ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(new Date())}`, decided: ['What it decided', 'Ships only when the check passes.'] });
     // The page itself is served: the filled scaffold, with its steps to tap.
     assert.match(await (await fetch(new URL('/mock/local/how~/index.html', url))).text(), /<button type="button" class="next">Next<\/button>/);

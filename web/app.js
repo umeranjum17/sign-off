@@ -1026,8 +1026,9 @@
   }
   /** A mock or view is served from inside its own folder, so the files beside it load by their relative names. */
   const mockUrl = (key, value, path) => `${state.mockBase}${key}~${value}/${encodeURIComponent(path.split('?')[0].split('/').pop())}`;
-  /** A report's own page: drawn in the board's light or dark, never the system's, so the frame carries the pick and the page follows it (web/point.js). */
-  const reportUrl = (d) => `${src(mockUrl(d.key, '', d.view))}${FROZEN || d.type === 'plan' ? '' : `?report=1&theme=${isDark() ? 'dark' : 'light'}`}`;
+  /** A report's own page: drawn in the board's light or dark, never the system's, so the frame carries the pick and the page follows it (web/point.js).
+   *  A browser that refuses its own storage (a copy opened from disk, private mode) falls back to the system's light or dark, never to no page. */
+  const reportUrl = (d) => `${src(mockUrl(d.key, '', d.view))}${FROZEN || d.type === 'plan' ? '' : `?report=1&theme=${(() => { try { return isDark() ? 'dark' : 'light'; } catch { return sysDark.matches ? 'dark' : 'light'; } })()}`}`;
   /** A mock is a prototype when it is a page that can be tapped, not a picture of one. */
   const prototype = (m) => !!m && /\.html?$/i.test(m.path.split('?')[0]);
   /** One place decides where a live link goes: that option's own prototype page, this card's key and this option's value, with the variant its mock reads.
@@ -2876,8 +2877,11 @@
   /** A report's page draws in the board's light or dark, at the board's ink and ground: said again when the person flips the board, so an open report follows it. */
   function reportFrames() { return [...document.querySelectorAll(':is(#reader, .split-detail) .read iframe')]; }
   function reportTheme(frame) {
-    const s = getComputedStyle(document.documentElement), token = (n) => s.getPropertyValue(n).trim(), ink = token('--tk-ink'), ground = token('--tk-canvas');
-    frame.contentWindow?.postMessage({ 'sign-off': 'theme', theme: isDark() ? 'dark' : 'light', ...(ink && { ink }), ...(ground && { ground }) }, '*');
+    // A token the board does not define is left out, so the page falls back to its own Canvas and CanvasText; nothing here may stop a frame's sizing.
+    try {
+      const s = getComputedStyle(document.documentElement), token = (n) => s.getPropertyValue(n).trim(), ink = token('--tk-ink'), ground = token('--tk-canvas');
+      frame.contentWindow?.postMessage({ 'sign-off': 'theme', theme: isDark() ? 'dark' : 'light', ...(ink && { ink }), ...(ground && { ground }) }, '*');
+    } catch {}
   }
   // An interactive page may post its own height, `{ height: <px> }`, and its frame then fits it with no blank below.
   // Only a frame's own message sizes it. Document readers must fit even long pages; previews stay capped.

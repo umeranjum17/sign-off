@@ -24,7 +24,9 @@
   // colour it sits on (white on white, black on black) has that word set to whichever of the board's ink or ground reads against what is behind it,
   // so no report leaves a blank block where its words are. Only a report's page: a design mock and a drawing keep the colours their author chose.
   const query = new URLSearchParams(location.search), told = query.get('report') === '1' ? query.get('theme') : null;
-  if (told === 'light' || told === 'dark') board(told);
+  // The theme pass is never allowed to take the rest of this bridge down with it: a page that cannot be read for its colours still points and still
+  // reports its height, so a frame never waits on a `ready` that a colour lookup stopped.
+  if (told === 'light' || told === 'dark') { try { board(told); } catch (e) { console.warn('sign-off: the page kept its own colours', e); } }
   if (parent === window) return;
   let on = false, touch;
   const navigate = (key) => parent.postMessage({ 'sign-off': 'viewer-nav', key }, '*');
@@ -50,7 +52,7 @@
   };
   addEventListener('message', (m) => {
     if (m.source === parent && m.data?.['sign-off'] === 'point') on = m.data.on === true;
-    if (m.source === parent && m.data?.['sign-off'] === 'theme') board(m.data.theme, m.data.ink, m.data.ground);
+    if (m.source === parent && m.data?.['sign-off'] === 'theme') { try { board(m.data.theme, m.data.ink, m.data.ground); } catch (e) { console.warn('sign-off: the page kept its own colours', e); } }
     if (m.source === parent && m.data?.['sign-off'] === 'size') {
       // The document reader owns scrolling; its frame follows the entire content height.
       document.documentElement.style.overflow = 'hidden';
