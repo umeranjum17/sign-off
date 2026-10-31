@@ -60,6 +60,10 @@ journeys:
   # A page report held to the board's look (report init --page): no colour of its own, no card in a card; post refuses a palette or a nested card with the kit as the fix, the plain page opens in the board at 390 and 1280, light and dark.
   page-look:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/page-look-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
+  # A report's own page in the board's theme: the voice report the captain met, read in the reader and on its own at 390 and 1280 in dark and light, failing on
+  # any word under 4.5:1 against what is behind it, on a painted box or tab showing nothing, on a frame handed no theme, or on a page drawing on another ground.
+  report-contrast:
+    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/report-contrast-proof.sh'
   # An ask on a guided report answers the tap at 390, light and dark: the Ask control pressed, Sent to the agent with the time, Already sent on a repeat with one ask saved,
   # Agent replied; and a design report's inline-SVG flow diagram at the column's width, following the board's own light-or-dark pick (diagram-sample/flow.html).
   comment-send:
