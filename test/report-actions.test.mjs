@@ -19,9 +19,15 @@ const run = (...args) => {
   catch (e) { return { out: `${e.stdout}${e.stderr}`, code: e.status }; }
 };
 const procs = [];
-after(() => {
-  for (const p of procs) if (p.exitCode === null) p.kill();
-  rmSync(scratch, { recursive: true, force: true });
+after(async () => {
+  // A served board is stopped and gone before the scratch folder is taken away, and the folder is waited out: the suite fails a file that
+  // leaves anything in the run's temp folder.
+  await Promise.all(procs.map((p) => new Promise((ok) => (p.exitCode !== null ? ok() : (p.once('exit', ok), p.kill())))));
+  for (let i = 0; i < 50 && existsSync(scratch); i++) {
+    try { rmSync(scratch, { recursive: true, force: true }); } catch {}
+    if (!existsSync(scratch)) break;
+    await new Promise((r) => setTimeout(r, 100));
+  }
 });
 const report = (patch = {}) => {
   const m = JSON.parse(readFileSync(new URL('../fixtures/contract/report.v5/valid-minimal.json', import.meta.url), 'utf8'));
