@@ -5785,7 +5785,10 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
     await until(async () => JSON.stringify(await list()) === JSON.stringify([['New', '* Open the beta to every team?']]));
     await evaluate('{ const b = document.getElementById("ib-find"); b.value = ""; b.dispatchEvent(new Event("input")); }');
     await evaluate('document.querySelector(".ib-done").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Done');
+    // Done, picked, is the finished threads and nothing else; off again, the rail is the live threads.
+    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Done', 'Send the digest on Mondays?']]));
+    await evaluate('document.querySelector(".ib-done").click()');
+    await until(async () => (await list()).at(-1)?.[0] === 'Waiting on agents');
     // A row opens its thread: the action and what was done with its link, then the item it reaches.
     await evaluate('[...document.querySelectorAll(".ib-row")].find((r) => r.textContent.includes("Open the beta")).click()');
     await until(() => evaluate('!!document.querySelector(".ib-thread") && location.hash === "#inbox/built"'));
@@ -6040,8 +6043,7 @@ test('the inbox: a thread whose question is answered and whose card is marked ac
     await evaluate('location.hash = "#inbox"; location.reload()');
     await until(async () => (await list()).some((s) => s[0] === 'New' && s.includes('* Open the beta to every team?')));
     await evaluate('document.querySelector(".ib-done").click()');
-    await until(async () => (await list()).at(-1)?.[0] === 'Done');
-    assert.deepEqual(await list(), [['New', '* Open the beta to every team?', '* Keep the weekly digest?'], ['Waiting on agents', 'Ship the settings page Friday?', 'Turn on the CSV export?'], ['Done', 'Send the digest on Mondays?']]);
+    await until(async () => JSON.stringify(await list()) === JSON.stringify([['Done', 'Send the digest on Mondays?']]));
     assert.deepEqual(await chips(), ['All4', 'Decisions4', 'Tickets']);
   } finally { await close(); }
 });
@@ -6072,8 +6074,11 @@ test('the inbox holds only the threads the person took part in: an ask they neve
     await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
     await until(() => evaluate('!!document.querySelector(".ib-sec")'));
     await evaluate('document.querySelector(".ib-done")?.click()');
-    // Present: the one answered and the one commented on. Absent: the ask, the unread report and the other ask nobody touched.
-    assert.deepEqual(await rows(), ['Open the beta to every team?', 'Send the digest on Mondays?']);
+    // Done picked is the finished threads alone: the one answered and acted on.
+    assert.deepEqual(await rows(), ['Send the digest on Mondays?']);
+    // Picked off again, the rail is the live threads: the one the person commented on. Absent: the ask, the unread report and the other ask nobody touched.
+    await evaluate('document.querySelector(".ib-done").click()');
+    await until(async () => JSON.stringify(await rows()) === JSON.stringify(['Open the beta to every team?']));
     assert.equal(await badge(), '');
     // The other places keep what the inbox does not hold.
     const decide = await (await fetch(`${url}api/decisions`)).json();
