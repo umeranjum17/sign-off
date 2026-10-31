@@ -127,92 +127,6 @@ const PAGES = [
     await h.press('menu Search', [...document.querySelectorAll('a[href="#find"]')].find(shown), () => document.getElementById('t-search')?.open);
     await h.press('Close Search', document.querySelector('#t-search .x'), () => !document.getElementById('t-search').open);
   } }] },
-  // The Inbox, one more menu: a Decide row opens its thread; the thread's own link opens the item (beside the list on a desk, over the thread on a phone). The kind chips
-  // filter the list, the two unread filters switch on and off, and the Done entry opens the finished threads.
-  { name: 'inbox', hash: '#inbox', ready: '.ib-row', stages: [{ run: async (h) => {
-    const row = h.need('Decide row', h.board().querySelector('.ib-sec[aria-label="Decide"] a.ib-row'));
-    if (row) { row.click(); await h.until('the Decide row thread', () => /^#inbox\/[\w.~-]+$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-open')); h.did.push('Inbox Decide row'); }
-    await h.nav('thread Open the item', h.board().querySelector('.ib-thread .ib-open'), /^#inbox\/[\w.~-]+\/open$/);
-    location.hash = '#inbox';
-    await h.until('the inbox list', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
-    const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
-    await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
-    await h.press('All chip', chip('All'), on('All'));
-    // The answered digest question was acted on, so its thread is Done: the Done entry opens it. A report the person wrote on is read from its thread.
-    location.hash = '#inbox/new-sign-in/open';
-    await h.until('the report read', () => /\/open$/.test(location.hash) && h.reader()?.textContent.trim());
-    location.hash = '#inbox';
-    await h.until('the inbox list again', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
-    // The rail's two unread filters, each on and off again; Agents leads to the read-only Channels room; the Done entry opens the finished threads.
-    const flt = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), fltOn = (name) => () => h.board().querySelector('.ib-flt[aria-pressed="true"]')?.textContent.startsWith(name), fltOff = () => !h.board().querySelector('.ib-flt[aria-pressed="true"]');
-    for (const name of ['Unread from agents', 'Not read by agents']) {
-      await h.press(`${name} filter`, flt(name), fltOn(name));
-      await h.press(`${name} filter off`, flt(name), fltOff);
-    }
-    h.need('Agents entry', h.board().querySelector('.ib-agents[href="#channels"]'));
-    const done = await h.until('the Done entry', () => h.board().querySelector('.ib-done'));
-    await h.press('Done entry', done, () => h.board().querySelector('.ib-sec[aria-label="Done"]'));
-  } },
-  // A thread Done from its own row: one tap on the row's control takes it out of the live rail at once, and Undo stays up for a few seconds. A swipe
-  // left on a row does the same. Done, picked, is the finished threads and nothing else, and a search reads one there; a thread an agent wrote on
-  // after it is Done comes back to the live rail, unread (the page after this one).
-  { run: async (h) => {
-    const rail = () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]');
-    // Done off again, so the rail is the live threads this slice leaves.
-    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => rail());
-    const control = h.need('Done on the row itself', rail()?.closest('li')?.querySelector('.ib-dn'));
-    if (!control) return;
-    control.click();
-    await h.until('the thread to leave the live rail', () => !rail());
-    await h.until('the Done toast with its Undo', () => /^Done · /.test(h.toast()));
-    h.has('Done counting it', h.board().querySelector('.ib-done')?.textContent === 'Done2' && h.board().querySelector('.ib-done'));
-    h.did.push('Done from the row');
-  } },
-  { run: async (h) => {
-    // Undo puts the thread back in the live rail.
-    const u = h.need('Undo after Done', !document.getElementById('undo').hidden && document.getElementById('undo'));
-    if (!u) return;
-    u.click();
-    await h.until('the row back in the live rail', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
-    await h.until('the rail to say it came back', () => /^Back in the inbox$/.test(h.toast()));
-    h.did.push('Undo of Done');
-    // A swipe left on the row is the same gesture: the row flies off its side, then leaves the rail, with Undo.
-    const f = h.board().querySelector('.ib-row[data-thread="ship"]'), r = f.getBoundingClientRect(), y = r.top + 30;
-    const at = (x) => ({ bubbles: true, pointerId: 9, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
-    f.dispatchEvent(new PointerEvent('pointerdown', at(r.left + 40)));
-    for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', at(r.left + 40 - 300 * i / 8))); }
-    f.dispatchEvent(new PointerEvent('pointerup', at(r.left + 40 - 300)));
-    await h.until('the swiped thread to leave the live rail', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
-    await h.until('the Done toast after the swipe', () => /^Done · /.test(h.toast()));
-    h.did.push('Swipe left: Done');
-    const back = h.need('Undo after the swipe', !document.getElementById('undo').hidden && document.getElementById('undo'));
-    if (!back) return;
-    back.click();
-    await h.until('the swiped row back', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
-    await h.until('the rail again', () => /^Back in the inbox$/.test(h.toast()));
-    h.did.push('Undo of the swipe');
-  } },
-  // The Done view: the entry picked shows the finished threads and nothing else, a search reads them there, and one opens as the same thread.
-  { shot: 'inbox-done-view', run: async (h) => {
-    await h.press('Done entry', h.board().querySelector('.ib-done'), () => !h.board().querySelector('.ib-sec[aria-label="New"], .ib-sec[aria-label="Decide"], .ib-sec[aria-label="Waiting on agents"]'));
-    h.type(document.getElementById('ib-find'), 'digest');
-    await h.until('the Done search', () => [...h.board().querySelectorAll('.ib-row')].length === 1 && /digest/i.test(h.board().querySelector('.ib-row')?.textContent ?? ''));
-    h.has('the Done thread the search found', h.board().querySelector('.ib-row'));
-    h.did.push('Done view: search');
-  } },
-  { run: async (h) => {
-    // A Done thread opens as a chat, with where it stands; then the search and the Done view are cleared and a thread is marked Done again.
-    h.need('the Done row', h.board().querySelector('.ib-row'))?.click();
-    await h.until('the Done thread open', () => /^#inbox\/digest-old$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-state')?.textContent === 'Answered');
-    h.has('the Done thread\u2019s own word', h.board().querySelector('.ib-thread .ib-state'));
-    location.hash = '#inbox';
-    await h.until('the rail again', () => /^#inbox$/.test(location.hash) && h.board().querySelector('.ib-chip'));
-    h.type(document.getElementById('ib-find'), '');
-    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row'));
-    h.board().querySelector('.ib-row[data-thread="ship"]')?.closest('li')?.querySelector('.ib-dn')?.click();
-    await h.until('the thread marked Done for good', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
-    h.did.push('Done kept');
-  } }] },
   { name: 'waiting', hash: '#waiting', ready: '[id="item-npm"]', stages: [
     { run: async (h) => {
       const links = { 'plan-kind-board': '#waiting/plan-kind-board', npm: '#decide/npm', ship: '#decide/ship', 'keep-the-weekly-digest': '#decide/keep-the-weekly-digest' };
@@ -370,6 +284,92 @@ const PAGES = [
       await h.press('Approve', h.find(/^Approve$/, r(), 'button'), () => status() === 'Approved');
     } },
   ] },
+  // The Inbox, one more menu: a Decide row opens its thread; the thread's own link opens the item (beside the list on a desk, over the thread on a phone). The kind chips
+  // filter the list, the two unread filters switch on and off, and the Done entry opens the finished threads.
+  { name: 'inbox', hash: '#inbox', ready: '.ib-row', stages: [{ run: async (h) => {
+    const row = h.need('Decide row', h.board().querySelector('.ib-sec[aria-label="Decide"] a.ib-row'));
+    if (row) { row.click(); await h.until('the Decide row thread', () => /^#inbox\/[\w.~-]+$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-open')); h.did.push('Inbox Decide row'); }
+    await h.nav('thread Open the item', h.board().querySelector('.ib-thread .ib-open'), /^#inbox\/[\w.~-]+\/open$/);
+    location.hash = '#inbox';
+    await h.until('the inbox list', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
+    const chip = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), on = (name) => () => h.board().querySelector('.ib-chip[aria-pressed="true"]')?.textContent.startsWith(name);
+    await h.press('Decisions chip', chip('Decisions'), on('Decisions'));
+    await h.press('All chip', chip('All'), on('All'));
+    // The answered digest question was acted on, so its thread is Done: the Done entry opens it. A report the person wrote on is read from its thread.
+    location.hash = '#inbox/new-sign-in/open';
+    await h.until('the report read', () => /\/open$/.test(location.hash) && h.reader()?.textContent.trim());
+    location.hash = '#inbox';
+    await h.until('the inbox list again', () => !/\/open$/.test(location.hash) && h.board().querySelector('.ib-chip'));
+    // The rail's two unread filters, each on and off again; Agents leads to the read-only Channels room; the Done entry opens the finished threads.
+    const flt = (name) => h.find(new RegExp(`^${name}`), h.board(), 'button'), fltOn = (name) => () => h.board().querySelector('.ib-flt[aria-pressed="true"]')?.textContent.startsWith(name), fltOff = () => !h.board().querySelector('.ib-flt[aria-pressed="true"]');
+    for (const name of ['Unread from agents', 'Not read by agents']) {
+      await h.press(`${name} filter`, flt(name), fltOn(name));
+      await h.press(`${name} filter off`, flt(name), fltOff);
+    }
+    h.need('Agents entry', h.board().querySelector('.ib-agents[href="#channels"]'));
+    const done = await h.until('the Done entry', () => h.board().querySelector('.ib-done'));
+    await h.press('Done entry', done, () => h.board().querySelector('.ib-sec[aria-label="Done"]'));
+  } },
+  // A thread Done from its own row: one tap on the row's control takes it out of the live rail at once, and Undo stays up for a few seconds. A swipe
+  // left on a row does the same. Done, picked, is the finished threads and nothing else, and a search reads one there; a thread an agent wrote on
+  // after it is Done comes back to the live rail, unread (the page after this one).
+  { run: async (h) => {
+    const rail = () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]');
+    // Done off again, so the rail is the live threads this slice leaves.
+    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => rail());
+    const control = h.need('Done on the row itself', rail()?.closest('li')?.querySelector('.ib-dn'));
+    if (!control) return;
+    control.click();
+    await h.until('the thread to leave the live rail', () => !rail());
+    await h.until('the Done toast with its Undo', () => /^Done · /.test(h.toast()));
+    h.has('Done counting it', h.board().querySelector('.ib-done')?.textContent === 'Done2' && h.board().querySelector('.ib-done'));
+    h.did.push('Done from the row');
+  } },
+  { run: async (h) => {
+    // Undo puts the thread back in the live rail.
+    const u = h.need('Undo after Done', !document.getElementById('undo').hidden && document.getElementById('undo'));
+    if (!u) return;
+    u.click();
+    await h.until('the row back in the live rail', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the rail to say it came back', () => /^Back in the inbox$/.test(h.toast()));
+    h.did.push('Undo of Done');
+    // A swipe left on the row is the same gesture: the row flies off its side, then leaves the rail, with Undo.
+    const f = h.board().querySelector('.ib-row[data-thread="ship"]'), r = f.getBoundingClientRect(), y = r.top + 30;
+    const at = (x) => ({ bubbles: true, pointerId: 9, isPrimary: true, pointerType: 'touch', clientX: x, clientY: y });
+    f.dispatchEvent(new PointerEvent('pointerdown', at(r.left + 40)));
+    for (let i = 1; i <= 8; i++) { await h.sleep(16); f.dispatchEvent(new PointerEvent('pointermove', at(r.left + 40 - 300 * i / 8))); }
+    f.dispatchEvent(new PointerEvent('pointerup', at(r.left + 40 - 300)));
+    await h.until('the swiped thread to leave the live rail', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the Done toast after the swipe', () => /^Done · /.test(h.toast()));
+    h.did.push('Swipe left: Done');
+    const back = h.need('Undo after the swipe', !document.getElementById('undo').hidden && document.getElementById('undo'));
+    if (!back) return;
+    back.click();
+    await h.until('the swiped row back', () => !!h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    await h.until('the rail again', () => /^Back in the inbox$/.test(h.toast()));
+    h.did.push('Undo of the swipe');
+  } },
+  // The Done view: the entry picked shows the finished threads and nothing else, a search reads them there, and one opens as the same thread.
+  { shot: 'inbox-done-view', run: async (h) => {
+    await h.press('Done entry', h.board().querySelector('.ib-done'), () => !h.board().querySelector('.ib-sec[aria-label="New"], .ib-sec[aria-label="Decide"], .ib-sec[aria-label="Waiting on agents"]'));
+    h.type(document.getElementById('ib-find'), 'digest');
+    await h.until('the Done search', () => [...h.board().querySelectorAll('.ib-row')].length === 1 && /digest/i.test(h.board().querySelector('.ib-row')?.textContent ?? ''));
+    h.has('the Done thread the search found', h.board().querySelector('.ib-row'));
+    h.did.push('Done view: search');
+  } },
+  { run: async (h) => {
+    // A Done thread opens as a chat, with where it stands; then the search and the Done view are cleared and a thread is marked Done again.
+    h.need('the Done row', h.board().querySelector('.ib-row'))?.click();
+    await h.until('the Done thread open', () => /^#inbox\/digest-old$/.test(location.hash) && h.board().querySelector('.ib-thread .ib-state')?.textContent === 'Answered');
+    h.has('the Done thread\u2019s own word', h.board().querySelector('.ib-thread .ib-state'));
+    location.hash = '#inbox';
+    await h.until('the rail again', () => /^#inbox$/.test(location.hash) && h.board().querySelector('.ib-chip'));
+    h.type(document.getElementById('ib-find'), '');
+    await h.press('Done entry off', h.board().querySelector('.ib-done[aria-pressed="true"]'), () => h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row'));
+    h.board().querySelector('.ib-row[data-thread="ship"]')?.closest('li')?.querySelector('.ib-dn')?.click();
+    await h.until('the thread marked Done for good', () => !h.board().querySelector('.ib-sec:not([aria-label="Done"]) .ib-row[data-thread="ship"]'));
+    h.did.push('Done kept');
+  } }] },
   // The agent writes again on that Done thread (the reply lands before this page opens): the rail has it back under New, unread and counted once, and
   // opening it clears the count.
   { name: 'inbox-return', hash: '#inbox', ready: '.ib-row', fresh: true, prep: async () => {

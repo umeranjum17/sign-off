@@ -84,9 +84,9 @@
     state = { ...state, ...board, decisions: [...rows.values()], page,
       tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
       ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])),
-      // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was.
+      // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was. 'done' is the rail's own marks, kept like them so a thread stays Done after a reload.
       ...Object.fromEntries(['dismissed', 'promoted', 'seen', 'deeper'].filter(had).map((name) => [name, listed(name)])),
-      ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened'].filter(had).map((name) => [name, kept(name)])),
+      ...Object.fromEntries(['answers', 'seen_at', 'opened', 'discarded', 'signin_opened', 'done'].filter(had).map((name) => [name, kept(name)])),
       ...(had('reads') && { reads: kept('reads', (k) => k.split('/')[0]) }),
       ...(had('delivery') && { delivery: { ...state.delivery, ...body.delivery } }) };
   }

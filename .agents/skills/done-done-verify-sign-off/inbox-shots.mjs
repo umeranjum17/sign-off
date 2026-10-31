@@ -204,6 +204,10 @@ try {
       assert.deepEqual(m.marks.map((r) => r[0]).sort(), ['Keep the weekly digest?', 'Send the digest on Mondays?'], 'the search does not read the Done threads: ' + JSON.stringify(m.marks));
       assert.ok(m.entries.at(-1).startsWith('Done'), 'Done is the entry that was picked: ' + m.entries.join(', '));
     });
+    // The mark is the rail's own state, kept beside the board, so a reload reads it back: the thread is still Done and out of the live rail.
+    const kept = await checkPage('#inbox');
+    assert.ok(!kept.marks.some((r) => r[0].startsWith('Keep the weekly digest')), 'the Done mark did not survive a reload: ' + JSON.stringify(kept.marks));
+    assert.equal(doneCount(kept), 2, 'Done still counts it after a reload: ' + kept.entries.join(', '));
     // A Done thread reads as any thread does, with the same chat and the agent's own words.
     const doneThread = await checkPage('#inbox/digest');
     assert.equal(doneThread.thread, 'Keep the weekly digest?', 'the Done thread opens: ' + doneThread.thread);
