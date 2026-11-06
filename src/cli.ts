@@ -21,7 +21,7 @@ import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
-import { homeOf, readTask, type Assignee } from './fleet.js';
+import { fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
 import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -1463,14 +1463,25 @@ const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind:
 function ticketsApi(path: string): [number, unknown] | undefined {
   const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
   if (path !== '/api/tickets' && !one) return undefined;
-  const all = withRecords(rollUp(readTickets(file, warn)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
+  const folded = new Map<string, string>(), all = withRecords(rollUp(readTickets(file, warn, folded)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
   // Newest card first, as the CLI and the ticket's page list them.
   const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
   if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
-  let id: string;
-  try { id = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
-  const t = all.find((x) => x.id === id);
-  return t ? [200, { ticket: { ...t, cards: cardsOf(id).map(ticketCard) } }] : [404, { error: 'No ticket with that id' }];
+  let handle: string;
+  try { handle = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
+  // A key is read as the Tickets view shows it, so the keys are made over the whole board, in its order; the ticket itself is sent as the list has it.
+  const id = ticketNamed(withKeys(all), handle, folded)?.id, t = all.find((x) => x.id === id);
+  return t ? [200, { ticket: { ...t, cards: cardsOf(t.id).map(ticketCard) } }] : [404, { error: `No ticket named ${handle} on this board` }];
+}
+/** The ticket a link names, whichever name the link was given: its id, its key in any case (SO-453), a unique start of at least 8 of a fleet id's hex (with or
+ * without its jg- or fm- prefix, so an id from before the fleet re-keyed its tickets still opens the ticket), or the slug of the backlog item it was filed from.
+ * An id the board folded into the open ticket that already tracks its work (`folded`, from readTickets) opens that ticket. */
+function ticketNamed<T extends { id: string; key?: string }>(all: T[], handle: string, folded: Map<string, string>): T | undefined {
+  const shown = (id: string) => all.find((t) => t.id === (folded.get(id) ?? id)), hex = /^(?:(?:jg|fm)-)?([0-9a-f]{8,32})$/i.exec(handle)?.[1]?.toLowerCase();
+  const hits = hex ? [...all.map((t) => t.id), ...folded.keys()].filter((id) => /^(?:jg|fm)-[0-9a-f]{32}$/.test(id) && id.slice(3).startsWith(hex)) : [];
+  // One piece of work can sit under both prefixes: jg- is the id the fleet writes now, so it wins. Two different hashes that start alike name no one ticket.
+  const one = new Set(hits.map((id) => id.slice(3))).size === 1 ? hits.find((id) => id.startsWith('jg-')) ?? hits[0] : undefined;
+  return shown(handle) ?? all.find((t) => t.key?.toUpperCase() === handle.toUpperCase()) ?? (one ? shown(one) : undefined) ?? fleetIdsOf(handle).map(shown).find(Boolean);
 }
 /** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
  * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
