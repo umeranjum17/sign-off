@@ -731,6 +731,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
         s === 'hold' ? prop('pause', 'Hold', el('span', {}, 'On hold'), el('span', { class: 'tk-why' }, t.hold_reason ?? 'No reason recorded')) : '',
+        t.blocked_by?.length ? prop('clock', 'Waiting on', ...t.blocked_by.map((id) => tkById(id)).filter(Boolean).map((w) => el('a', { href: `#ticket/${w.id}`, dir: 'auto' }, w.title))) : '',
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',
         prop('clock', 'Last update', el('span', {}, stamp(t.at)))),
       el('p', { class: 'ui-dl' }, 'Description'), t.description ? el('div', { class: 'tk-desc' }, ...tkDescription(t.description, t.id)) : el('p', { class: 'meta tk-note' }, 'No summary recorded. A ticket carries a one-line summary, then Ask, Why and Done when.'),
