@@ -75,7 +75,8 @@ try {
       { title: 'ntfy issue: iOS delivery', text: 'Users report delays on iOS without the relay.', link: 'https://github.com/binwiederhier/ntfy/issues/1', source: 'user' }],
     options: [{ title: 'ntfy', text: 'Free, self-hosted.', more: 'Cost: free.\nSetup: one hour.' }, { title: 'Pushover', text: 'Paid once, hosted.', more: 'Cost: $5 per platform.\nSetup: ten minutes.' }],
     findings: [{ title: 'Delivery under 2 seconds', text: 'Timed on one Android phone.', confidence: 'high' }],
-    slices: [{ title: 'Move the page', text: 'Settings open from the profile.', size: 'S, half a day' }], tests: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }],
+    slices: [{ title: '1. Move the page', text: 'Settings open from the profile. Done when a browser test opens it in under 2 seconds.', size: 'S, half a day' }],
+    risks: [{ title: 'Old links break', text: 'Mitigation: the old address redirects for 30 days.' }], tests: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }],
   };
   const sections = (purpose) => REPORT_PARTS[purpose].map(([part, heading]) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line or two.`,
     ...(purpose !== 'decision' && NEEDS[part] && { items: NEEDS[part] }), ...(purpose === 'plan' && part === 'design' && { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }) }));
