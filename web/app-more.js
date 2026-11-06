@@ -576,7 +576,6 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const open = picked || (desk ? L.moving[0] ?? L.hold[0] ?? L.todo[0] ?? L.done[0] : undefined);
     tkShown = open?.id ?? '';
     const empty = !tkAll().length;
-    const say = `${L.done.length} of ${L.shown.length} done · ${L.moving.length} moving · ${L.hold.length} on hold · ${L.todo.length} to do`;
     const pick = tkProj ? el('button', { class: 'tk-fpill' }, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(tkProj)), tkProj, glyph('x')) : '';
     if (pick) pick.onclick = () => { tkProj = ''; render(); }, pick.setAttribute('aria-label', `Show every project, not only ${tkProj}`);
     const whose = L.kind ? el('button', { class: 'tk-fpill', 'aria-label': `Show everyone's tickets, not only ${TK_WHO[L.kind]}` }, TK_WHO[L.kind], glyph('x')) : '';
@@ -587,7 +586,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const nomatch = emptyState('empty', { mark: 'list', title: 'No tickets match', text: tkProj ? `Nothing in ${tkProj} right now.` : 'Nothing here right now.', ...((tkProj || L.kind) && { act: ['Clear filters', () => { tkProj = ''; tkWhose = ''; render(); }] }) });
     nomatch.classList.add('tk-empty');
     if (desk) {
-      const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? { loading: 'Loading tickets…', error: 'Couldn’t load tickets', ready: 'Nothing tracked yet' }[tkLoad()] : say)),
+      const head = el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), el('p', {}, empty ? { loading: 'Loading tickets…', error: 'Couldn’t load tickets', ready: 'Nothing tracked yet' }[tkLoad()] : '')),
         el('div', { class: 'acts' }, pick, whose, tkTabs('tickets'), tkFilter(L), themeButton()));
       if (empty || nothing) return [el('div', { class: 'ui-desk tk-desk' }, head, empty ? none : nomatch)];
       return [el('div', { class: 'ui-desk tk-desk' }, head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkHero(), tkGroup('mv', 'In progress', L.moving, true, 'grow')),
