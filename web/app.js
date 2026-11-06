@@ -1495,7 +1495,7 @@
   function tkHero() {
     const all = tkAll(), open = all.filter((t) => tkStateOf(t) !== 'done').length;
     return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'All tickets')),
-      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(all.length), el('small', {}, ` tickets · ${all.length - open} done · ${open} open`))));
+      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(all.length)), el('span', { class: 'tk-hero-sub' }, ` tickets · ${all.length - open} done · ${open} open`)));
   }
   /** The tabs at the top of Tickets: every ticket, the epics with their children, and Activity, the timeline of what moved on them. */
   function tkTabs(on) {

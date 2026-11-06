@@ -2420,3 +2420,5 @@ dialog.ch-full{position:fixed;margin:auto 1rem auto auto;max-height:calc(100dvh 
 .tk-back .glyph { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; }
 .tk-ecards { margin-top: var(--tk-sp-3); }
 @media (min-width: 64rem) { .tk-story-grid.tk-epics-grid { grid-template-columns: minmax(0, 1fr); } }
+.tk-hero .hv { flex-wrap: wrap; height: auto; min-height: 2rem; }
+.tk-hero-sub { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-variant-numeric: tabular-nums; }
