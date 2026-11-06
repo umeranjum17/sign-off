@@ -17,6 +17,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
@@ -125,7 +126,7 @@ examples:
   sign-off-axi raise --ask-ref message-example --title "Which day should the release ship?" --why "Two fixes are still in review." --option a="A: Today" --option b="B: Friday" --option c="C: Next week" --outcome a="Ships now without the fixes." --outcome b="Ships with both fixes." --outcome c="Ships with the redesign too." --recommend b --recommend-reason "Both fixes land by Thursday." --default b --merge release-day
   sign-off-axi raise --from ./decisions.json
 `,
-  validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid]
+  validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid] [--new]
 Checks message files against the communication contract without posting them: ${CONTRACT}
 A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
 A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). Every report names what it is for in "purpose", required on a report 5 and on any new report, and so is its "project".
@@ -140,6 +141,7 @@ In such a file a new item of a contract kind (a decision, the default, an ask or
 Each file gets a row with ok, or the error and one help line that names the fix. A field written twice, an unknown field or a broken limit refuses the file.
   --kind            each file must be this kind, so the wrong file is refused
   --expect-invalid  every file must be refused: exits 0 only then, 2 when any passes (the conformance check of invalid fixtures)
+  --new             also hold a report to the content rules a new post meets (see report init): a plan needs its slices (each with size, acceptance check and order), a measured number and a mitigation for each risk, and no section that only points elsewhere; research needs 3 source links, a count and its pick. A page report is read as its text
 Exits 0 when every file passes, 2 when any is refused or no file is named, and 1 when any file cannot be read.
 example message:
   {"contract":1,"kind":"ask","schema":1,"key":"ship-signin-2","title":"Ship the new sign-in screen this week?","about":"Slice 5 passed its checks.","why":"The screen is ready and the release goes out Friday.","options":[{"value":"yes","label":"Yes","outcome":"It ships to everyone on Friday."},{"value":"no","label":"No","outcome":"It waits for next week's release."}],"recommend_value":"yes","recommend_reason":"Every check passed on 3 phones.","default_if_silent":"no","silent_by":"2026-10-19T16:00Z"}
@@ -592,6 +594,7 @@ function contractItems(items: any[], from: string, file: string, replace = false
       if (!held) newReportFields(check, file);
       if ((check.kind === 'report' || check.kind === 'plan') && !guided(check)) reportPage(check, dirname(file));
       if (guided(check)) diagramPages(check, dirname(file));
+      if (!held) reportContent(check, dirname(file));
       if (check.kind === 'design') designFiles(check, dirname(file));
     } catch (e) {
       throw e instanceof ContractError ? fail(`${from}: items[${i}]: ${e.message}`, 'VALIDATION_ERROR', e.help) : e;
@@ -1855,12 +1858,15 @@ async function postKind(file: string, named: string, on: string, values: Record<
     // A new ask is held to the question standard, and so is a new design's title; a card already on the board still re-posts as it was.
     const existing = !built && ['ask', 'design'].includes(kind) && existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
     checkMessage(m, built ? 'report' : kind, !built && kind === 'ask' && !existing, !built && kind === 'design' && !existing);
-    if (!(existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key))) newReportFields(m, file);
+    const onBoard = existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key);
+    if (!onBoard) newReportFields(m, file);
     // Media paths read from the message file's folder, or from the current folder for stdin.
     if (m.kind === 'evidence') sources = mediaFiles(m, from === '-' ? process.cwd() : dirname(resolve(from)));
     // A report's or plan's page is served from the board file's folder, as --view is.
-    if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file), !(existsSync(file) && readItems(file).items.some((i: any) => i?.key === m.key)));
+    if ((m.kind === 'report' || m.kind === 'plan') && !guided(m)) reportPage(m, dirname(file), !onBoard);
     if (guided(m)) { diagramPages(m, dirname(file)); for (const w of kitWarnings(m)) process.stderr.write(`warning: ${name}: ${w}\n`); }
+    // A report new to the board is held to its content rules; a key already there is a re-post and stays as it was filed.
+    if (!onBoard) reportContent(m, dirname(file));
     if (m.kind === 'design') designFiles(m, dirname(file));
   } catch (e) { throw e instanceof ContractError ? fail(`${name}: ${e.message}`, 'VALIDATION_ERROR', e.help) : e; }
   if (m.filer !== undefined && values.filer !== undefined && m.filer !== values.filer) {
@@ -1885,10 +1891,10 @@ async function postKind(file: string, named: string, on: string, values: Record<
 /** Checks message files without posting them: one row per file, exit 2 when any is refused, 1 when any cannot be read. */
 function validate(args: string[]) {
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { kind: { type: 'string' }, 'expect-invalid': { type: 'boolean' } } }); } catch (e: any) {
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { kind: { type: 'string' }, 'expect-invalid': { type: 'boolean' }, new: { type: 'boolean' } } }); } catch (e: any) {
     throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi validate --help`');
   }
-  const { values: { kind: want, 'expect-invalid': expect }, positionals: names } = parsed;
+  const { values: { kind: want, 'expect-invalid': expect, new: asNew }, positionals: names } = parsed;
   if (!names.length) throw fail('name at least one message file', 'VALIDATION_ERROR', 'sign-off-axi validate ask.json');
   if (want !== undefined && !KINDS.includes(want)) throw fail(`--kind must be one of ${KINDS.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi validate --kind ask ask.json');
   let unread = false;
@@ -1903,6 +1909,7 @@ function validate(args: string[]) {
       m = parseMessage(raw);
       const kind = checkMessage(m, want);
       if (m.kind === 'evidence') mediaFiles(m, dirname(resolve(file)));
+      if (asNew) reportContent(m, dirname(resolve(file)));
       return { file, ...kind, ok: true, error: '', help: '' };
     } catch (e) {
       if (!(e instanceof ContractError)) throw e;

@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bots share one computer</title>
+<style>body{margin:0 auto;padding:16px;max-width:660px;font:17px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:Canvas;color:CanvasText}
+h1{font-size:1.35rem;line-height:1.25}p,li{max-width:58ch}table{border-collapse:collapse;width:100%;font-size:.95rem}td,th{border-bottom:1px solid GrayText;padding:6px;text-align:left;vertical-align:top}
+button{padding:10px 16px;border-radius:10px;border:0;background:CanvasText;color:Canvas;font-weight:600}
+@media (prefers-color-scheme: dark){body{background:Canvas;color:CanvasText}}</style></head><body>
+<svg viewBox="0 0 460 150" role="img" aria-label="Bots share one computer"><rect width="460" height="150" rx="12" fill="Canvas"/><g font-family="system-ui" font-size="14" fill="CanvasText"><rect x="16" y="20" width="90" height="34" rx="8" fill="Canvas" stroke="GrayText"/><text x="32" y="42">Chief</text><rect x="16" y="66" width="90" height="34" rx="8" fill="Canvas" stroke="GrayText"/><text x="32" y="88">helper</text><rect x="16" y="112" width="90" height="30" rx="8" fill="Canvas" stroke="GrayText"/><text x="32" y="133">helper</text></g><text x="130" y="90" fill="GrayText" font-family="system-ui" font-size="13">share</text><rect x="200" y="52" width="240" height="60" rx="10" fill="CanvasText"/><text x="222" y="88" fill="Canvas" font-family="system-ui" font-size="15">the one computer</text></svg>
+<h1>Bots share one computer, and can get their own</h1>
+<p>Your answer, as a plan. Every bot works on the one computer that is already set up. You can give any single bot its own computer. When the shared one is busy, a bot can take its own.</p>
+<section style="margin:14px 0"><div id="wtext" style="min-height:2.8em"></div><div style="display:flex;gap:10px;margin-top:10px"><button id="wback" type="button" style="background:transparent;color:inherit;border:1px solid GrayText">Back</button><button id="wnext" type="button">Next</button></div></section>
+<script>const w=["You open Crewhouse. Chief and your helpers all work on the computer already set up.","Tap a bot and choose: share the computer, or give this bot its own - this machine, or a cloud one.","If the shared computer is busy, a bot takes its own for that job and hands the result back.","One account, one place to look: nothing changes about where your files live."];let i=0;const t=document.getElementById("wtext"),b=document.getElementById("wback"),n=document.getElementById("wnext");function r(){t.textContent=w[i];b.disabled=i===0;n.textContent=i===w.length-1?"Start again":"Next";}b.onclick=()=>{if(i>0){i--;r();}};n.onclick=()=>{i=(i+1)%w.length;r();};r();</script>
+<h2>What each choice costs</h2>
+<p>Illustrative figures for this proof copy, not Crewhouse measurements.</p>
+<table><tr><th>Choice</th><th>Cost</th><th>Measured</th></tr><tr><td>Shared computer</td><td>nothing extra</td><td>12 bots used 8 GB of 16 GB</td></tr><tr><td>Its own local computer</td><td>nothing extra, uses your machine</td><td>a bot starts in 4 seconds</td></tr><tr><td>Its own cloud computer</td><td>$0.05 per hour, only while it runs</td><td>a bot starts in 95 seconds</td></tr></table>
+<h2>The slices, in order</h2>
+<ol>
+<li>Show which computer each bot uses. Size: S, half a day. Done when the bot list names the computer for all 12 test bots.</li>
+<li>Let a bot take its own local computer. Size: M, 2 days. Done when a test bot started on its own computer finishes a job and hands the result back.</li>
+<li>Let a bot take a cloud computer when the shared one is busy. Size: L, 4 days. Done when 3 busy-machine runs in a row hand over within 120 seconds.</li>
+</ol>
+<h2>The one risk worth knowing</h2>
+<ul><li>If the shared computer runs out of memory, everything on it stops, every bot at once. The memory run stopped 12 of 12 bots at 16 GB on the desktop class, not on the real engine. Mitigation: a bot takes its own computer once the shared one passes 80% of its memory, and the rollback is one setting that puts every bot back on the shared computer.</li></ul>
+<details style="margin-top:20px"><summary style="cursor:pointer;font-weight:600">Details</summary><p>No code is written until you approve it. Each slice ships on its own and can be switched off alone.</p></details>
+</body></html>

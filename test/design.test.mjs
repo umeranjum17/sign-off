@@ -2457,8 +2457,8 @@ test('report kinds and their workflows: post names what a report is for and hold
   // A full plan: every part, the design with its diagram, each slice sized, each tested.
   const sec = (part, heading, more = {}) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line.`, ...more });
   const plan = { ...base, key: 'k-plan', purpose: 'plan', title: 'Move settings into the profile page', filed: at(1), sections: [sec('goal', 'Goal and non-goals'), sec('current', 'How it works today'),
-    sec('design', 'Design', { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }), sec('slices', 'Slices', { items: [{ title: 'Move the page', text: 'Settings open from the profile.', size: 'S, half a day' }] }),
-    sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback'), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
+    sec('design', 'Design', { diagram: [{ label: 'Flow', src: 'diagrams/flow.html' }] }), sec('slices', 'Slices', { items: [{ title: '1. Move the page', text: 'Settings open from the profile. Done when a browser test opens it in under 2 seconds.', size: 'S, half a day' }] }),
+    sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback', { items: [{ title: 'Old links break', text: 'Mitigation: the old address redirects for 30 days.' }] }), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
   writeFileSync(join(dir, 'muxr.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
   assert.equal(run('project', file, '--name', 'Muxr', '--icon', 'muxr.svg').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Move settings', '--project', 'Muxr').code, 0);
@@ -5064,7 +5064,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.equal(await evaluate(`[...document.querySelectorAll('.tk-day .tk-ev')].filter((b) => b.getAttribute('aria-label').startsWith('Ship the new settings page')).length`), 1);
     const burstView = JSON.parse(await evaluate(`JSON.stringify({ changes: [...document.querySelectorAll('dialog.tk-evs[open] .tk-chg li')].map((li) => li.textContent), ask: document.querySelector('dialog.tk-evs[open] .tk-ask')?.innerText.replace(/\\s+/g, ' ') })`));
     assert.ok(burstView.changes.length >= 3 && burstView.changes.some((c) => /Ticket created/.test(c)) && burstView.changes.some((c) => /Progress changed to 60%/.test(c)) && /Progress changed to 75% \(60% → 75%\)/.test(burstView.changes.at(-1)), burstView.changes.join(' | '));
-    assert.equal(burstView.ask, `${askBody.replace(/\s+/g, ' ')} ${burstView.ask.slice(-21)}`); assert.match(burstView.ask, /\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    assert.match(burstView.ask, /\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/); assert.equal(burstView.ask.replace(/ \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/, ''), askBody.replace(/\s+/g, ' '));
     assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
     assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
     // Escape closes it and the focus is back on the row that opened it.
