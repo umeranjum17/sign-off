@@ -218,7 +218,7 @@ New guided defaults use plan schema 3 / report schema 5, contract 1, with a requ
 - Every item that asks something has one place to type, folded behind a quiet
   **Add a comment** right after its buttons (a design's Picks too; a sign-in has none,
   it closes with `signin done`; on Decide it is one **Note** open under the cards,
-  and **Your own answer**, the last card, sends its own words as the answer `text`): a short text,
+  and **Something else**, the last card, sends its own words as the answer `text`): a short text,
   500 characters or fewer, with the placeholder "Add a note (optional)". Typed
   before a button is picked, it goes with that answer as its note (the comment),
   and the card then shows it and reads **Edit comment**. The card keeps one

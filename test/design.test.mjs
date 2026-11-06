@@ -1801,10 +1801,10 @@ test('Waiting and Decide: Spacious ask cards, decision options, answer and undo,
   assert.equal(await evaluate('document.querySelector(".decide h2").textContent'), 'Which day for release?');
   // A reason text wins over the ask's context line.
   assert.equal(await evaluate('document.querySelector(".decide .why").textContent'), 'The release needs one calm day.');
-  // Three answers then Your own answer; nothing is picked yet: Recommended is a tag on its card, and the button waits, off, until a pick.
-  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")'),
-    'today:false|friday*:false|next-week:false|Your own answer:false');
-  assert.equal(await evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()'), 'Pick an answer|true');
+  // Three answers then Something else; the recommended one starts selected (shown only, nothing is saved), so the button already names it.
+  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-checked")).join("|")'),
+    'today:false|friday*:true|next-week:false|Something else:false');
+  assert.equal(await evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()'), 'Answer friday|false');
   // A pick slides the button's label to it; the answer turns the button green with a check, then the sheet closes back to the list.
   await evaluate('document.querySelector(".pick-option").click()');
   assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".answer .lbl").classList.contains("swap")'), 'Answer today|true');
@@ -1975,7 +1975,7 @@ test('Waiting on you: asks share project tiles while a reply-only ask, a yes/no 
   await evaluate('document.querySelector("#item-ship").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ship');
   assert.equal(await evaluate('document.querySelector(".decide .eyebrow")'), null); // no kind eyebrow on Decide
-  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option .label")].map((l) => l.textContent).join("|")'), 'Yes|No|Your own answer');
+  assert.equal(await evaluate('[...document.querySelectorAll(".pick-option .label")].map((l) => l.textContent).join("|")'), 'Yes|No|Something else');
   await evaluate('location.hash = "#waiting"');
   await evaluate('document.querySelector("#item-ready").click()');
   await until(async () => (await evaluate('location.hash')) === '#decide/ready');
@@ -1990,7 +1990,7 @@ test('Waiting on you: asks share project tiles while a reply-only ask, a yes/no 
   proc.kill();
 });
 
-test('Decide on a pick-one ask: nothing is picked until you pick and the button then names the pick, Your own answer is the last card and opens one box whose words Send answer sends, one note goes with any pick, More holds only Ask me later and Discard, and E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async (t) => {
+test('Decide on a pick-one ask: the recommended answer starts selected (shown only) and the button names the pick, Something else is the last card and opens one box whose words Send answer sends, one note goes with any pick, More holds only Ask me later and Discard, and E moves to the next ask', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async (t) => {
   const dir = join(scratch, 'decide-option-box'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const abc = ['A', 'B', 'C'].map((l) => ({ value: l.toLowerCase(), label: l }));
@@ -2018,12 +2018,12 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   const { evaluate, close } = await browse(join(dir, 'b'), 1280);
   await evaluate(`location.href = ${JSON.stringify(`http://127.0.0.1:${proxy.address().port}/#decide/beta`)}`);
   await until(async () => (await evaluate('document.querySelector(".decide h2")?.textContent')) === 'Beta question?');
-  const cards = () => evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-pressed")).join("|")');
+  const cards = () => evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".recommend") ? "*" : "") + ":" + b.getAttribute("aria-checked")).join("|")');
   const button = () => evaluate('(() => { const a = document.querySelector(".decide-bar .answer"); return a.textContent + "|" + a.disabled; })()');
-  // The answers then Your own answer, as cards side by side in the answer area pinned at the ask's foot (each 160px or wider, radius 16); nothing is picked, Recommended is only a tag, and the button waits, off.
-  assert.equal(await cards(), 'A:false|B*:false|C:false|Your own answer:false');
+  // The answers then Something else, as cards side by side in the answer area pinned at the ask's foot (each 160px or wider, radius 16); the recommended B starts selected and the button names it.
+  assert.equal(await cards(), 'A:false|B*:true|C:false|Something else:false');
   assert.equal(await evaluate('(() => { const rows = [...document.querySelectorAll(".decide .ppin .pick-list > li")], b = (e) => e.getBoundingClientRect(); return rows.length === 4 && rows.every((li) => li.firstElementChild?.classList.contains("pick-option") && b(li).width >= 160) && getComputedStyle(rows[0].firstElementChild).borderTopLeftRadius === "16px" && b(rows[0]).top === b(rows[1]).top; })()'), true);
-  assert.equal(await button(), 'Pick an answer|true');
+  assert.equal(await button(), 'Answer B|false');
   // One note, open under the cards with no toggle to find it, and no box for your own answer until you pick it.
   assert.equal(await evaluate('[!!document.querySelector(".decide .note-field .note-box"), !!document.querySelector(".decide details:not(.dl-more)"), document.querySelector(".decide .own-field").getBoundingClientRect().height].join("|")'), 'true|false|0');
   // More, on the ask's head line, holds only Discard, in red: Ask me later is the bar's, beside the answer.
@@ -2034,7 +2034,7 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   await until(async () => (await evaluate('location.hash')) === '#decide/beta');
   // A pick names itself on the button, and the note goes with it.
   await evaluate('document.querySelectorAll(".decide .pick-option")[2].click()');
-  assert.equal(await cards(), 'A:false|B*:false|C:true|Your own answer:false');
+  assert.equal(await cards(), 'A:false|B*:false|C:true|Something else:false');
   assert.equal(await button(), 'Answer C|false');
   await evaluate('(() => { const t = document.querySelector(".decide .note-box"); t.value = "Only after the release"; t.dispatchEvent(new Event("input")); })()');
   await evaluate('document.querySelector(".decide-bar .answer").click()');
@@ -2044,7 +2044,7 @@ test('Decide on a pick-one ask: nothing is picked until you pick and the button 
   await until(async () => (await evaluate('location.hash + "|" + document.querySelector(".split-detail #ask-title")?.textContent')) === '#decide/alpha|Alpha question?');
   await evaluate('(() => { const t = document.querySelector(".decide .note-box"); t.value = "A note that stays behind"; t.dispatchEvent(new Event("input")); })()');
   await evaluate('document.querySelector(".decide .own-option").click()');
-  assert.equal(await cards(), 'A*:false|B:false|C:false|Your own answer:true');
+  assert.equal(await cards(), 'A*:false|B:false|C:false|Something else:true');
   assert.equal(await button(), 'Send answer|true');
   await until(async () => (await evaluate('document.querySelector(".decide .own-field").getBoundingClientRect().height')) > 60);
   assert.equal(await evaluate('[document.activeElement === document.querySelector(".decide .own-box"), getComputedStyle(document.querySelector(".decide .note-field")).display].join("|")'), 'true|none');
@@ -2085,10 +2085,10 @@ test('Add a comment on every answer: a yes/no on a phone and a pick-one on a des
       { shown: true, after: true, before: true, name: 'Note', placeholder: 'A note for the agent, optional', toggles: 0 }, key);
     await evaluate('document.querySelector(".decide .note-box").focus()');
     await insertText(text);
-    // The page keeps one way to answer, the bar's one button, off until a pick, with Ask me later beside it; More holds Discard.
+    // The page keeps one way to answer, the bar's one button, naming the recommended answer that starts selected, with Ask me later beside it; More holds Discard.
     assert.deepEqual(await evaluate(`(() => ({ bar: [...document.querySelectorAll('.decide-bar button')].map((b) => b.textContent + (b.disabled ? ' (off)' : '')),
       folded: [...document.querySelectorAll('.sh-head .dl-menu > *, .split-bar .dl-menu > *')].map((b) => b.textContent) }))()`),
-      { bar: ['Ask me later', 'Pick an answer (off)'], folded: ['Discard'] }, key);
+      { bar: ['Ask me later', { feel: 'Answer Yes', layout: 'Answer A' }[key]], folded: ['Discard'] }, key);
     // Keys typed into the box are not keyboard navigation, so the next page's title gets no focus ring; Tab out of the box is.
     await evaluate('document.querySelector(".decide .note-box").dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }))');
     assert.equal(await evaluate('"kbd" in document.documentElement.dataset'), false, key);
@@ -2164,8 +2164,8 @@ test('Decide on a phone: an ask is a sheet over the list with its bar at the foo
   // Change answer brings the cards back with nothing picked and the answer given tagged; the button is off until another answer, then names the change.
   await evaluate('document.querySelector(".decide-bar .answer").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".decide .pick-option").length')) === 4);
-  assert.equal(await evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".now") ? "=" : "") + b.getAttribute("aria-pressed")).join("|") + "|" + document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'),
-    'A=false|Bfalse|Cfalse|Your own answerfalse|Pick a new answer|true');
+  assert.equal(await evaluate('[...document.querySelectorAll(".decide .pick-option")].map((b) => b.querySelector(".label").textContent + (b.querySelector(".now") ? "=" : "") + b.getAttribute("aria-checked")).join("|") + "|" + document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'),
+    'A=false|Bfalse|Cfalse|Something elsefalse|Pick a new answer|true');
   await evaluate('document.querySelector(".decide .pick-option").click()');
   assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'), 'Change to A|true');
   await evaluate('document.querySelectorAll(".decide .pick-option")[2].click()');
@@ -2305,9 +2305,11 @@ test('Decide on a desk: the list beside its ask, J and K move the selection, a n
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
   await key('j'), await key('k');
   await until(async () => (await seen()) === '#decide/beta|beta|Beta question?|true');
-  // Nothing is picked until a number picks: 2 picks B and the button names it. Enter answers with the pick: the button draws its check, the row folds away,
+  // The recommended B starts selected and the button names it; a number picks too (1 picks A, 2 back to B). Enter answers with the pick: the button draws its check, the row folds away,
   // the next ask is selected beside the list, and the toast, 440px wide, sits centred over the list and the ask's pane.
-  assert.equal(await evaluate('document.querySelector(".split-detail .answer").disabled'), true);
+  assert.equal(await evaluate('document.querySelector(".split-detail .answer").textContent + "|" + document.querySelector(".split-detail .answer").disabled'), 'Answer B|false');
+  await key('1');
+  assert.equal(await evaluate('document.querySelector(".split-detail .answer").textContent'), 'Answer A');
   await key('2');
   assert.equal(await evaluate('document.querySelector(".split-detail .answer").textContent + "|" + document.querySelector(".split-detail .answer").disabled'), 'Answer B|false');
   await key('Enter');
@@ -2748,7 +2750,7 @@ test('Undo on a card outside Waiting takes the answer back and stays on that are
   proc.kill();
 });
 
-test('Decide after an ask is replaced under the same key: the pick remembered from the old options is dropped, so nothing is picked and the button waits, and a new pick answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Decide after an ask is replaced under the same key: the pick remembered from the old options is dropped, so the new recommended answer is the one selected, and a new pick answers', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'decide-options-changed'), file = join(dir, 'board.json');
   mkdirSync(dir);
   const doc = (options) => JSON.stringify({ schema: 2, items: [{ key: 'when', title: 'When should it ship?', options, recommend_value: options[0].value }] });
@@ -2764,8 +2766,8 @@ test('Decide after an ask is replaced under the same key: the pick remembered fr
   writeFileSync(file, doc([{ value: 'c', label: 'C' }, { value: 'd', label: 'D' }]));
   await evaluate('refresh()');
   await until(async () => (await evaluate('document.querySelector(".decide .pick-option .label")?.textContent')) === 'C');
-  assert.equal(await evaluate('document.querySelectorAll(".decide .pick-option[aria-pressed=true]").length'), 0);
-  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'), 'Pick an answer|true');
+  assert.equal(await evaluate('[...document.querySelectorAll(".decide .pick-option[aria-checked=true] .label")].map((l) => l.textContent).join()'), 'C');
+  assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent + "|" + document.querySelector(".decide-bar .answer").disabled'), 'Answer C|false');
   await evaluate('document.querySelector(".decide .pick-option").click()');
   assert.equal(await evaluate('document.querySelector(".decide-bar .answer").textContent'), 'Answer C');
   await evaluate('document.querySelector(".decide-bar .answer").click()');

@@ -215,7 +215,7 @@
   .plan-section[data-verdict="change"] .num { background: var(--tk-p1); color: var(--tk-p1-text); }
   .plan-send button { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
   .plan-verdicts button[aria-pressed="true"] { box-shadow: inset 0 0 0 1.5px currentColor; background: var(--surface); }
-  .plan-verdicts button[aria-pressed="true"]::before, .plan-decision button[aria-pressed="true"]::before { content: none; }
+  .plan-verdicts button[aria-pressed="true"]::before, .plan-decision button[aria-checked="true"]::before { content: none; }
   .plan-verdicts .approve[aria-pressed="true"] { color: var(--ok); }
   .plan-verdicts .change[aria-pressed="true"] { color: var(--warn); }
   .plan-section label { display: grid; gap: 0.5rem; margin-top: 1rem; color: var(--muted); }
@@ -223,11 +223,12 @@
   .plan-section textarea { width: 100%; min-height: 7rem; padding: 0.75rem; background: var(--sunk); }
 .plan-decision label { display: grid; gap: 0.5rem; margin-top: 0.75rem; color: var(--muted); }
 .plan-decision textarea { width: 100%; min-height: 4rem; padding: 0.75rem; background: var(--sunk); }
+  .plan-decision .plan-other { margin-top: 0.625rem; } .plan-decision .plan-other[hidden] { display: none; }
   .plan-decision .choices { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.625rem; }
   .plan-decision .choices button { text-align: left; border-radius: 0.875rem; padding: 0.875rem; gap: 0.25rem; }
   .plan-decision .choices button .tag { margin: 0; text-transform: none; letter-spacing: normal; color: var(--accent); }
   .plan-decision .choices button .tag::before { content: none; }
-  .plan-decision .choices button[aria-pressed="true"] { background: var(--tk-inset); color: var(--text); border: 2px solid var(--accent); }
+  .plan-decision .choices button[aria-checked="true"] { background: var(--tk-inset); color: var(--text); border: 2px solid var(--accent); }
   .plan-decision .tag { display: block; color: var(--accent); font-size: 0.875rem; }
   .plan-explain .foot { justify-content: space-between; }
   /* The plan page as designed: the diagram alone in a tile, the explainer inside its section, each decision under the section it follows. */
@@ -251,7 +252,7 @@
   .plan-decision .choices button > :not(.rd):not(.lbl) { grid-column: 2; }
   .plan-decision .choices .rd { display: grid; place-items: center; width: 1.375rem; height: 1.375rem; margin-top: 0.125rem; border-radius: 50%; border: 1.5px solid var(--muted); color: transparent; }
   .plan-decision .choices .rd .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; }
-  .plan-decision .choices button[aria-pressed="true"] .rd { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .plan-decision .choices button[aria-checked="true"] .rd { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .plan-decision .choices .lbl .tag { order: 2; display: inline; } .plan-decision .choices .lbl { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.5rem; }
   .plan-other { margin-top: 0.75rem; } .plan-other summary { cursor: pointer; color: var(--muted); font-weight: 600; }
   .plan-send { position: absolute; bottom: 0; left: 0; right: 0; padding: 0.625rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); background: var(--bar); border-top: 1px solid var(--line); }
@@ -1407,6 +1408,8 @@
   .gd-opt:disabled { cursor: default; }
   .gd-opt .ol { font-weight: 600; line-height: 1.3; display: flex; flex-wrap: wrap; gap: 0.375rem 0.5rem; align-items: center; }
   .gd-opt .oo { display: block; color: var(--muted); font-size: 0.9375rem; line-height: 1.4; margin-top: 0.125rem; }
+  .gd-ownf { margin: -0.125rem 0 0.75rem; } .gd-ownf[hidden] { display: none; }
+  .gd-own { width: 100%; min-height: 4.5rem; padding: 0.75rem; border-radius: 0.875rem; border: 1.5px solid var(--hair); background: var(--tile); color: inherit; font: inherit; resize: vertical; }
   .gd-pick { font-size: 0.75rem; font-weight: 700; color: var(--accent); background: var(--tint); padding: 0.1875rem 0.5rem; border-radius: 999px; }
   .gd-why { padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: var(--well); font-size: 0.9375rem; line-height: 1.45; margin: 0 0 0.625rem; }
   .gd-why b { font-weight: 600; }
@@ -1715,8 +1718,8 @@
   .decide .pick-option { display: flex; align-items: flex-start; gap: 0.75rem; width: 100%; min-height: 4rem; padding: 0.75rem 0; border-radius: 0; background: none; color: var(--tk-ink); font-weight: 400; text-align: left;
     -webkit-tap-highlight-color: transparent; transition: opacity 120ms linear; }
   .decide .pick-option:active { opacity: 0.6; transition-duration: 60ms; }
-  .decide .pick-option[aria-pressed="true"] { background: none; color: var(--tk-ink); font-weight: 400; }
-  .decide .pick-option[aria-pressed="true"]::before { content: none; }
+  .decide .pick-option[aria-checked="true"] { background: none; color: var(--tk-ink); font-weight: 400; }
+  .decide .pick-option[aria-checked="true"]::before { content: none; }
   .decide .pick-option .words { display: grid; flex: 1; min-width: 0; gap: 0.125rem; }
   .decide .pick-option .label-line { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; }
   .decide .pick-option .label { color: var(--tk-ink); font-size: var(--tk-fs-secondary); line-height: var(--tk-lh-secondary); font-weight: 500; }
@@ -1726,9 +1729,9 @@
   .decide .pick-option .recommend.now { background: var(--tk-ink); color: var(--tk-canvas); }
   .decide .pick-option .check { display: grid; flex: none; place-items: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ring); color: var(--tk-canvas); visibility: visible;
     transition: background-color 160ms var(--ease); }
-  .decide .pick-option[aria-pressed="true"] .check { background: var(--tk-ink); box-shadow: none; }
+  .decide .pick-option[aria-checked="true"] .check { background: var(--tk-ink); box-shadow: none; }
   .decide .pick-option .check .glyph { width: 0.875rem; height: 0.875rem; stroke-width: 3; transform: scale(0); transition: transform 280ms var(--spring); }
-  .decide .pick-option[aria-pressed="true"] .check .glyph { transform: scale(1); }
+  .decide .pick-option[aria-checked="true"] .check .glyph { transform: scale(1); }
   .decide .pick-option > .kc { align-self: center; }
   /* Your own answer: the last row; picking it opens one box under the group, and the note steps aside. The note: one box for any pick, always open. */
   .decide .own-field { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 220ms var(--ease); }
@@ -1931,7 +1934,7 @@
     .ask2 .ppin .pick-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 0.75rem; margin: 0; padding: 0; background: none; }
     .ask2 .ppin .pick-list > li + li::before { content: none; }
     .ask2 .ppin .pick-option { height: 100%; min-height: 3.5rem; padding: 0.75rem 1rem; border-radius: 1rem; background: var(--tk-inset); box-shadow: inset 0 0 0 1.5px transparent; }
-    .ask2 .ppin .pick-option[aria-pressed="true"] { background: var(--tk-raised); box-shadow: inset 0 0 0 1.5px var(--tk-ink); }
+    .ask2 .ppin .pick-option[aria-checked="true"] { background: var(--tk-raised); box-shadow: inset 0 0 0 1.5px var(--tk-ink); }
     .ask2 .ppin .pick-option .check { display: none; }
     .ask2 .ppin .own-box { margin-top: 0.75rem; }
     .ask2 .decide-bar { position: static; flex-wrap: nowrap; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0; padding: 0; background: none; }

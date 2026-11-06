@@ -192,8 +192,8 @@ try {
     const picked = await inPage(`const ps = [...document.querySelectorAll('#board .ask-sheet .pick-option, #board .split-detail .pick-option, #board .pick-option')];
       if (!ps.length) return 'missing'; ps[0].click(); await s(500);
       const a = document.querySelector('#board .decide-bar .answer');
-      return JSON.stringify({ before: typeof ps[0].onclick, pressed: ps[0].getAttribute('aria-pressed'), n: ps.length, bar: document.querySelectorAll('#board .decide-bar').length,
-        live: ps[0].isConnected, text: a?.textContent, disabled: a?.disabled, pressedNow: [...document.querySelectorAll('#board .pick-option')].map((x) => x.getAttribute('aria-pressed')) });`);
+      return JSON.stringify({ before: typeof ps[0].onclick, pressed: ps[0].getAttribute('aria-checked'), n: ps.length, bar: document.querySelectorAll('#board .decide-bar').length,
+        live: ps[0].isConnected, text: a?.textContent, disabled: a?.disabled, pressedNow: [...document.querySelectorAll('#board .pick-option')].map((x) => x.getAttribute('aria-checked')) });`);
     check(JSON.parse(picked).pressed === 'true', `answer: no answer could be picked (${picked})`);
     const sent = await inPage(`const b = document.querySelector('#board .decide-bar .answer');
       if (!b) return 'no-answer-button'; if (b.disabled) return 'disabled'; b.click(); await s(2200); return 'ok';`);

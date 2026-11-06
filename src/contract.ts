@@ -34,7 +34,7 @@ const DESIGN_1 = [...COMMON, 'group', 'filed', 'status', 'preview', 'journeys', 
 export const FRAME_ROLES = ['today', 'proposed', 'built', 'target'];
 const GUIDE = ['understood', 'visual', 'sections', 'next'];
 const GUIDE_FIELDS: Record<string, string[]> = {
-  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', 'actions', 'version', 'changes', ...GUIDE],
+  report: [...COMMON, 'filed', 'group', 'decided', 'asked_by', 'purpose', 'project', 'layout', 'actions', 'version', 'changes', 'decisions', ...GUIDE],
   plan: [...COMMON, 'project', 'decisions', ...GUIDE],
 };
 /** A done-done run: its id, full commit and the four Checks lines. */
@@ -415,6 +415,30 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     }
     return ids;
   };
+  /** The typed questions of a plan or a guided report: each one question with 2 to 6 options and the recommended one, so the board can draw it as a radio list. */
+  const decisions = (ids: string[]) => {
+    // A plan always lists its decisions (0 to 5); a guided report may, for the open questions it asks.
+    if (m.kind === 'plan' || Object.hasOwn(m, 'decisions')) list('decisions', 0, 5, g ? ['key', 'question', 'why', 'reason', 'quiet', 'options', 'recommend'] : ['key', 'question', 'why', 'reason', 'after', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
+      const at = `decisions[${n}]`;
+      if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
+      if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
+      text(`${at}.question`, o.question, 160, 'the question, ending in a question mark');
+      // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
+      const q = o.question.trim();
+      if (q.search(/[?？]/) !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one question mark as its last character', 'Ask one question ending in a question mark, and split any other into its own decision');
+      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
+      text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
+      if (Object.hasOwn(o, 'reason')) text(`${at}.reason`, o.reason, 300, 'why the recommended option, in 300 characters or fewer, or leave it out');
+      if (Object.hasOwn(o, 'quiet')) text(`${at}.quiet`, o.quiet, 160, 'what happens if the person stays quiet, in 160 characters or fewer, or leave it out');
+      if (Object.hasOwn(o, 'after') && !ids.includes(o.after)) throw bad(`${at}.after`, `must be the id of one of the plan's sections`, `Set "after" to one of: ${ids.join(', ')}`);
+      if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
+      checkOptions(`${at}.options`, o.options, 'plan');
+      recommend(`${at}.recommend`, o, o.options);
+    });
+    // An open question the person must answer is a typed question, never only prose: the page draws its radio list and its answer from "decisions".
+    const prose = (m.sections ?? []).find((x: any) => ['open-questions', 'owner-calls'].includes(x?.part) || /\bopen questions?\b/i.test(x?.heading ?? ''));
+    if (prose && !m.decisions?.length) throw bad('decisions', `is required: section ${show(prose.id)} holds an open question only as prose, so there is nowhere to answer it`, 'Add "decisions": [{"key":"store","question":"Keep plans in the board file?","why":"...","options":[{"value":"yes","label":"Yes","outcome":"..."},{"value":"no","label":"No","outcome":"..."}],"recommend":"yes"}], one per open question');
+  };
   need('contract');
   if (m.contract !== 1) throw bad('contract', `must be 1, not ${show(m.contract)}`, whole(m.contract) ? 'Upgrade sign-off-axi: this one knows contract 1' : 'Set "contract": 1');
   need('kind');
@@ -482,7 +506,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     // A report is a page to tap through and a picture of it for the card: text alone is a status note, not a report.
     if (g) {
       // A report 5 is a guided page, so its own parts are checked first; then the Actions block it ends on, by its key.
-      guide(1);
+      const ids = guide(1);
     // The Actions block: a report 5 says what the person can do with it - who owns the build, when the first pull request comes, and which
     // of Approve, Refine and Reject is recommended. A report that declares none cannot end on an action, so it fails here by its key.
     const ACTIONS_HELP = 'Add "actions": {"role":"addons lead","owner":"Ada","first_pull_request":"2026-11-06","recommended":"approve"}: the role that does the work, its name when it has one, the day the first pull request lands, and the action this report recommends';
@@ -524,6 +548,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (m.version > 1 && !Object.hasOwn(m, 'changes')) throw bad('changes', `is required on version ${m.version}: what changed since version ${m.version - 1}`, 'Add "changes": one line per change, each added, rewritten (with "was") or removed');
     if (Object.hasOwn(m, 'changes') && !(m.version > 1)) throw bad('changes', 'is only for a version after the first', 'Leave "changes" out of a first version, or post it as "version": 2');
 
+      decisions(ids);
       return { kind: m.kind, schema: m.schema };
     }
     const need = 'a report is a page to tap through, not text';
@@ -633,23 +658,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);
     if (twice >= 0) throw bad(`sections[${twice}].id`, `repeats ${ids[twice]}`, 'Give every section its own id');
-    list('decisions', 0, 5, g ? ['key', 'question', 'why', 'reason', 'quiet', 'options', 'recommend'] : ['key', 'question', 'why', 'reason', 'after', 'options', 'recommend'], '{"key":"store","question":"Keep plans in the board file?","why":"...","options":[...],"recommend":"yes"}').forEach((o, n, all) => {
-      const at = `decisions[${n}]`;
-      if (!isKey(o.key)) throw bad(`${at}.key`, 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "key" to a short id such as "store"');
-      if (all.slice(0, n).some((p) => p.key === o.key)) throw bad(`${at}.key`, `repeats ${o.key}`, 'Give every decision its own key');
-      text(`${at}.question`, o.question, 160, 'the question, ending in a question mark');
-      // One question: a single ?, as its last character, so "Keep A? Or B?" is two decisions.
-      const q = o.question.trim();
-      if (q.search(/[?？]/) !== q.length - 1) throw bad(`${at}.question`, 'must be one question, with one question mark as its last character', 'Ask one question ending in a question mark, and split any other into its own decision');
-      if (!/[\p{L}\p{N}]/u.test(q) || q.split(/\s+/).length > 12) throw bad(`${at}.question`, 'must be one question of 12 words or fewer, ending in a question mark', 'Ask it in 12 words or fewer, ending in a question mark; put the rest in "why"');
-      text(`${at}.why`, o.why, 500, 'why it matters, in 500 characters or fewer');
-      if (Object.hasOwn(o, 'reason')) text(`${at}.reason`, o.reason, 300, 'why the recommended option, in 300 characters or fewer, or leave it out');
-      if (Object.hasOwn(o, 'quiet')) text(`${at}.quiet`, o.quiet, 160, 'what happens if the person stays quiet, in 160 characters or fewer, or leave it out');
-      if (Object.hasOwn(o, 'after') && !ids.includes(o.after)) throw bad(`${at}.after`, `must be the id of one of the plan's sections`, `Set "after" to one of: ${ids.join(', ')}`);
-      if (!Array.isArray(o.options) || o.options.length < 2 || o.options.length > 6) throw bad(`${at}.options`, Object.hasOwn(o, 'options') ? 'must list 2 to 6 options' : 'is required', 'Set "options" to 2-6 objects such as {"value":"yes","label":"Yes","outcome":"Plans live in the board file"}');
-      checkOptions(`${at}.options`, o.options, 'plan');
-      recommend(`${at}.recommend`, o, o.options);
-    });
+    decisions(ids);
     if (g) return { kind: m.kind, schema: m.schema };
     if (Object.hasOwn(m, 'steps')) list('steps', 2, 12, ['title', 'text'], '{"title":"The agent posts the plan"}').forEach((o, n) => {
       text(`steps[${n}].title`, o.title, 80, 'the step, in 80 characters or fewer');

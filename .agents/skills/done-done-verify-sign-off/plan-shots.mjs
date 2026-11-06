@@ -91,8 +91,8 @@ try {
   drive('await page.eval(() => { const t = document.querySelector("#plan-note-architecture"); t.value = "Keep the desktop layout too."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
   capture('note', 'The second section is marked Change with the note Keep the desktop layout too.');
   drive('await page.eval(() => document.querySelector(".plan-next").click());');
-  drive('await page.eval(() => { const t = document.querySelector("#plan-other-send-back"); t.value = "Neither: decide it in the review."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
-  capture('decision', 'A decision has an Other answer Neither: decide it in the review, no option is picked, and Send back is enabled.');
+  drive('await page.eval(() => document.querySelector("#plan-decision-send-back [aria-controls=plan-other-send-back]").click()); await page.eval(() => { const t = document.querySelector("#plan-other-send-back"); t.value = "Neither: decide it in the review."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
+  capture('decision', 'A decision has Something else picked with the answer Neither: decide it in the review, no listed option is selected, and Send back is enabled.');
   drive('await page.eval(() => document.querySelector("#plan-comment").scrollIntoView({ block: "center" }));');
   drive('await page.eval(() => { const t = document.querySelector("#plan-comment"); t.value = "Overall: start with slice 1."; t.dispatchEvent(new Event("input", { bubbles: true })); });');
   capture('comment', 'The whole-plan comment Overall: start with slice 1 is filled and Send back is enabled.');

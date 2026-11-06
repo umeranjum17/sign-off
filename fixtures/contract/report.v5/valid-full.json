@@ -27,5 +27,6 @@
     {"id": "not-checked", "part": "not-checked", "stage": "found", "heading": "iOS was not timed", "body": "I had no iPhone; Reddit blocked fetching."},
     {"id": "recommendation", "part": "recommendation", "stage": "recommend", "heading": "Use ntfy; Pushover is the runner-up", "body": "ntfy is free at our size; Pushover if self-hosting is too much."},
     {"id": "open-questions", "part": "open-questions", "stage": "recommend", "heading": "Who runs the server", "body": "Self-hosting needs an owner for updates."}
-  ]
+  ],
+  "decisions": [{"key": "server-owner", "question": "Who runs the push server?", "why": "Self-hosting needs an owner for updates.", "options": [{"value": "us", "label": "We run it", "outcome": "One more service on our on-call list."}, {"value": "vendor", "label": "The vendor runs it", "outcome": "A monthly bill, and no updates to own."}], "recommend": "vendor", "reason": "No one on the team has time to own updates."}]
 }

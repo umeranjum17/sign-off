@@ -356,7 +356,7 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       ...(d.kind === 'finding' && { finding: { cause: d.cause, incidents: d.incidents, days: d.days, evidence_ids: d.evidence_ids, change_kind: d.change_kind, proposal: d.proposal } }),
       ...(plan && { sections: d.sections, decisions: d.decisions }), ...((plan || report) && d.project && { project: d.project }),
       ...(engagement && { engagement: { kind: d.kind, schema: d.schema, filer: d.filer, revision: documentRevision(d) } }),
-      ...(guided && { guided: true, layout: d.layout, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections }) }),
+      ...(guided && { guided: true, layout: d.layout, understood: d.understood, visual: d.visual, next: d.next, ...(report && { sections: d.sections, ...(d.decisions?.length && { decisions: d.decisions }) }) }),
       ...(report && d.actions && { actions: d.actions }), ...(report && d.version && { version: d.version }), ...(report && d.changes && { changes: d.changes }), ...(report && d.versions && { versions: d.versions }),
       ...(design && { kind: 'design', type: 'design', group: d.group, filed: d.filed, status: d.status, preview: d.preview, journeys: d.journeys, ...(d.accepts && { accepts: d.accepts }), ...(d.reviewed && { reviewed: d.reviewed }), ...(d.options && { options: d.options, recommend_value: d.recommend }) }),
       ...(d.type === 'explainer' && d.chapters && { chapters: d.chapters.map(({ at, title }: Chapter) => ({ at, title })) }),
