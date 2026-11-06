@@ -280,6 +280,9 @@ journeys:
   # A report that sets its approve words (approve_result, approved_heading) shows them; one that sets none keeps today's. 390 and 1280, then the Designs capture at 1440, dark.
   approve-words:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/approve-words-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
+  # Tickets from Beads (CLI only, screen: none): the board reads and writes a Beads store through the Juggernaut wrapper and keeps no tickets file; then the Designs capture at 1440, dark.
+  beads-tickets:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-tickets-proof.sh'
   board-actions:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-actions-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the

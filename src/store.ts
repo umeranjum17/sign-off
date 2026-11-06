@@ -1,6 +1,7 @@
 import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { beadsEvents, beadsOn, readBeadsTickets, writeBeadsTicket } from './beads.js';
 
 export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
@@ -721,11 +722,13 @@ const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'hold_reason', '
 const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
   const line = ticketLine({ ...t, at: now() });
+  if (beadsOn()) { writeBeadsTicket(line); return line; }
   appendLine(ticketsPath(decisionsPath), line);
   return line;
 }
 /** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn. */
 export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}): Ticket[] {
+  if (beadsOn()) return oneOfEach(readBeadsTickets(warn));
   const latest = new Map<string, Ticket>();
   readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, n) => {
     let t;
@@ -739,7 +742,8 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
  *  state is only filled in as done, was not finished that day, so a bulk import is never counted as a week's work. */
 export function readTicketWeek(decisionsPath: string, nowMs = Date.now()) {
   const last = new Map<string, Ticket>(), hits: { at: string; id: string }[] = [];
-  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
+  if (beadsOn()) { for (const t of readBeadsTickets(() => {})) last.set(t.id, t); hits.push(...beadsEvents().filter((e) => e.kind === 'state').map((e) => ({ at: e.at, id: e.ticket }))); }
+  else readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
     let t: Ticket;
     try { t = line && JSON.parse(line); } catch { return; }
     if (!t || ticketFault(t)) return;
@@ -764,6 +768,7 @@ export type TicketActivity = { ticket: string; title: string; kind: 'created' | 
 const BURST_MS = 120_000;
 /** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
 export function readTicketActivity(decisionsPath: string): TicketActivity[] {
+  if (beadsOn()) return foldBursts(beadsEvents(), decisionsPath, new Set(readBeadsTickets(() => {}).filter((t) => t.asked).map((t) => t.id)));
   const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
   readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
     let t: Ticket;
@@ -792,6 +797,9 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
   for (const { event } of events) { const now = previous.get(event.ticket)!; Object.assign(event, { ...(now.project && { project: now.project }), ...(now.priority && { priority: now.priority }), ...(now.prs?.length && { prs: now.prs }) }); }
   const live = new Set(readTickets(decisionsPath).map((t) => t.id));
   const newest = events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
+  return foldBursts(newest, decisionsPath, new Set([...previous.values()].filter((t) => t.asked).map((t) => t.id)));
+}
+function foldBursts(newest: TicketActivity[], decisionsPath: string, asked: Set<string>): TicketActivity[] {
   // Folded newest first: an older change of a ticket joins that ticket's open row while it is within BURST_MS of the row's oldest change.
   const rows: TicketActivity[] = [], open = new Map<string, TicketActivity>();
   for (const e of newest) {
@@ -799,7 +807,7 @@ export function readTicketActivity(decisionsPath: string): TicketActivity[] {
     if (head && Date.parse(head.earlier?.[0]?.at ?? head.at) - Date.parse(e.at) <= BURST_MS) (head.earlier ??= []).unshift(e);
     else { rows.push(e); open.set(e.ticket, e); }
   }
-  const words = askWords(decisionsPath, new Set([...previous.values()].filter((t) => t.asked).map((t) => t.id)));
+  const words = askWords(decisionsPath, asked);
   for (const e of rows) if (words.has(e.ticket)) e.ask = words.get(e.ticket);
   return rows;
 }
