@@ -4962,16 +4962,16 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // The ticket above it lists the ticket under it, and no card names it.
     await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
     await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Assigned | Tickets in this epic · 0 of 1 done | Linked | No cards yet');
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Description | Assigned | Tickets in this epic · 0 of 1 done | Linked | No cards yet');
     // A ticket's tiles wear its type's own glyph, never the project's picture or its initials.
     assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .tk-shd .ui-icon, .tk-sheet .tk-in .tk-row .ui-icon")].every((t) => /\\btk-tile t-/.test(t.className)) && !document.querySelector(".tk-sheet .mono") && !document.querySelector(".tk-sheet .ui-icon img")'), true);
     // The Tickets tab lists the tickets under no other, all of them unless the filter's Who asked says From you (T-9 and T-32, which the user asked for) or Fleet upkeep (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
     const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
       lists: [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
-    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets/all`)}`);
     await until(() => evaluate('!!document.querySelector(".tk-hero")'));
     assert.equal(await evaluate('[...document.querySelectorAll("main .tk-row .ui-icon")].every((t) => /\\btk-tile t-/.test(t.className)) && !document.querySelector("main .tk-row .mono") && !document.querySelector("main .tk-row .ui-icon img")'), true);
-    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['All tickets on', 'Epics', 'Activity'], hero: 'Tickets done 0 of 3 2 moving', lists: ['In progress #ticket/T-9,#ticket/T-32', 'On hold #ticket/T-31'] });
+    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Story', 'Epics', 'All tickets on', 'Activity'], hero: 'All tickets 4 tickets · 0 done · 4 open', lists: ['In progress #ticket/T-9,#ticket/T-32', 'On hold #ticket/T-31'] });
     const who = (word) => evaluate(`document.querySelector('.tk-rb').click(), [...document.querySelectorAll('#tk-filter .tk-pick')].find((b) => b.textContent.startsWith(${JSON.stringify(word)})).click()`);
     await who('Fleet upkeep');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
@@ -5037,9 +5037,9 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     // The Activity tab: every row carries the cards' tags and opens an expanded view, by tap and by key; Escape puts the focus back on the row; the ticket opens from the view.
     assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '75', '--pr', prs.join(','), '--asked', 'yes', '--filer', 'firstmate-crew').code, 0);
     await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-    await evaluate(`location.hash = '#tickets'`);
-    await until(() => evaluate('document.querySelectorAll(".tk-seg button").length === 3'));
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-seg button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? " on" : "")).join()'), 'All tickets on,Epics,Activity');
+    await evaluate(`location.hash = '#tickets/all'`);
+    await until(() => evaluate('document.querySelectorAll(".tk-seg button").length === 4'));
+    assert.equal(await evaluate('[...document.querySelectorAll(".tk-seg button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? " on" : "")).join()'), 'Story,Epics,All tickets on,Activity');
     await evaluate('document.querySelector(".tk-seg button:last-child").click()');
     await evaluate('refresh()');
     const evRow = (text) => `[...document.querySelectorAll('.tk-day .tk-ev')].find((b) => b.getAttribute('aria-label').includes(${JSON.stringify(text)}))`;
@@ -5183,7 +5183,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
     const see = (name) => `main section[aria-label="${name}"] .ui-sec .see`;
     const where = (name) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(see(name))}); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
     const lists = () => evaluate(`JSON.stringify({ hash: location.hash, rows: Object.fromEntries([...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((s) => [s.getAttribute('aria-label'), s.querySelectorAll('a.tk-row').length])) })`).then((v) => JSON.parse(v));
-    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
+    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets/all`)}`);
     const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
     const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
     await until(() => evaluate('!!document.querySelector(".tk-activity > summary") && document.querySelectorAll("main section[aria-label]:not(.tk-activity)").length === 4'));
@@ -5202,7 +5202,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
       await tap(await where(other));
       await until(async () => (await lists()).rows[other] === sizes[other]);
       const now = await lists();
-      assert.equal(now.hash, '#tickets', `${open} expanded, See all on ${other} opened ${now.hash}`);
+      assert.equal(now.hash, '#tickets/all', `${open} expanded, See all on ${other} opened ${now.hash}`);
       assert.deepEqual(now.rows, { 'In progress': 3, 'On hold': 3, 'To do': 3, Done: 3, ...{ [open]: sizes[open], [other]: sizes[other] } });
     }
     // The list moves under the finger between touchstart and the tap (the board redraws, the page settles): the tap still does what its See all does.
@@ -5215,7 +5215,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
       await evaluate(`document.querySelector('main').style.paddingTop = 'calc(' + getComputedStyle(document.querySelector('main')).paddingTop + ' + ${shift}px)'`);
       await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
       await until(async () => (await lists()).rows['To do'] === 6);
-      assert.equal((await lists()).hash, '#tickets', `a ${shift}px shift opened a ticket`);
+      assert.equal((await lists()).hash, '#tickets/all', `a ${shift}px shift opened a ticket`);
     }
     // A tap on a row still opens its ticket.
     await fresh();

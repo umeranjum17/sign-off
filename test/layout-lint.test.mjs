@@ -14,7 +14,9 @@ import { lint } from './support/layout-lint.mjs';
 const cli = new URL('../dist/cli.js', import.meta.url).pathname, baseline = new URL('./layout-baseline.json', import.meta.url);
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-layout-')), env = { ...process.env, HOME: scratch };
 const procs = [];
-after(async () => { await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill()))); rmSync(scratch, { recursive: true, force: true }); });
+let closeBrowser;
+// Runs on a pass and on a failure alike, before scratch goes.
+after(async () => { await closeBrowser?.(); await Promise.all(procs.map((p) => p.exitCode ?? p.signalCode ?? new Promise((ok) => p.once('exit', ok).kill()))); rmSync(scratch, { recursive: true, force: true }); });
 const chrome = ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser'].flatMap((b) => process.env.PATH.split(':').map((d) => join(d, b))).find(existsSync);
 // Chrome's socket path must stay under 107 characters, so its TMPDIR is a short one of its own.
 const chromeTmp = chrome && mkdtempSync('/tmp/so-');
@@ -35,7 +37,8 @@ test('Decide\'s ask header sits on one grid at every width and theme: icon and l
   let log = ''; server.stdout.on('data', (d) => (log += d));
   const url = await until(() => /http:\/\/127\.0\.0\.1:\d+\//.exec(log)?.[0]);
   const profile = mkdtempSync(join(scratch, 'chrome-')), active = join(profile, 'DevToolsActivePort');
-  procs.push(spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { env: { ...process.env, TMPDIR: chromeTmp }, stdio: 'ignore' }));
+  const browser = spawn(chrome, ['--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', `--user-data-dir=${profile}`, '--remote-debugging-port=0', 'about:blank'], { env: { ...process.env, TMPDIR: chromeTmp }, stdio: 'ignore' });
+  procs.push(browser);
   await until(() => existsSync(active) && readFileSync(active, 'utf8').includes('\n'));
   const page = (await (await fetch(`http://127.0.0.1:${readFileSync(active, 'utf8').split('\n')[0]}/json`)).json()).find((t) => t.type === 'page');
   const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -44,6 +47,11 @@ test('Decide\'s ask header sits on one grid at every width and theme: icon and l
   ws.onmessage = (m) => { const x = JSON.parse(m.data); replies.get(x.id)?.(x.result); replies.delete(x.id); };
   // A call the browser never answers gives undefined after 10 s instead of hanging the run.
   const send = (method, params = {}) => new Promise((ok) => { const id = ++seq; replies.set(id, ok); setTimeout(() => replies.delete(id) && ok(undefined), 10000).unref(); ws.send(JSON.stringify({ id, method, params })); });
+  // Let Chrome flush its profile first: killing its parent can leave children writing into the removed folder, which the leftovers check then fails on.
+  closeBrowser = async () => {
+    if (browser.exitCode === null && browser.signalCode === null) { const closed = new Promise((ok) => browser.once('exit', ok)); send('Browser.close'); await closed; }
+    ws.close();
+  };
   const evaluate = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }))?.result?.value;
   const faults = [], boxes = {};
   for (const theme of ['light', 'dark']) for (const width of [360, 390, 445, 1280, 1440]) {
@@ -67,7 +75,6 @@ test('Decide\'s ask header sits on one grid at every width and theme: icon and l
       for (let i = 0; i < shot.data.length; i += 4) if (px(i).some((v, c) => Math.abs(v - ground[c]) > 24)) { faults.push(`${at}: ink in the gap between the header's icon and its label`); break; }
     }
   }
-  ws.close();
   if (process.env.LAYOUT_BASELINE === 'write') writeFileSync(baseline, `{\n${Object.entries(boxes).map(([k, v]) => ` ${JSON.stringify(k)}: ${JSON.stringify(v)}`).join(',\n')}\n}\n`);
   assert.deepEqual(faults, [], `the layout lint found:\n${faults.join('\n')}`);
   assert.deepEqual(boxes, JSON.parse(readFileSync(baseline, 'utf8')), 'Decide\'s ask header moved from test/layout-baseline.json; if the move is meant, run with LAYOUT_BASELINE=write and commit the file');
