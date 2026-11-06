@@ -512,7 +512,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     const ACTIONS_HELP = 'Add "actions": {"role":"addons lead","owner":"Ada","first_pull_request":"2026-11-06","recommended":"approve"}: the role that does the work, its name when it has one, the day the first pull request lands, and the action this report recommends';
     if (m.schema >= 5 && !Object.hasOwn(m, 'actions')) throw bad('actions', 'is required: what the person can do with this report, the owner and the recommended action', ACTIONS_HELP);
     if (Object.hasOwn(m, 'actions')) {
-      const a = m.actions, KEYS = ['role', 'owner', 'first_pull_request', 'recommended', 'reasons'];
+      const a = m.actions, KEYS = ['role', 'owner', 'first_pull_request', 'recommended', 'reasons', 'approve_result', 'approved_heading'];
       if (!a || typeof a !== 'object' || Array.isArray(a)) throw bad('actions', 'must be one object', ACTIONS_HELP);
       const unknown = Object.keys(a).find((k) => !KEYS.includes(k));
       if (unknown) throw bad(`actions.${escaped(unknown)}`, 'is not a field of the Actions block', `Use ${KEYS.join(', ')}`);
@@ -525,6 +525,8 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
         }
       }
       if (!REPORT_ACTIONS.includes(a.recommended)) throw bad('actions.recommended', `${show(a.recommended)} is not one of ${REPORT_ACTIONS.join(', ')}`, `Set "recommended" to the action this report recommends: ${REPORT_ACTIONS.join(', ')}`);
+      if (Object.hasOwn(a, 'approve_result')) text('actions.approve_result', a.approve_result, 120, 'the line shown under Approve saying what approving does, such as "Runs the test. Ada posts the result.", or leave it out for "Starts the build."');
+      if (Object.hasOwn(a, 'approved_heading')) text('actions.approved_heading', a.approved_heading, 40, 'the heading shown once approved, such as "Test started", or leave it out for "Build started"');
       if (Object.hasOwn(a, 'reasons')) {
         if (!Array.isArray(a.reasons) || a.reasons.length < 2 || a.reasons.length > 4) throw bad('actions.reasons', 'must list 2 to 4 reasons a report can be rejected for', 'Set "reasons" to two to four short lines such as ["Wrong direction","Too expensive","Not now"], or leave it out for the four the board shows');
         a.reasons.forEach((r: unknown, n: number) => text(`actions.reasons[${n}]`, r, 30, 'a reason a report can be rejected for, in 30 characters or fewer'));

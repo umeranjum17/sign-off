@@ -277,6 +277,9 @@ journeys:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/inbox-layout-merge-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Every card kind's actions at 390 and 1280 in light and dark, then the report Actions block in each state with both replays as text,
   # then the required Designs capture at 1440, dark, in the same run.
+  # A report that sets its approve words (approve_result, approved_heading) shows them; one that sets none keeps today's. 390 and 1280, then the Designs capture at 1440, dark.
+  approve-words:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/approve-words-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   board-actions:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-actions-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
