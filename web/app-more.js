@@ -1681,7 +1681,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const declared = d.actions ?? null, acted = () => (state.report_actions ?? {})[key] ?? null;
     const whoActs = declared ? plain(declared.owner?.trim() || declared.role || '') : '';
     const dayWords = (iso) => { const t = Date.parse(`${iso}T00:00:00Z`); return Number.isNaN(t) ? iso : new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); };
-    const resultOf = (a) => a === 'approve' ? `Starts the build. ${whoActs} opens the first PR${declared?.first_pull_request ? ` by ${dayWords(declared.first_pull_request)}` : ''}.`
+    const resultOf = (a) => a === 'approve' ? (declared?.approve_result?.trim() || `Starts the build. ${whoActs} opens the first PR${declared?.first_pull_request ? ` by ${dayWords(declared.first_pull_request)}` : ''}.`)
       : a === 'refine' ? `Sends it back with a note. ${whoActs} posts version ${(d.version ?? 1) + 1} here.`
       : `Closes it, starts nothing. ${whoActs} keeps your reason as a rule.`;
     const decBox = el('section', { class: 'rda', 'aria-labelledby': `ra-dec-${key}` });
@@ -1709,9 +1709,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         return;
       }
       if (got && got.action === 'approve') {
-        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, 'Build started'),
+        decBox.replaceChildren(el('h2', { id: `ra-dec-${key}` }, declared?.approved_heading?.trim() || 'Build started'),
           el('p', { class: 'rda-closed' }, `Approved by you · ${hhmm(got.at)} · ${got.who} has it`),
-          el('p', { class: 'rda-none' }, `The first pull request lands by ${declared?.first_pull_request ? dayWords(declared.first_pull_request) : 'the day ' + whoActs + ' names'}. Its ticket is on Tickets.`));
+          el('p', { class: 'rda-none' }, `${declared?.approved_heading || declared?.approve_result ? '' : `The first pull request lands by ${declared?.first_pull_request ? dayWords(declared.first_pull_request) : 'the day ' + whoActs + ' names'}. `}Its ticket is on Tickets.`));
         return;
       }
       if (actMode === 'refine') {

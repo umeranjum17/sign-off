@@ -56,6 +56,15 @@ test('a report with no Actions block fails the lint, naming the report, and pass
   assert.equal(run('validate', write('with-actions.json', report())).code, 0, 'a report that declares its actions passes');
 });
 
+test('a report sets its approve words, and an empty or overlong one is refused by field', () => {
+  const act = (extra) => report({ actions: { ...report().actions, ...extra } });
+  assert.equal(run('validate', write('words.json', act({ approve_result: 'Runs the test. Ada posts the result.', approved_heading: 'Test started' }))).code, 0);
+  const empty = run('validate', write('words-empty.json', act({ approved_heading: ' ' })));
+  assert.equal(empty.code, 2, empty.out);
+  assert.match(empty.out, /actions\.approved_heading/);
+  assert.match(run('validate', write('words-long.json', act({ approve_result: 'x'.repeat(121) }))).out, /actions\.approve_result/);
+});
+
 test('Refine sends the report back, and the owner\'s version 2 lands on the same key with the diff of what changed', async () => {
   const board = join(scratch, 'refine-board.json');
   const first = run('post', board, '--kind', 'report', '--from', write('v1.json', report()), '--filer', 'agent-41');

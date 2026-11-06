@@ -154,7 +154,7 @@ export const REPORT_ACTIONS = ['approve', 'refine', 'reject'];
 /** The reasons the board offers when a report is rejected, unless the report declares its own. */
 export const REPORT_REASONS = ['Wrong direction', 'Too expensive', 'Not now', 'Already handled'];
 /** The Actions block a report declares: who does the work, when the first pull request comes, and which action it recommends. */
-export type ReportActions = { role: string; owner?: string; first_pull_request?: string; recommended: string; reasons?: string[] };
+export type ReportActions = { role: string; owner?: string; first_pull_request?: string; recommended: string; reasons?: string[]; approve_result?: string; approved_heading?: string };
 /** One line of what changed between two versions of a report: added, rewritten (with the wording it replaces) or removed. */
 export type VersionChange = { kind: 'added' | 'rewritten' | 'removed'; text: string; was?: string };
 export const NOTE_MAX = 500;
@@ -261,6 +261,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
       if (!a || typeof a !== 'object' || Array.isArray(a) || typeof a.role !== 'string' || !a.role.trim() || [...a.role].length > 40
         || (a.owner !== undefined && (typeof a.owner !== 'string' || !a.owner.trim() || [...a.owner].length > 40))
         || (a.first_pull_request !== undefined && !(typeof a.first_pull_request === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.first_pull_request)))
+        || (a.approve_result !== undefined && (typeof a.approve_result !== 'string' || !a.approve_result.trim() || [...a.approve_result].length > 120))
+        || (a.approved_heading !== undefined && (typeof a.approved_heading !== 'string' || !a.approved_heading.trim() || [...a.approved_heading].length > 40))
         || !REPORT_ACTIONS.includes(a.recommended)
         || (a.reasons !== undefined && (!Array.isArray(a.reasons) || a.reasons.length < 2 || a.reasons.length > 4 || a.reasons.some((r: any) => typeof r !== 'string' || !r.trim() || [...r].length > 30)))) {
         throw bad('actions', `must name the role that does the work, its owner when it has one, the day the first pull request lands and one of ${REPORT_ACTIONS.join(', ')}`);
