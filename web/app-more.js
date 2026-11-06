@@ -700,20 +700,60 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   }
   /** A card that names a ticket wears its type's mark: a proof is evidence, a pull request is a merge, and the rest are decisions. */
   const tkKindTile = (k) => el('span', { class: `ui-icon tk-tile t-${k}`, role: 'img', 'aria-label': k });
+  /** The owner sets a ticket's status and who works on it on its page (POST /api/tickets/<id>). The change shows at once and says it was saved for the fleet to take to the
+   *  backlog; a save that fails puts the old value back and says why. A frozen copy and a read-only board show the values with no control; a board the fleet feeds
+   *  (answers only) takes the change, as it takes an answer, for the fleet to read. */
+  const TK_SET = [['queued', 'To do'], ['in progress', 'In progress'], ['done', 'Done']];
+  const tkEditable = () => !FROZEN && !state.readonly;
+  function tkSave(t, change) {
+    const was = { state: t.state, hold: t.hold, progress: t.progress, assignee: t.assignee };
+    if (change.state) Object.assign(t, { state: change.state, hold: false, ...(change.state === 'done' && { progress: 100 }) });
+    if ('assignee' in change) t.assignee = change.assignee === null ? undefined : { lead: change.assignee, live: false };
+    render();
+    fetch(`/api/tickets/${encodeURIComponent(t.id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(change) }).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? `The board replied ${res.status}`);
+      say('Saved · the fleet applies it to the backlog', 4000);
+      readTickets(true);
+    }).catch((e) => { Object.assign(t, was); render(); say(`Couldn’t save: ${why(e)}`, 8000, undefined, 'error'); });
+  }
+  /** Status, first in a ticket's card: To do, In progress and Done as one switch, the one it is in pressed (none while it is on hold). */
+  function tkSetStatus(t) {
+    if (!tkEditable()) return '';
+    const cur = { todo: 'queued', moving: 'in progress', done: 'done' }[tkStateOf(t)];
+    return el('div', { class: 'tk-set' }, el('span', { class: 'k' }, tkMark('half'), 'Status'), el('div', { class: 'ui-seg tk-set-seg', role: 'group', 'aria-label': 'Status' },
+      ...TK_SET.map(([v, w]) => { const b = el('button', { type: 'button', 'aria-pressed': String(cur === v) }, w); b.onclick = () => { if (cur !== v) buzz('tick'), tkSave(t, { state: v }); }; return b; })));
+  }
+  /** Who works on it, picked from the leads that own tickets on this board (most tickets first, each with the model it last ran), or nobody. */
+  const tkAsgSheet = sheetOf('tk-asg');
+  function tkPickAssignee(t) {
+    const leads = new Map();
+    for (const x of tkAll()) if (x.assignee?.lead) { const had = leads.get(x.assignee.lead); leads.set(x.assignee.lead, { n: (had?.n ?? 0) + 1, model: had?.model || x.assignee.model || '' }); }
+    const cur = t.assignee?.lead ?? '';
+    const pick = (name, sub) => { const x = el('button', { type: 'button', class: 'ui-pr tk-pick', ...(cur === name && { 'aria-current': 'true' }) }, el('span', { class: 'k', dir: 'auto' }, name || 'Unassigned', sub ? el('small', {}, sub) : ''), el('span', { class: 'v' }, cur === name ? glyph('check') : ''));
+      x.onclick = () => { tkAsgSheet.close(); if (cur !== name) tkSave(t, { assignee: name || null }); }; return x; };
+    tkAsgSheet.replaceChildren(el('div', {}, sheetHead('tk-asg', 'Assign to'), el('div', { class: 'ui-props' }, ...[...leads].sort((x, y) => y[1].n - x[1].n).map(([name, l]) => pick(name, l.model)), pick('', ''))));
+    tkAsgSheet.showModal();
+    tkAsgSheet.querySelector('h2').focus();
+  }
   /** The Assigned block of a ticket page, as its task record says it: who owns it and what runs it first (lead · model), then the record's own detail.
    *  A ticket moving with no record is a defect and says so in the warning colour; one that has not started reads quietly. */
   function tkAssignee(t) {
     const a = t.assignee, row = tkProp, none = (w) => el('span', { class: 'tk-none' }, w), av = (src, v, w) => v ? el('span', { class: 'tk-av' }, logoMark(src, v), el('span', { dir: 'auto' }, v)) : none(w);
     const who = (x) => el('span', { class: 'tk-av' }, x.model ? logoMark(x.model_logo, x.model) : x.tool ? logoMark(x.tool_logo, x.tool) : '', el('span', { dir: 'auto' }, [x.lead, x.model].filter(Boolean).join(' · ')),
       x.live ? el('span', { class: 'tk-live' }, el('i', { 'aria-hidden': 'true' }), 'Live') : '');
-    return [el('p', { class: 'ui-dl' }, 'Assigned'), el('div', { class: 'ui-props tk-assigned' }, ...(a ? [
-      row('person', 'Assignee', who(a)),
+    // The Assignee row is the control: it opens the picker, with the value and a chevron on its right.
+    const asg = (v) => { if (!tkEditable()) return row('person', 'Assignee', v); const b = el('button', { type: 'button', class: 'ui-pr tk-pick tk-asg', 'aria-haspopup': 'dialog' }, el('span', { class: 'k' }, tkMark('person'), 'Assignee'), el('span', { class: 'v' }, v, glyph('right')));
+      b.onclick = () => tkPickAssignee(t); return b; };
+    // The owner's own pick names only a lead: the rows of what runs it show once the fleet records one.
+    return [el('p', { class: 'ui-dl' }, 'Assigned'), el('div', { class: 'ui-props tk-assigned' }, ...(a && !(a.worker || a.model || a.tool || a.live) ? [asg(who(a))] : a ? [
+      asg(who(a)),
       row('person', 'Lead', el('span', { dir: 'auto' }, a.lead)),
       row('person', 'Worker', a.worker ? el('span', { class: 'tk-worker', dir: 'auto', title: a.worker_id }, a.worker) : 'None running'),
       row('chip', 'Model', av(a.model_logo, a.model, 'Not recorded')),
       row('layers', 'Tool', av(a.tool_logo, a.tool, 'Not recorded')),
       row('clock', 'Worker live', a.live ? el('span', { class: 'tk-live' }, el('i', { 'aria-hidden': 'true' }), 'Live') : 'Not running')]
-      : [row('person', 'Assignee', tkStateOf(t) === 'moving' ? el('span', { class: 'tk-as missing' }, tkMark('no-person'), 'No assignee') : none('Unassigned'))]))];
+      : [asg(tkStateOf(t) === 'moving' ? el('span', { class: 'tk-as missing' }, tkMark('no-person'), 'No assignee') : none('Unassigned'))]))];
   }
   function ticketPage(t, close = '') {
     const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
@@ -730,7 +770,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.key && !t.key_derived ? el('p', { class: 'tk-slug', dir: 'ltr' }, t.id) : '',
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
-      el('div', { class: 'ui-props' }, t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
+      el('div', { class: 'ui-props' }, tkSetStatus(t), t.priority ? prop('flag', 'Priority', el('span', { class: `ui-pc ${t.priority.toLowerCase()}` }, t.priority)) : '',
         prop('half', 'Progress', ...tkStatus(t), ...((t.stage && !kids.length) || (t.progress > 0 && t.progress < 100) ? [el('span', { class: 'ui-bar' }, el('i', { style: `width: ${t.progress}%` })), el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', {}, t.progress >= 100 ? 'All done' : 'Not started')])),
         s === 'hold' ? prop('pause', 'Hold', el('span', {}, 'On hold'), el('span', { class: 'tk-why' }, t.hold_reason ?? 'No reason recorded')) : '',
         up ? prop('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : '',

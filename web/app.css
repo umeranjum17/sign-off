@@ -529,6 +529,8 @@
     display: flex; align-items: center; gap: 0.875rem; padding: 0.5rem 0.5rem 0.5rem 1.125rem; border-radius: 0.875rem;
     background: var(--text); color: var(--bg); font-size: 1rem; }
   #toast[hidden] { display: none; }
+  /* An open ticket sits over the page at z-index 30: what it says about a change made on it (saved, or why not) shows above it. */
+  body:has(.tk-over) #toast { z-index: 31; }
   #toast #toast-text { flex: 1; min-width: 0; }
   #toast button { flex: none; min-height: var(--ctl); padding: 0 0.875rem; background: var(--tk-on-ink-press); color: inherit; font-weight: 600; }
   #toast button:focus-visible { outline-color: var(--bg); }
@@ -2023,6 +2025,13 @@
   .tk-empty { margin-top: 1rem; }
   /* The project filter's sheet: Every project, then each project with its tickets' count, the one picked checked. */
   :is(.tk-pick, .dl-pick) { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
+  /* A ticket's Status switch heads its card, and its Assignee row opens the picker: the switch keeps the board's segmented control, each button 44px to the touch. */
+  .tk-set { padding: 0.75rem 0; }
+  .tk-set .k { display: flex; align-items: center; gap: 0.5rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
+  .tk-set + .ui-pr::before { content: ''; position: absolute; top: -0.5px; right: 0; left: 0; height: 1px; background: var(--tk-line); }
+  .tk-set-seg { margin-top: 0.5rem; }
+  .tk-pick .k small { margin-left: 0.5rem; color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
+  .tk-asg .v .glyph { flex: none; color: var(--tk-text-secondary); }
   :is(.tk-pick, .dl-pick) .k { color: var(--tk-ink); } :is(.tk-pick, .dl-pick):active { background: none; } :is(.tk-pick, .dl-pick) .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
   /* A ticket over the list, on a phone: a sheet from the bottom over a dimmed list, up to 48px from the top, scrolling inside. */
   .tk-over { position: fixed; z-index: 30; inset: 0; }

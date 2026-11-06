@@ -348,3 +348,47 @@ test('the first view of Tickets reads the Story: its figures over every ticket a
   assert.ok(JSON.stringify(first).length < JSON.stringify(whole).length / 2, 'the first view is a fraction of the roll-up');
   await stopAll();
 });
+
+test('the owner switches a ticket to In progress or Done and picks who works on it: the board keeps it as its own line, the page reads it back, and --changes lists it for the fleet', async () => {
+  // The fleet's own board is answers-only (the fleet feeds it): it takes the owner's change, as it takes an answer.
+  const file = join(scratch, 'owner.json');
+  writeFileSync(file, '{"schema":2,"answers_only":true,"items":[]}\n');
+  axi('ticket', file, '--id', 'O-1', '--title', 'Umer filed this ticket', '--project', 'sign-off', '--state', 'queued');
+  // The fleet's own line carries its assignee as it records it; the reader keeps it, in the board's words.
+  appendFileSync(join(scratch, 'owner.tickets.jsonl'), JSON.stringify({ id: 'O-2', title: 'Fleet work', progress: 30, state: 'in progress', assignee: { lead: 'main', live: false, worker: 'no worker yet', model: 'claude-sonnet-5-5', tool: 'claude' }, at: '2026-11-06T04:00:00Z' }) + '\n');
+  await stopAll();
+  const child = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(child);
+  let out = '';
+  for await (const chunk of child.stdout) { out += chunk; if (/url: "http:\/\/[^"]+\/"/.test(out)) break; }
+  const base = /url: "(http:\/\/[^"]+)\/"/.exec(out)[1];
+  const set = (id, body) => fetch(`${base}/api/tickets/${id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const read = async () => (await (await fetch(`${base}/api/state?view=tickets`)).json()).tickets;
+  assert.deepEqual((await read()).find((t) => t.id === 'O-2').assignee, { lead: 'main', model: 'Sonnet 5.5', model_logo: '/logos/anthropic.svg', tool: 'Claude Code', tool_logo: '/logos/claude-code.svg', live: false });
+  assert.equal((await set('O-1', { state: 'in progress', assignee: 'crewhouse' })).status, 200);
+  let o1 = (await read()).find((t) => t.id === 'O-1');
+  assert.deepEqual([o1.state, o1.assignee], ['in progress', { lead: 'crewhouse', live: false }]);
+  assert.equal((await set('O-1', { state: 'done' })).status, 200);
+  assert.equal((await set('O-2', { assignee: null })).status, 200);
+  const after = await read();
+  o1 = after.find((t) => t.id === 'O-1');
+  assert.deepEqual([o1.state, o1.progress, o1.assignee.lead], ['done', 100, 'crewhouse']);
+  assert.equal(after.find((t) => t.id === 'O-2').assignee, undefined, 'Unassigned stays unassigned');
+  // Refused: a state the switch does not offer, a field it does not set, and a ticket the board has not got.
+  assert.equal((await set('O-1', { state: 'on hold' })).status, 400);
+  assert.equal((await set('O-1', { title: 'x' })).status, 400);
+  assert.equal((await set('nope', { state: 'done' })).status, 404);
+  assert.equal((await fetch(`${base}/api/tickets/O-1`, { method: 'POST', body: '{"state":"done"}' })).status, 415);
+  // A read-only board refuses it.
+  await stopAll();
+  writeFileSync(file, '{"schema":2,"readonly":true,"items":[]}\n');
+  const ro = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(ro);
+  let roOut = '';
+  for await (const chunk of ro.stdout) { roOut += chunk; if (/url: "http:\/\/[^"]+\/"/.test(roOut)) break; }
+  const roBase = /url: "(http:\/\/[^"]+)\/"/.exec(roOut)[1];
+  assert.equal((await fetch(`${roBase}/api/tickets/O-1`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"state":"queued"}' })).status, 403);
+  const { changes } = JSON.parse(axi('ticket', file, '--changes', '--json'));
+  assert.deepEqual(changes.map(({ ticket, field, from, to }) => [ticket, field, from, to]), [['O-1', 'state', 'queued', 'in progress'], ['O-1', 'assignee', 'nobody', 'crewhouse'], ['O-1', 'state', 'in progress', 'done'], ['O-2', 'assignee', 'main', 'nobody']]);
+  await stopAll();
+});

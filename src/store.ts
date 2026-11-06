@@ -669,7 +669,9 @@ export type TicketType = (typeof TICKET_TYPES)[number];
 export const TICKET_KEY = /^[A-Z][A-Z0-9]{1,9}-\d{1,6}$/;
 /** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
  * Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** What the row is: epic, ticket, bug, decision, evidence or merge. Absent reads as a ticket, or an epic once it has tickets under it. */ type?: TicketType; /** Why the ticket is on hold, as written when the hold was recorded: a hold without one is refused. */ hold_reason?: string; /** The readable name a row, the sheet and search show in place of the id's slug (JG-101); absent falls back to the slug. */ key?: string; /** The ticket's description as the sheet draws it: a summary paragraph, then headings, lists, links and quotes; no structure reads as plain text. */ description?: string; /** Who wrote this line (a tool or agent id passed with --filer), kept only when one was given. */ by?: string; at: string };
+export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** What the row is: epic, ticket, bug, decision, evidence or merge. Absent reads as a ticket, or an epic once it has tickets under it. */ type?: TicketType; /** Why the ticket is on hold, as written when the hold was recorded: a hold without one is refused. */ hold_reason?: string; /** The readable name a row, the sheet and search show in place of the id's slug (JG-101); absent falls back to the slug. */ key?: string; /** The ticket's description as the sheet draws it: a summary paragraph, then headings, lists, links and quotes; no structure reads as plain text. */ description?: string; /** Who wrote this line (a tool or agent id passed with --filer, or `owner` for a change the board's owner made on the page), kept only when one was given. */ by?: string; /** Who works on it as the line says: the fleet's own record (`lead` and what runs it), or the owner's pick of a lead; null when the owner set it to nobody. */ assignee?: TicketAssignee | null; at: string };
+/** An assignee as a ticket line carries it: the lead that owns the work and, when the fleet records them, the worker, model, tool and whether it is live. */
+export type TicketAssignee = { lead: string; [field: string]: string | boolean };
 /** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
 export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
 /** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
@@ -690,7 +692,9 @@ export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z
   : t.key !== undefined && (typeof t.key !== 'string' || !TICKET_KEY.test(t.key)) ? 'key must be a readable name such as JG-101 (a prefix of A-Z and 0-9, a dash, then a number)'
   : t.description !== undefined && (!isText(t.description) || !t.description.trim() || [...t.description].length > 4000) ? 'description must be text of 4000 characters or fewer'
   : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
-  : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
+  : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false'
+  : t.assignee !== undefined && t.assignee !== null && (typeof t.assignee !== 'object' || Array.isArray(t.assignee) || !isText(t.assignee.lead) || !t.assignee.lead.trim() || [...t.assignee.lead].length > 80
+    || !Object.values(t.assignee).every((v) => typeof v === 'boolean' || (isText(v) && [...v].length <= 200))) ? 'assignee must name a lead in 80 characters or fewer, with only short text or yes/no fields beside it' : '');
 /** A release names what ships (v1.4, 2026-11), never when: a word like "later" beside a priority reads as a contradiction, and priority is where urgency goes. */
 export const releaseIsWhen = (release: unknown) => typeof release === 'string' && /^(later|soon|now|next|someday|eventually|asap|urgent|tbd|tba|backlog|never)$/i.test(release.trim());
 /** Whether a ticket is still open work: not marked done by state, stage or progress. */
@@ -714,7 +718,7 @@ function oneOfEach(tickets: Ticket[], folded?: Map<string, string>): Ticket[] {
   }
   return [...first.values()];
 }
-const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'hold_reason', 'type', 'key', 'description', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'by'] as const;
+const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'hold_reason', 'type', 'key', 'description', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'assignee', 'by'] as const;
 /** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
 const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
 export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
@@ -733,6 +737,24 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
     if (t) latest.set(t.id, ticketLine(t));
   });
   return oneOfEach([...latest.values()], folded);
+}
+/** A change the board's owner made to a ticket on the page (a line written `by: owner`): its status or its assignee, what it was and what it is now, oldest first.
+ *  The fleet reads these (`sign-off-axi ticket --changes`) and applies them to its own backlog. */
+export type TicketChange = { ticket: string; title: string; field: 'state' | 'assignee'; from: string; to: string; at: string };
+export function readTicketChanges(decisionsPath: string): TicketChange[] {
+  const last = new Map<string, Ticket>(), out: TicketChange[] = [], lead = (t?: Ticket) => t?.assignee?.lead ?? '';
+  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
+    let t: Ticket;
+    try { t = line && JSON.parse(line); } catch { return; }
+    if (!t || ticketFault(t)) return;
+    const had = last.get(t.id);
+    if (t.by === 'owner') {
+      if ((had?.state ?? '') !== (t.state ?? '')) out.push({ ticket: t.id, title: t.title, field: 'state', from: had?.state ?? '', to: t.state ?? '', at: t.at });
+      if (lead(had) !== lead(t)) out.push({ ticket: t.id, title: t.title, field: 'assignee', from: lead(had), to: lead(t), at: t.at });
+    }
+    last.set(t.id, t);
+  });
+  return out;
 }
 /** What was finished in the last seven days (today and the six before, UTC): a ticket whose line moves its state to done from a state it had. A ticket that first appears done, or whose
  *  state is only filled in as done, was not finished that day, so a bulk import is never counted as a week's work. */

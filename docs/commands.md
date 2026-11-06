@@ -130,6 +130,7 @@ without it gets the same `401` as the rest.
 |---|---|
 | `GET /api/tickets` | `{"tickets": [...]}`: every ticket, in the order each was first written |
 | `GET /api/tickets/<name>` | `{"ticket": {...}}`: that ticket and the cards that name it. The name may be its id, its key in any case, a unique start of at least 8 of a `jg-`/`fm-` id's hex (either prefix), an id folded into the open ticket that tracks the same work, or a Juggernaut backlog slug; `404` with `No ticket named <name> on this board` otherwise |
+| `POST /api/tickets/<name>` | `{"state": "queued" \| "in progress" \| "done", "assignee": "<lead>" \| null}`, either or both: the owner's change from the ticket's page, written as a ticket line `by: owner`. A read-only board answers `403`. `sign-off-axi ticket --changes` lists these changes for the fleet |
 
 Each ticket carries the fields of its line in the file: `id`, `title`, `progress` (rolled up: an
 epic is as far along as the tickets under it, on average), `at`, and, when set, `parent`,
