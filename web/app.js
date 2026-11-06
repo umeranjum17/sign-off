@@ -133,25 +133,35 @@
       renderKeepingFocus();
     }
   }
-  /** The ticket roll-up is the largest part of the board and only the Tickets screen shows it: it is read when that screen first opens. */
-  let ticketsRead = false, ticketsFailed = '', ticketTag = '', ticketRequest, ticketScreen = false;
-  function readTickets(force = false) {
-    if (!force && ticketsRead) return Promise.resolve(false);
-    if (ticketRequest) return ticketRequest;
-    ticketRequest = fetch('/api/decisions?view=tickets', { headers: ticketTag ? { 'if-none-match': ticketTag } : {} }).then(async (res) => {
+  /** The ticket roll-up is the largest part of the board and only the Tickets screen shows it: it is read when that screen first opens. The Story, the first view,
+   *  reads only its own figures and the rows it lists (`story`); every other view of Tickets, and a ticket opened, reads the whole roll-up. */
+  let ticketsRead = false, storyRead = false, ticketsFailed = '', ticketRequest, ticketScreen = false;
+  const ticketTags = {};
+  /** The Story and a link being looked up need only the Story's read: #tickets and #tickets/<name>, never #tickets/all. */
+  const tkStoryOnly = () => /^#tickets(?:\/(?!all$)[\w.~-]+)?$/.test(location.hash);
+  function readTickets(force = false, story = false) {
+    const view = story && !ticketsRead ? 'story' : 'tickets';
+    if (!force && (ticketsRead || (view === 'story' && storyRead))) return Promise.resolve(false);
+    // A Story read on its way does not hold the roll-up: a screen that needs it reads it once that one lands.
+    if (ticketRequest) return view === 'tickets' && ticketRequest.view === 'story' ? ticketRequest.then(() => readTickets()) : ticketRequest;
+    ticketRequest = fetch(`/api/decisions?view=${view}`, { headers: ticketTags[view] ? { 'if-none-match': ticketTags[view] } : {} }).then(async (res) => {
       if (res.status === 304) return false;
       const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
       if (!res.ok) throw new Error(body.error);
-      ticketTag = res.headers.get('etag') ?? '';
-      ticketsRead = true; ticketsFailed = '';
+      ticketTags[view] = res.headers.get('etag') ?? '';
+      storyRead = true; if (view === 'tickets') ticketsRead = true;
+      ticketsFailed = '';
       mergeView(body);
       renderKeepingFocus();
       return true;
-    }).catch((e) => { ticketsRead = false; ticketsFailed = why(e); renderKeepingFocus(); return false; }).finally(() => { ticketRequest = undefined; });
+    }).catch((e) => { ticketsFailed = why(e); renderKeepingFocus(); return false; }).finally(() => { ticketRequest = undefined; });
+    ticketRequest.view = view;
     return ticketRequest;
   }
   /** Where the ticket roll-up stands, so a screen never calls a read still on its way, or one that failed, an empty board. A frozen copy holds it already. */
   const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
+  /** The same for the Story, which needs only its own read. */
+  const tkStoryLoad = () => (FROZEN || storyRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
 
   /** The addresses whose screens live in app-more.js: Decide, Designs, Evidence, Reports, Answered, Tickets. Today is the first screen and waits for nothing. */
   const MORE_SCREENS = /^#(?:waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|epics|inbox|channels)(?:\/|$)/;
@@ -2716,9 +2726,9 @@
     const [, at, key, opening] = /^#(waiting|decide|designs|evidence|reports|answered|tickets|ticket|activity|epics|inbox|channels)(?:\/([\w.~-]+)(\/open)?)?$/.exec(location.hash) ?? [];
     const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.needs).length;
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity' || at === 'epics';
-    if (showingTickets && !ticketScreen) readTickets(true);
+    if (showingTickets && (!ticketScreen || (!ticketsRead && !tkStoryOnly()))) readTickets(!ticketScreen, tkStoryOnly());
     ticketScreen = showingTickets;
-    if (key && tkLoad() === 'ready' && (at === 'tickets' ? key !== 'all' : at === 'ticket' && !tkById(key))) tkResolve(key);
+    if (key && (at === 'tickets' ? key !== 'all' : at === 'ticket' && tkLoad() === 'ready' && !tkById(key))) tkResolve(key);
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
@@ -2967,7 +2977,7 @@
         const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
         if (card?.card) mergeView(card), (changed = true);
       }
-      if (/^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
+      if (/^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true, tkStoryOnly())) changed = true;
       if (!changed) return;
       // One redraw for what the poll read: the lists come in with the page, and the rest of the board draws once when its own pages land.
       await readLists();
