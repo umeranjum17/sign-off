@@ -12,6 +12,6 @@ DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node "$here/design-demo-shots.mjs" "$out"
 node -e '
 const fs = require("fs"), out = process.argv[1], v = JSON.parse(fs.readFileSync(process.argv[2], "utf8")).version;
 fs.writeFileSync(out + "/steps.json", JSON.stringify({ target: { version: v }, start: "An isolated board given a stand-in Beads store of five rows through SIGN_OFF_BEADS_DIR and SIGN_OFF_BEADS_WRAPPER", steps: [
-  "Run the integration test: with SIGN-OFF Beads variables set, ticket --json lists the rows of a stand-in Beads store with their hold reason, pull requests, parent, priority and project, and no tickets file is written (beads-tickets.log).",
+  "Run the integration test: with SIGN_OFF Beads variables set, ticket --json lists the rows of a stand-in Beads store with their hold reason, pull requests, parent, priority and project, and no tickets file is written (beads-tickets.log).",
   "A ticket write, a hold with its reason and its release reach the store through the wrapper as create and update; a hold without a reason is refused; an unreadable store shows no tickets and a warning (beads-tickets.log)."], result: "The tickets listed are the rows of the store, the writes are in the store, and no tickets file exists (beads-tickets.log: 4 tests pass)." }, null, 2));
 ' "$out" "$repo/package.json"

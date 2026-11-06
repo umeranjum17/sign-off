@@ -27,7 +27,7 @@ else { console.error('unserved verb ' + verb); process.exit(2); }
 chmodSync(wrapper, 0o755);
 const seed = [
   { id: 'jg-1', title: 'Ship the board', status: 'in_progress', priority: 1, issue_type: 'task', labels: ['project:alpha', 'asked'], metadata: { progress: 40, stage: 'building', prs: 'https://github.com/o/r/pull/9' }, created_at: '2026-11-01T09:00:00Z', updated_at: '2026-11-05T09:00:00Z' },
-  { id: 'jg-2', title: 'Pick the logo', status: 'on_hold', priority: 2, issue_type: 'task', labels: [], metadata: { hold_reason: 'Waiting on the owner' }, created_at: '2026-11-02T09:00:00Z', updated_at: '2026-11-05T10:00:00Z' },
+  { id: 'jg-2', title: 'Pick the logo', status: 'on_hold', priority: 2, issue_type: 'task', labels: [], metadata: { hold_reason: 'Waiting on the owner' }, dependencies: [{ issue_id: 'jg-2', depends_on_id: 'jg-4', type: 'blocks' }, { issue_id: 'jg-2', depends_on_id: 'jg-3', type: 'blocks' }], created_at: '2026-11-02T09:00:00Z', updated_at: '2026-11-05T10:00:00Z' },
   { id: 'jg-3', title: 'Old chore', status: 'closed', priority: 3, issue_type: 'bug', labels: [], created_at: '2026-10-01T09:00:00Z', updated_at: '2026-11-04T09:00:00Z', closed_at: '2026-11-04T09:00:00Z' },
   { id: 'jg-4', title: 'The epic', status: 'open', priority: 2, issue_type: 'epic', labels: [], created_at: '2026-10-01T09:00:00Z', updated_at: '2026-11-04T09:00:00Z' },
   { id: 'jg-5', title: 'Under the epic', status: 'open', priority: 2, issue_type: 'task', labels: [], dependencies: [{ issue_id: 'jg-5', depends_on_id: 'jg-4', type: 'parent-child' }], created_at: '2026-10-01T09:00:00Z', updated_at: '2026-11-04T09:00:00Z' },
@@ -45,6 +45,8 @@ test('the board lists the tickets Beads holds, with their hold reason, pull requ
   assert.deepEqual([by['jg-1'].priority, by['jg-1'].project, by['jg-1'].asked, by['jg-1'].stage, by['jg-1'].state, by['jg-1'].progress], ['P1', 'alpha', true, 'building', 'in progress', 40]);
   assert.deepEqual(by['jg-1'].prs, ['https://github.com/o/r/pull/9']);
   assert.deepEqual([by['jg-2'].hold, by['jg-2'].hold_reason, by['jg-2'].state], [true, 'Waiting on the owner', 'on hold']);
+  assert.deepEqual(by['jg-2'].blocked_by, ['jg-4'], 'it waits on the open ticket, not on the closed one');
+  assert.equal(by['jg-1'].blocked_by, undefined);
   assert.deepEqual([by['jg-3'].state, by['jg-3'].progress, by['jg-3'].type], ['done', 100, 'bug']);
   assert.deepEqual([by['jg-4'].type, by['jg-5'].parent, by['jg-4'].progress], ['epic', 'jg-4', 0]);
 });

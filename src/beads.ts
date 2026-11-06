@@ -24,20 +24,25 @@ const rowsNow = (warn: (msg: string) => void): any[] => {
 const HELD = ['on_hold', 'blocked', 'deferred'];
 const metaList = (v: unknown) => (typeof v === 'string' ? v.split(',').map((x) => x.trim()).filter(Boolean) : []);
 /** A Beads row as a ticket. State comes from the status (a held row is on hold whatever it was doing); progress, stage, the pull requests and the rest of what a row shows are in its metadata. */
-export function ticketOf(row: any): Ticket {
+export function ticketOf(row: any, open: Set<string> = new Set()): Ticket {
   const meta = row.metadata ?? {}, labels: string[] = row.labels ?? [], held = HELD.includes(row.status), done = row.status === 'closed';
   const edge = (type: string) => (row.dependencies ?? []).filter((d: any) => d.type === type).map((d: any) => d.depends_on_id as string);
   const project = labels.find((l) => l.startsWith('project:'))?.slice(8), prs = [...new Set([row.external_ref, ...metaList(meta.prs)].filter(Boolean))];
-  const type = meta.type ?? ({ epic: 'epic', bug: 'bug', decision: 'decision' } as Record<string, string>)[row.issue_type] ?? 'ticket';
+  const waits = edge('blocks').filter((id: string) => open.has(id)), type = meta.type ?? ({ epic: 'epic', bug: 'bug', decision: 'decision' } as Record<string, string>)[row.issue_type] ?? 'ticket';
   return { id: row.id, title: row.title, progress: done ? 100 : Number.isInteger(meta.progress) ? meta.progress : 0, type: type as Ticket['type'],
     state: done ? 'done' : held ? 'on hold' : row.status === 'in_progress' ? 'in progress' : 'queued',
     ...(edge('parent-child')[0] && { parent: edge('parent-child')[0] }), ...(Number.isInteger(row.priority) && row.priority <= 3 && { priority: `P${row.priority}` }),
     ...(project && { project }), ...(held && { hold: true as const }), ...(held && meta.hold_reason && { hold_reason: meta.hold_reason }), ...(labels.includes('asked') && { asked: true }),
+    // The tickets it waits on (blocks edges to rows not yet closed): a held ticket's sheet names them.
+    ...(waits.length && { blocked_by: waits }),
     ...(meta.release && { release: meta.release }), ...(prs.length && { prs }), ...(meta.stage && { stage: meta.stage }), ...(done && !meta.stage && { stage: 'done' as const }),
     ...(Number.isInteger(meta.last_event_at) && { last_event_at: meta.last_event_at }), ...(meta.key && { key: meta.key }), ...(row.description && { description: row.description }),
     at: row.updated_at ?? row.created_at } as Ticket;
 }
-export const readBeadsTickets = (warn: (msg: string) => void) => rowsNow(warn).map(ticketOf);
+export const readBeadsTickets = (warn: (msg: string) => void) => {
+  const rows = rowsNow(warn), open = new Set<string>(rows.filter((r) => r.status !== 'closed').map((r) => r.id));
+  return rows.map((r) => ticketOf(r, open));
+};
 
 /** The week's finished work and the activity feed, from rows alone: Beads rows carry no earlier states, so the feed has what the rows say now (created, held, finished). */
 export function beadsEvents(warn: (msg: string) => void = () => {}) {
