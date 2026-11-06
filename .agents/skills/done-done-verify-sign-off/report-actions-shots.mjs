@@ -20,8 +20,9 @@ const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), X
 for (const k of Object.keys(env)) if (/^(FM_|FIRSTMATE|SIGN_OFF_)/.test(k)) delete env[k];
 const run = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 180000, ...options }); assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const cli = (...args) => run(process.execPath, [cliJs, ...args], { env });
-const KEY = 'paint-budget', FILER = 'agent-41';
-const message = (patch = {}) => ({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v5/valid-minimal.json'), 'utf8')), key: KEY, filed: '2026-10-31T09:00:00Z', filer: FILER, ...patch });
+// Filed now: a report over a day old archives by itself, and an archived report's link opens nothing to capture.
+const KEY = 'paint-budget', FILER = 'agent-41', FILED = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+const message = (patch = {}) => ({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v5/valid-minimal.json'), 'utf8')), key: KEY, filed: FILED, filer: FILER, ...patch });
 const messageFile = (name, patch = {}) => { const file = join(dir, name); writeFileSync(file, JSON.stringify(message(patch))); return file; };
 const lines = (file) => { try { return readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch { return []; } };
 
