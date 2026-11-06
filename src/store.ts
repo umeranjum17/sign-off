@@ -707,13 +707,13 @@ export const ticketWork = (t: Pick<Ticket, 'title' | 'project' | 'parent'>) => [
 /** The open ticket that already tracks this work under another id, if any: a second one is the same work filed twice. */
 export const ticketTwin = (tickets: Ticket[], t: Pick<Ticket, 'id' | 'title' | 'project' | 'parent'>) => tickets.find((x) => x.id !== t.id && ticketOpen(x) && ticketWork(x) === ticketWork(t));
 const STAGES = ['queued', 'building', 'review', 'merging', 'done'];
-/** Open tickets that are the same work keep one record: the first id written, with the furthest stage and progress either one reached. */
-function oneOfEach(tickets: Ticket[]): Ticket[] {
+/** Open tickets that are the same work keep one record: the first id written, with the furthest stage and progress either one reached. `folded` learns each later id and the id it joined. */
+function oneOfEach(tickets: Ticket[], folded?: Map<string, string>): Ticket[] {
   const first = new Map<string, Ticket>(), far = (t: Ticket) => STAGES.indexOf(t.stage ?? '') * 1000 + t.progress;
   for (const t of tickets) {
     const key = ticketOpen(t) ? ticketWork(t) : t.id, had = first.get(key);
     if (!had) first.set(key, t);
-    else first.set(key, { ...(far(t) > far(had) ? t : had), id: had.id, at: Date.parse(t.at) > Date.parse(had.at) ? t.at : had.at });
+    else folded?.set(t.id, had.id), first.set(key, { ...(far(t) > far(had) ? t : had), id: had.id, at: Date.parse(t.at) > Date.parse(had.at) ? t.at : had.at });
   }
   return [...first.values()];
 }
@@ -726,9 +726,10 @@ export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Tick
   appendLine(ticketsPath(decisionsPath), line);
   return line;
 }
-/** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn. */
-export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}): Ticket[] {
-  if (beadsOn()) return oneOfEach(readBeadsTickets(warn));
+/** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn.
+ * An id whose open work an earlier id already tracks is read as that ticket, and `folded`, when given, learns which, so a link to it still opens the work. */
+export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}, folded?: Map<string, string>): Ticket[] {
+  if (beadsOn()) return oneOfEach(readBeadsTickets(warn), folded);
   const latest = new Map<string, Ticket>();
   readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, n) => {
     let t;
@@ -736,7 +737,7 @@ export function readTickets(decisionsPath: string, warn: (msg: string) => void =
     if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
     if (t) latest.set(t.id, ticketLine(t));
   });
-  return oneOfEach([...latest.values()]);
+  return oneOfEach([...latest.values()], folded);
 }
 /** What was finished in the last seven days (today and the six before, UTC): a ticket whose line moves its state to done from a state it had. A ticket that first appears done, or whose
  *  state is only filled in as done, was not finished that day, so a bulk import is never counted as a week's work. */

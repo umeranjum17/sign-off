@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { TICKET_KEY } from './store.js';
 import { homedir } from 'node:os';
@@ -37,6 +38,10 @@ export function workerTitle(id: string, named?: string): string {
   const text = words.join(' ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
+
+/** The ids a Juggernaut fleet gives the ticket of a backlog item, as its tickets sync makes them: `jg-` and, from before the fleet re-keyed its tickets, `fm-`, each
+ * followed by the first 32 hex of sha256("main/<slug>"). A link that names the backlog item by its slug (#tickets/bots-share-build) opens that ticket. */
+export const fleetIdsOf = (slug: string) => { const h = createHash('sha256').update(`main/${slug}`).digest('hex').slice(0, 32); return [`jg-${h}`, `fm-${h}`]; };
 
 /** The `key=value` lines of a task record; a line of another shape is skipped. Lines that name an endpoint as `endpoint:` are kept under that key too. */
 function lines(text: string): Map<string, string> {

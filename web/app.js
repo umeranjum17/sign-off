@@ -1518,7 +1518,7 @@
   /** A mark from web/logos, drawn as a mask in the text colour. */
   const logoMark = (src, name) => el('span', { class: 'tk-logo', role: 'img', 'aria-label': name, style: `--logo: url("${/^\/logos\/[\w-]+\.svg$/.test(src ?? '') ? src : '/logos/generic.svg'}")` });
   // Filled by app-more.js when the screens file lands: the owner line and a short reason are drawn after the first paint.
-  let tkOwnerLine = () => '', tkShort = (t) => t;
+  let tkOwnerLine = () => '', tkShort = (t) => t, tkResolve = () => {};
   /** The tickets the lists hold (those under no ticket on the board), of the kind and project picked. The kinds show only while the board has both. */
   function tkLists() {
     const roots = tkAll().filter((t) => !tkById(t.parent)), asked = roots.filter((t) => t.asked), both = asked.length > 0 && asked.length < roots.length;
@@ -2742,6 +2742,7 @@
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity' || at === 'epics';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
+    if (key && tkLoad() === 'ready' && (at === 'tickets' ? key !== 'all' : at === 'ticket' && !tkById(key))) tkResolve(key);
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.

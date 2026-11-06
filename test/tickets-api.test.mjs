@@ -280,3 +280,44 @@ test('a week counts a ticket that moves to done from a state it had, never one t
   assert.deepEqual(week.projects, [{ project: 'Beacon', done: 1 }]);
   assert.equal(week.days.filter((d) => d.done).length, 1);
 });
+
+test('a link opens its ticket by id, key, an id from before the fleet re-keyed, a short hash or the backlog slug it was filed from, and a ticket filed now is in the feed', async () => {
+  // Fleet ids as Juggernaut's tickets sync makes them: jg- and the first 32 hex of sha256("main/<backlog slug>"); fm- is the same work before the re-key.
+  const { createHash } = await import('node:crypto');
+  const fleet = (slug) => createHash('sha256').update(`main/${slug}`).digest('hex').slice(0, 32);
+  const file = join(scratch, 'links.json'), share = fleet('bots-share-build'), live = fleet('tickets-page-jira-basics');
+  writeFileSync(file, '{"schema":2,"items":[]}\n');
+  axi('ticket', file, '--id', `fm-${share}`, '--description', 'Summary line.', '--title', 'Build the bots share one computer plan', '--project', 'crewhouse', '--state', 'done', '--progress', '100');
+  axi('ticket', file, '--id', `jg-${share}`, '--description', 'Summary line.', '--title', 'Build the bots share one computer plan: all eight slices', '--project', 'crewhouse');
+  axi('ticket', file, '--id', `jg-${live}`, '--description', 'Summary line.', '--title', 'Live Tickets page: real links, no grid', '--project', 'sign-off', '--key', 'SO-77');
+  // The fleet appends its own lines too: an open ticket filed again under a new id is folded into the first one, and a link to the second id opens the first.
+  const again = fleet('settle-muxr-dependency-twice'), first = fleet('settle-muxr-dependency');
+  appendFileSync(join(scratch, 'links.tickets.jsonl'), [{ id: `fm-${first}`, title: 'Settle the muxr dependency', progress: 0, project: 'muxr', at: '2026-11-06T01:00:00Z' },
+    { id: `fm-${again}`, title: 'Settle the muxr dependency', progress: 0, project: 'muxr', at: '2026-11-06T02:00:00Z' }].map((t) => JSON.stringify(t) + '\n').join(''));
+  const child = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(child);
+  let out = '';
+  for await (const chunk of child.stdout) { out += chunk; if (/url: "http:\/\/[^"]+\/"/.test(out)) break; }
+  const base = /url: "(http:\/\/[^"]+)\/"/.exec(out)[1];
+  const open = async (name) => { const res = await fetch(`${base}/api/tickets/${encodeURIComponent(name)}`); return res.ok ? (await res.json()).ticket.id : res.status; };
+  assert.equal(await open(`jg-${live}`), `jg-${live}`);
+  assert.equal(await open('SO-77'), `jg-${live}`);
+  assert.equal(await open('so-77'), `jg-${live}`);
+  assert.equal(await open('tickets-page-jira-basics'), `jg-${live}`);
+  assert.equal(await open('bots-share-build'), `jg-${share}`);
+  assert.equal(await open(live.slice(0, 10)), `jg-${live}`);
+  // The fm- row is the same work: the jg- row the fleet writes now is the one a short hash opens, and the fm- id itself still opens its own row.
+  assert.equal(await open(share.slice(0, 8)), `jg-${share}`);
+  assert.equal(await open(`fm-${share}`), `fm-${share}`);
+  assert.equal(await open(`fm-${again}`), `fm-${first}`);
+  assert.equal(await open('settle-muxr-dependency-twice'), `fm-${first}`);
+  assert.equal(await open('no-such-backlog-item'), 404);
+  assert.match((await (await fetch(`${base}/api/tickets/no-such-backlog-item`)).json()).error, /No ticket named no-such-backlog-item/);
+  // A ticket filed while the board is up is in the feed at once, and its slug opens it.
+  const today = fleet('ticket-filed-in-this-run');
+  axi('ticket', file, '--id', `jg-${today}`, '--description', 'Summary line.', '--title', 'A ticket filed in this run', '--project', 'sign-off', '--state', 'queued');
+  const { tickets } = await (await fetch(`${base}/api/tickets`)).json();
+  assert.ok(tickets.some((t) => t.id === `jg-${today}` && t.title === 'A ticket filed in this run'));
+  assert.equal(await open('ticket-filed-in-this-run'), `jg-${today}`);
+  await stopAll();
+});

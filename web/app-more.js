@@ -643,6 +643,20 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     });
   }
   /** Who works on a ticket: model mark, `lead · Model`, Live dot (the amber defect when moving with nobody). Drawn here, after the first paint. */
+  /** A link may name a ticket by its key, an old id or the backlog item it was filed from, and #tickets/<name> as well as #ticket/<name>: the board says which ticket
+   *  that is (GET /api/tickets/<name>) and the address moves to it. A name no ticket has says so, once. Drawn here, after the first paint: a ticket's address waits for this file anyway. */
+  const tkAsked = new Set();
+  tkResolve = (name) => {
+    if (tkById(name)) return location.replace(`#ticket/${name}`);
+    if (FROZEN || tkAsked.has(name)) return;
+    tkAsked.add(name);
+    fetch(`/api/tickets/${encodeURIComponent(name)}`).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!location.hash.endsWith(`/${name}`)) return;
+      if (res.ok && body.ticket?.id) location.replace(`#ticket/${body.ticket.id}`);
+      else say(body.error ?? `Couldn’t open ticket ${name}: the board answered ${res.status}`, 8000, undefined, 'error');
+    }).catch((e) => { tkAsked.delete(name); say(`Couldn’t open ticket ${name}: ${why(e)}`, 8000, undefined, 'error'); });
+  };
   tkOwnerLine = (t) => {
     const a = t.assignee;
     if (!a) return tkStateOf(t) === 'moving' ? el('span', { class: 'tk-as missing' }, tkMark('no-person'), 'No assignee') : el('span', { class: 'tk-as none' }, 'Not assigned yet');
