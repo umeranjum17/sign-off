@@ -2,18 +2,27 @@
 // `validate --new` with each rule named; a corrected version of it (slices with size, check and order, measured numbers, a risk with its mitigation) passes.
 // Writes refused.txt, passes.txt, tests.log and steps.json into the folder named by argv[2].
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const out = resolve(process.argv[2]), repo = process.cwd(), sample = join(dirname(fileURLToPath(import.meta.url)), 'report-content-sample');
 mkdirSync(out, { recursive: true });
 const cli = join(repo, 'dist/cli.js');
+// The sample pages are stored as index.html.txt so they never ship as pages; each run copies them back to index.html in a folder of its own.
+const work = mkdtempSync(join(tmpdir(), 'so-content-sample-'));
+for (const name of ['bots-share-machine', 'bots-share-machine-fixed']) {
+  mkdirSync(join(work, name));
+  copyFileSync(join(sample, name, 'index.html.txt'), join(work, name, 'index.html'));
+  copyFileSync(join(sample, `${name}.json`), join(work, `${name}.json`));
+}
 const validate = (name) => {
-  const r = spawnSync(process.execPath, [cli, 'validate', '--new', name], { cwd: sample, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [cli, 'validate', '--new', name], { cwd: work, encoding: 'utf8' });
   return { code: r.status, text: `$ sign-off-axi validate --new ${name}\n${r.stdout}${r.stderr}exit ${r.status}\n` };
 };
 const refused = validate('bots-share-machine.json'), passes = validate('bots-share-machine-fixed.json');
+rmSync(work, { recursive: true, force: true });
 writeFileSync(join(out, 'refused.txt'), refused.text);
 writeFileSync(join(out, 'passes.txt'), passes.text);
 const tests = spawnSync(process.execPath, ['--test', '--test-global-setup=test/temp-folder.mjs', 'test/report-content.test.mjs'], { cwd: repo, encoding: 'utf8' });
