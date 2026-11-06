@@ -177,13 +177,13 @@ const PAGES = [
     name: `decide-${key}`, hash: `#decide/${key}`, ready: '.decide', stages: [{ data: { options, key, kind }, run: async (h, { options, key, kind }) => {
       const bar = () => h.board().querySelector('.decide-bar'), more = () => h.board().querySelector('.sh-head .dl-more, .split-bar .dl-more');
       if (kind === 'signin') await h.need('Open sign-in, npm', h.find(/^Open sign-in, npm$/, h.board()));
-      // Nothing is picked until a pick: the one button waits, off, then names the pick.
-      if (options.length) h.has('Pick an answer (off until a pick)', bar()?.querySelector('.answer:disabled'));
+      // The recommended answer starts selected (shown only), so the one button already names it and is on; nothing is saved until it is pressed.
+      if (options.length) h.has('Answer <recommended> (on at open)', /^Answer /.test(bar()?.querySelector('.answer')?.textContent ?? '') && bar().querySelector('.answer:not(:disabled)'));
       for (const o of options) await h.press(`option ${o}`, h.find(new RegExp(o), h.board().querySelector('.pick-list, .choices, .decide')), () => true);
       // One button in the bar with Ask me later beside it (a sign-in keeps Ask me later in its More), and one More over the ask holding Discard.
       h.has('More', more()?.querySelector('summary'));
       if (options.length) {
-        await h.press('Your own answer', h.find(/^Your own answer/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
+        await h.press('Something else', h.find(/^Something else/, h.board().querySelector('.pick-list')), () => bar().querySelector('.answer').textContent === 'Send answer');
         await h.press(`option ${options[0]} again`, h.find(new RegExp(options[0]), h.board().querySelector('.pick-list')), () => /^Answer /.test(bar().querySelector('.answer').textContent));
       }
       await h.cycle('Ask me later', h.find(/^Ask me later$/, h.board().querySelector('.ask-sheet') ?? (bar()?.querySelector('.later-btn') ? bar() : more())), () => !!h.board().querySelector('.dl-row[data-group=later]'), () => h.board().querySelector('.decide'), /moved to later/);
@@ -286,7 +286,7 @@ const PAGES = [
     const page = () => h.board().querySelector('.decide'), answer = () => page().querySelector('.decide-bar .answer');
     if (!h.need('Note', page()?.querySelector('.note-box'))) return;
     h.type(page().querySelector('.note-box'), 'Keep it short.');
-    await h.press('Your own answer', h.find(/^Your own answer/, page().querySelector('.pick-list')), () => answer().textContent === 'Send answer' && answer().disabled);
+    await h.press('Something else', h.find(/^Something else/, page().querySelector('.pick-list')), () => answer().textContent === 'Send answer' && answer().disabled);
     h.type(page().querySelector('.own-box'), 'Keep it, but send it on Mondays.');
     await h.cycle('Send answer', answer(), () => location.hash !== '#decide/keep-the-weekly-digest', () => true, /your reply/);
   } }] },

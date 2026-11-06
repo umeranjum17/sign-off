@@ -1228,7 +1228,8 @@
    *  A plan has no options but waits for its send-back, unless it is guided with no decisions: that one is for reading. */
   const area = (d) => {
     if (d.kind === 'design' && !promoted(d)) return 'designs';
-    const a = isAnswered(d) ? 'answered' : d.type === 'evidence' ? 'evidence' : d.area ?? (state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || (d.type === 'plan' && !(d.guided && !d.decisions?.length)) || d.kind === 'design') ? 'reports' : 'waiting');
+    // A report whose open questions were answered stays a report: it is still read under Reports.
+    const a = isAnswered(d) && d.kind !== 'report' ? 'answered' : d.type === 'evidence' ? 'evidence' : d.area ?? (state.readonly || d.type === 'explainer' || !(d.options.length || d.reply || d.type === 'signin' || (d.type === 'plan' && !(d.guided && !d.decisions?.length)) || d.kind === 'design') ? 'reports' : 'waiting');
     // Reports lists only what explains: a page to tap through, or a narrated video. Text alone (a receipt, a status line) is a note, folded under it.
     return a === 'reports' && !state.readonly && d.type !== 'explainer' && !reads(d) ? 'notes' : a;
   };

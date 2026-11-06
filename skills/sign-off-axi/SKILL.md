@@ -189,6 +189,8 @@ Each kind of report has the parts strong teams write for that kind of document, 
 - **status**: `done`, `in-progress`, `blocked` (held up, and on what), `up-next`.
 - **other**: no fixed parts; use it only when no kind fits.
 
+Every open question you need the user to answer goes in `"decisions"` as a typed question (`key`, `question`, `why`, `options` with `outcome`, `recommend`, `reason`): the board draws it as a radio list with your recommendation selected and Something else last, and the user answers it in one tap on the report. Post refuses a plan or report whose open question (`open-questions`, `owner-calls`, or a section headed "Open questions") is only prose. Read the answer with `answers --key <key> --json` (`decisions`).
+
 ## Draw a real diagram in every design, architecture or plan report
 
 A plan, and a report that explains a design or an architecture, needs at least one real diagram: a drawing of the thing itself, as an architecture diagram (the parts and what talks to what) or a flow (the steps in order, with their arrows). Bars, tiles or a numbered list are not a diagram. Other reports add one only where structure, order or dependency is the point; when the point is a number, keep the bars or tiles.

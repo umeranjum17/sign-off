@@ -190,11 +190,13 @@ without posting.
   recommended** and **Move all to later**. Every change shows a toast with
   **Undo**.
 - Tap a row to open the ask: its picture or page, what it is and why, the
-  proof it rests on, then its answers as cards. Nothing is picked until you
-  pick: **Recommended** is only a tag, and the one button stays off
-  (**Pick an answer**) until a pick, then names it (**Answer Friday**). The
-  last card is **Your own answer**: it opens one box, and the button becomes
-  **Send answer**, which sends the words as the answer. One **Note**, open
+  proof it rests on, then its answers as one radio list. The answer marked
+  **Recommended** starts selected and the one button names it (**Answer
+  Friday**), so one tap agrees; selected is only what the page shows, and
+  nothing is saved and no waiting agent wakes until the button is pressed. A
+  guarded ask selects nothing, so its button stays off (**Pick an answer**)
+  until a pick. The last choice is **Something else**: it opens one box, and
+  the button becomes **Send answer**, which sends the words as the answer. One **Note**, open
   under the cards, goes with any pick. **More** over the ask holds **Ask me
   later** and **Discard**. The button turns into a check and opens the next
   ask, or the list after the last; on a phone that ask's bar reads **Back**,

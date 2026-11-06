@@ -2487,7 +2487,10 @@ function report(args: string[]) {
       const filed = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
       const template = readFileSync(new URL(`../web/${kind}-template.json`, import.meta.url), 'utf8').replace('"FILL: UTC time"', JSON.stringify(filed));
       // With --purpose the template holds that kind's parts, one section each; with none, the general shape and purpose to fill.
-      const kinded = purpose && { ...JSON.parse(template), purpose, ...(REPORT_PARTS[purpose].length && { sections: kindSections(purpose) }) };
+      // A kind with an open-questions part (research) or owner-calls (plan) also gets a typed question to fill: the board draws it as a radio list to answer.
+      const asks = purpose && REPORT_PARTS[purpose].some(([part]) => part === 'open-questions' || part === 'owner-calls');
+      const kinded = purpose && { ...JSON.parse(template), purpose, ...(REPORT_PARTS[purpose].length && { sections: kindSections(purpose) }), ...(asks && { decisions: [{ key: 'FILL-short-id', question: 'FILL: one open question, 12 words or fewer?', why: 'FILL: why it needs an answer now',
+        options: [{ value: 'a', label: 'FILL: first choice', outcome: 'FILL: what happens if picked' }, { value: 'b', label: 'FILL: second choice', outcome: 'FILL: what happens if picked' }], recommend: 'a', reason: 'FILL: why you recommend it' }] }) };
       // With --gallery the first section also holds a gallery to fill: one option, its phone and desktop frame.
       const doc = gallery ? { ...(kinded || JSON.parse(template)) } : kinded;
       if (gallery) doc.sections = doc.sections.map((sec: any, n: number) => n ? sec : { ...sec, gallery: [{ label: 'FILL: Option A', model: 'FILL: the model that made it', ran: 'FILL: UTC time it ran', frames: [
@@ -3578,8 +3581,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }
-  // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision.
-  if (d.type === 'plan') {
+  // A plan's answer is its one send-back: every section's verdict and note, and a pick for each decision. A guided report's open questions send back the same way.
+  if (d.type === 'plan' || (d.kind === 'report' && d.guided && d.decisions?.length)) {
     try { answered(appendSendBack(file, d, notes, decisions, note), d); } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
     return [200, state()];
   }

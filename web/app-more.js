@@ -793,6 +793,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     try { draft = JSON.parse(drafts.get(draftKey) ?? '{}'); } catch { draft = {}; }
     const notes = new Map((saved?.notes ?? draft.notes ?? []).filter((n) => d.sections.some((s) => s.id === n.section)).map((n) => [n.section, n]));
     const picks = new Map(Object.entries(saved?.decisions ?? draft.decisions ?? {}).filter(([key, value]) => d.decisions.some((q) => q.key === key) && typeof value === 'string' && value.trim()));
+    // Each decision starts on its recommended answer, shown only: nothing is saved until Send back.
+    if (!saved) for (const q of d.decisions) if (!picks.has(q.key)) picks.set(q.key, q.recommend);
     let comment = saved?.note ?? (typeof draft.comment === 'string' ? draft.comment : '');
     const answered = (q) => typeof picks.get(q.key) === 'string' && !!picks.get(q.key).trim();
     const remember = () => { drafts.set(draftKey, JSON.stringify({ notes: [...notes.values()], decisions: Object.fromEntries(picks), ...(comment.trim() && { comment }) })); keep(); };
@@ -865,26 +867,24 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       under(s.id).forEach((q) => main.append(decisionCard(q)));
     });
     function decisionCard(q) {
-      const choices = el('div', { class: 'choices', role: 'group', 'aria-label': q.question });
-      const other = el('textarea', { id: `plan-other-${q.key}`, maxlength: '500', placeholder: 'Other: write your own answer' });
-      other.value = q.options.some((o) => o.value === picks.get(q.key)) ? '' : (picks.get(q.key) ?? '');
+      // One radio list: the recommended answer starts selected (shown only; nothing is saved until Send back), and Something else, last, opens a field for the person's own words.
+      const choices = el('div', { class: 'choices', role: 'radiogroup', 'aria-label': q.question });
+      let mine = picks.has(q.key) && !q.options.some((o) => o.value === picks.get(q.key));
+      const other = el('textarea', { id: `plan-other-${q.key}`, maxlength: '500', placeholder: 'Say what you want instead', 'aria-label': `Something else, ${q.question}` });
+      other.value = mine ? picks.get(q.key) : '';
       other.disabled = ro;
-      const press = () => [...choices.children].forEach((b, i) => b.setAttribute('aria-pressed', q.options[i].value === picks.get(q.key)));
+      const field = el('div', { class: 'plan-other' }, other);
+      const press = () => { [...choices.children].forEach((b, i) => b.setAttribute('aria-checked', String(i < q.options.length ? !mine && q.options[i].value === picks.get(q.key) : mine))); field.hidden = !mine; };
       const n = d.decisions.indexOf(q) + 1;
-      other.oninput = () => {
-        if (other.value.trim()) picks.set(q.key, other.value);
-        else if (!q.options.some((o) => o.value === picks.get(q.key))) picks.delete(q.key);
-        remember(); press(); update();
-      };
-      q.options.forEach((o) => {
-        const b = el('button', { 'aria-pressed': picks.get(q.key) === o.value, ...(ro && { disabled: '' }) }, el('span', { class: 'rd' }, glyph('check')), el('span', { class: 'lbl' }, el('strong', {}, o.label),
-          o.value === q.recommend ? el('span', { class: 'tag' }, 'Recommended') : ''), el('span', { class: 'out', dir: 'auto' }, o.outcome),
-          o.value === q.recommend && q.reason ? el('span', { class: 'out why2', dir: 'auto' }, `Why: ${q.reason}`) : '');
-        b.onclick = () => { picks.set(q.key, o.value); other.value = ''; remember(); press(); update(); };
-        choices.append(b);
-      });
-      return el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('p', { class: 'eyebrow' }, icon('split'), `Decision ${n} of ${d.decisions.length}`), el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices,
-        el('details', { class: 'plan-other' }, el('summary', {}, 'Other answer'), el('label', { for: other.id }, 'Your own answer (optional)', other)),
+      other.oninput = () => { if (other.value.trim()) picks.set(q.key, other.value); else picks.delete(q.key); remember(); update(); };
+      const radio = (on, ...body) => { const b = el('button', { role: 'radio', ...(ro && { disabled: '' }) }, el('span', { class: 'rd' }, glyph('check')), ...body); b.onclick = () => { on(); remember(); press(); update(); }; choices.append(b); return b; };
+      q.options.forEach((o) => radio(() => { mine = false; picks.set(q.key, o.value); other.value = ''; }, el('span', { class: 'lbl' }, el('strong', {}, o.label),
+        o.value === q.recommend ? el('span', { class: 'tag' }, 'Recommended') : ''), el('span', { class: 'out', dir: 'auto' }, o.outcome),
+        o.value === q.recommend && q.reason ? el('span', { class: 'out why2', dir: 'auto' }, `Why: ${q.reason}`) : ''));
+      radio(() => { mine = true; other.value.trim() ? picks.set(q.key, other.value) : picks.delete(q.key); setTimeout(() => other.focus()); }, el('span', { class: 'lbl' }, el('strong', {}, 'Something else')),
+        el('span', { class: 'out' }, 'Say what you want instead')).setAttribute('aria-controls', other.id);
+      press();
+      return el('section', { class: 'plan-decision', id: `plan-decision-${q.key}` }, el('p', { class: 'eyebrow' }, icon('split'), `Decision ${n} of ${d.decisions.length}`), el('h3', { dir: 'auto' }, q.question), el('p', { class: 'meta', dir: 'auto' }, q.why), choices, field,
         el('p', { class: 'quiet' }, icon('clock'), el('span', {}, el('b', {}, 'If you stay quiet:'), ' the plan waits, and the agent builds nothing until you send back.')));
     }
     if (!saved) main.append(el('details', { class: 'plan-fold' }, el('summary', {}, 'What the agent gets back'), el('p', {}, 'One send-back with every answer: each section as Approve or Change with your note, and the option you picked in each decision.'),
@@ -1118,7 +1118,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
      Read receipts and Go deeper are real: a part read for a moment is saved on the board (/api/reads), and Go deeper asks the agent (/api/deeper),
      whose answer (sign-off-axi deeper) is polled and shown under the part that was tapped. */
   function guideView(d) {
-    const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = plan ? d.decisions ?? [] : [], by = (stage) => sections.filter((s) => s.stage === stage);
+    const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = d.decisions ?? [], asks = plan || decisions.length > 0, by = (stage) => sections.filter((s) => s.stage === stage);
     const live = !FROZEN && !state.readonly;
     // View, this browser's choice: a report's pictures Drawn or As lists, and its numbers shown under the parts or not.
     const view = { lists: lsGet('sign-off-view-lists') === '1', nums: lsGet('sign-off-view-nums') !== '0' }, viewHooks = new Set();
@@ -1135,7 +1135,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const stageOf = new Map(); // part id -> stage
     const rcs = new Map(), panels = new Map(), deeps = new Map();
     const readAt = (part) => state.reads?.[`${key}/${part}`];
-    const changes = () => (S.understood === 'no' ? 1 : 0) + decisions.filter((q) => S.picks[q.key] !== q.recommend).length;
+    const changes = () => (plan && S.understood === 'no' ? 1 : 0) + decisions.filter((q) => S.picks[q.key] !== q.recommend).length;
 
     // ---- receipts: who read this part and when
     const rd = (cls) => E('i', `gdot ${cls ?? ''}`);
@@ -1640,21 +1640,35 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       return card(s.id, s.stage, ...(s.heading || s.body ? [head(s.heading, s.body, undefined, s.id, 'heading', 'body')] : []), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
     };
 
-    const optBtns = new Map();
+    const optBtns = new Map(), owns = new Map();
+    // A decision is one radio list: the recommended answer starts selected (shown only; nothing is saved until the send), and Something else, last, opens a field for the person's own words.
     const decCard = (q, n) => {
       const opts = q.options.map((o) => {
         const b = el('button', { class: 'gd-opt', type: 'button', role: 'radio', 'aria-checked': 'false' }, E('span', 'rdo'),
           E('span', '', E('span', 'ol', o.label, ...(o.value === q.recommend ? [E('span', 'gd-pick', 'My pick')] : [])), mdSpan('span', 'oo', o.outcome, NOLINK)));
-        b.onclick = () => { S.picks[q.key] = o.value; paintOpts(); paintSummary(); };
+        b.onclick = () => { S.picks[q.key] = o.value; owns.get(q.key).on = false; paintOpts(); paintSummary(); };
         (optBtns.get(q.key) ?? optBtns.set(q.key, []).get(q.key)).push([o.value, b]);
         return b;
       });
-      return card(`d:${q.key}`, 'decide', head(q.question, q.why, `Decision ${n + 1} of ${decisions.length}`, `d:${q.key}`, 'question', 'why'), E('div', 'gd-opts', ...opts),
-        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), fld(`d:${q.key}`, 'reason', mdSpan('span', '', q.reason)))] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', 'If you stay quiet: ', fld(`d:${q.key}`, 'quiet', mdSpan('span', '', q.quiet))))] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
+      const box = el('textarea', { class: 'gd-own', maxlength: '500', placeholder: 'Say what you want instead', 'aria-label': `Something else, ${q.question}` }), field = E('div', 'gd-ownf', box);
+      const mine = el('button', { class: 'gd-opt', type: 'button', role: 'radio', 'aria-checked': 'false' }, E('span', 'rdo'), E('span', '', E('span', 'ol', 'Something else'), E('span', 'oo', 'Say what you want instead')));
+      const typed = () => box.value.trim();
+      if (!q.options.some((o) => o.value === S.picks[q.key])) box.value = S.picks[q.key] ?? '';
+      mine.onclick = () => { S.picks[q.key] = typed(); owns.get(q.key).on = true; paintOpts(); paintSummary(); box.focus(); };
+      box.oninput = () => { S.picks[q.key] = typed(); paintSummary(); };
+      owns.set(q.key, { b: mine, field, box, on: !q.options.some((o) => o.value === S.picks[q.key]) });
+      return card(`d:${q.key}`, 'decide', head(q.question, q.why, `Decision ${n + 1} of ${decisions.length}`, `d:${q.key}`, 'question', 'why'), el('div', { class: 'gd-opts', role: 'radiogroup', 'aria-label': q.question }, ...opts, mine), field,
+        ...(q.reason ? [E('div', 'gd-why', E('b', '', 'Why my pick: '), fld(`d:${q.key}`, 'reason', mdSpan('span', '', q.reason)))] : []), ...(q.quiet ? [E('p', 'gd-quiet', gic('clock'), E('span', '', 'If you stay quiet: ', fld(`d:${q.key}`, 'quiet', mdSpan('span', '', q.quiet))))] : []),
+        // A report keeps its send under its last question, as it has no plan bar.
+        ...(!plan && n === decisions.length - 1 ? [sendSlot, sendLine(`plan:${key}`), err] : []), ...acts(`d:${q.key}`), rc(`d:${q.key}`));
     };
     const paintOpts = () => {
       const lock = sent() || !live;
-      optBtns.forEach((list, k) => list.forEach(([v, b]) => { b.setAttribute('aria-checked', String(S.picks[k] === v)); b.disabled = lock; }));
+      optBtns.forEach((list, k) => {
+        const own = owns.get(k);
+        list.forEach(([v, b]) => { b.setAttribute('aria-checked', String(!own.on && S.picks[k] === v)); b.disabled = lock; });
+        own.b.setAttribute('aria-checked', String(own.on)); own.b.disabled = own.box.disabled = lock; own.field.hidden = !own.on;
+      });
     };
 
     // ---- next step and Go ahead
@@ -1774,12 +1788,14 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     if (declared) paintActions(); else decBox.remove();
 
     async function go(b) {
-      if (S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
+      const empty = [...owns.values()].find((o) => o.on && !o.box.value.trim());
+      if (empty) { empty.box.focus(); err.textContent = 'Say what you want instead, or pick one of the answers.'; return; }
+      if (plan && S.understood === 'no' && !S.note.trim()) { noteBox.focus(); noteBox.scrollIntoView({ block: 'center' }); err.textContent = 'Say what is off first, or choose That is right.'; return; }
       err.textContent = ''; b.disabled = true;
-      const notes = S.understood ? [{ section: 'understood', verdict: S.understood === 'yes' ? 'approve' : 'change', ...(S.note.trim() && { note: S.note.trim() }) }] : [];
+      const notes = plan && S.understood ? [{ section: 'understood', verdict: S.understood === 'yes' ? 'approve' : 'change', ...(S.note.trim() && { note: S.note.trim() }) }] : [];
       if (!await sendWithFeedback(`plan:${key}`, b, async () => { await postJson('/api/answers', { key, note: '', notes, decisions: S.picks }); S.note = noteBox.value = ''; sync(); })) b.disabled = false;
     }
-    const goBtn = () => { const b = el('button', { class: 'gd-btn block', type: 'button' }, gic('send'), changes() ? `Send ${plural(changes(), 'change')}` : 'Go ahead'); b.onclick = () => go(b); return b; };
+    const goBtn = () => { const b = el('button', { class: 'gd-btn block', type: 'button' }, gic('send'), changes() ? `Send ${plural(changes(), 'change')}` : plan ? 'Go ahead' : `Send ${plural(decisions.length, 'answer')}`); b.onclick = () => go(b); return b; };
 
     // ---- rail, progress and the phone bar
     const sumHost = E('div', 'gd-sum'), bar = E('div', 'gd-bar'), barTxt = E('div', 'txt'), nav = el('nav', { 'aria-label': 'Parts' }), segs = E('div', 'gd-segs');
@@ -1804,6 +1820,8 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         b2.disabled = gone || !live; b2.onclick = () => go(b2);
         barTxt.replaceChildren(...(gone ? [E('b', '', 'Sent'), 'Agent is on it'] : n ? [E('b', '', plural(n, 'change')), 'My picks for the rest'] : [E('b', '', 'My picks are set'), decisions.length ? `${plural(decisions.length, 'question')}, nothing required` : 'Nothing is required']));
         bar.replaceChildren(barTxt, b2);
+      }
+      if (asks) {
         const mine = answerOf(key), seen = state.seen_at?.[key];
         sendSlot.replaceChildren(...(gone
           ? [E('div', 'gd-sent', E('h3', '', 'Sent. I am on it.'), E('p', '', mine.notes?.length || decisions.some((q) => mine.decisions?.[q.key] !== q.recommend) ? 'Your changes are with the agent.' : 'Your answers are my picks.'),
@@ -2188,15 +2206,18 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     if (!opts.some((o) => o.value === selected.get(d.key))) selected.delete(d.key);
     // Your own answer: its words are the answer, kept in a draft of their own so the note stays the note. A reply ask is only words; an ask with an option valued text takes words only as a note.
     const reply = !opts.length && !!d.reply, mine = live && (reply || (opts.length > 0 && !opts.some((o) => o.value === 'text'))), ownKey = reply ? d.key : `own:${d.key}`;
-    const isOwn = () => reply || own.has(d.key), chosen = () => opts.find((o) => o.value === selected.get(d.key));
-    const ownBox = mine ? el('textarea', { class: 'own-box', id: `own-${d.key}`, rows: 3, maxlength: 500, dir: 'auto', placeholder: reply ? 'Your reply' : 'Your answer', 'aria-label': `Your own answer, ${name}` }) : null;
+    // The recommended answer starts selected, for display only: nothing is saved or woken until the button is pressed. A guarded ask, and a change of answer, start with none.
+    const pre = !given && !d.guard && opts.some((o) => o.value === d.recommend_value) ? d.recommend_value : undefined;
+    const isOwn = () => reply || own.has(d.key), chosen = () => opts.find((o) => o.value === (selected.get(d.key) ?? pre));
+    const ownBox = mine ? el('textarea', { class: 'own-box', id: `own-${d.key}`, rows: 3, maxlength: 500, dir: 'auto', placeholder: reply ? 'Your reply' : 'Say what you want instead', 'aria-label': `Something else, ${name}` }) : null;
     // One note for any pick, always open: it goes with the answer as its comment.
     const note = live && opts.length ? el('textarea', { class: 'note-box', id: `note-${d.key}`, rows: 1, maxlength: 500, dir: 'auto', placeholder: 'A note for the agent, optional', 'aria-label': `Note, goes with your answer, ${name}` }) : null;
     // The answers are cards (1 to 9 pick one on a desk); the one picked gets a ring and a check that springs in, and the button's label slides to it.
     const card = (label, line, chip, now) => [el('span', { class: 'words' }, el('span', { class: 'label-line' }, el('span', { class: 'label' }, label), chip ? el('span', { class: 'recommend' }, 'Recommended') : '', now ? el('span', { class: 'recommend now' }, 'Your answer') : ''),
         line ? el('span', { class: 'reason', dir: 'auto' }, line) : ''), el('span', { class: 'check', 'aria-hidden': 'true' }, glyph('check'))];
-    const pickers = opts.map((o) => el('button', { class: 'pick-option', 'aria-pressed': String(o.value === selected.get(d.key) && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, given?.answer === o.value)));
-    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', 'aria-pressed': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Your own answer', 'Write it in your words', false, given?.answer === 'text')) : null;
+    // The answers are one radio list: the recommended one carries its tag and starts selected, and Something else, last, opens a field for the person's own words.
+    const pickers = opts.map((o) => el('button', { class: 'pick-option', role: 'radio', 'aria-checked': String(o.value === chosen()?.value && !own.has(d.key)) }, ...card(o.label, o.outcome, o.value === d.recommend_value, given?.answer === o.value)));
+    const ownRow = mine && !reply ? el('button', { class: 'pick-option own-option', role: 'radio', 'aria-checked': String(own.has(d.key)), 'aria-controls': ownBox.id }, ...card('Something else', 'Say what you want instead', false, given?.answer === 'text')) : null;
     const lbl = el('span', { class: 'lbl' });
     const answer = el('button', { class: 'answer', 'data-kbd': '↵', 'aria-keyshortcuts': 'Enter' }, lbl, el('span', { class: 'okmark', 'aria-hidden': 'true' }, glyph('check')));
     // The button reads the choice, and is off until there is one: a card picked, or words in Your own answer. A change is off while it would send the answer already given.
@@ -2209,8 +2230,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       if (swap) { lbl.classList.remove('swap'); void lbl.offsetWidth; lbl.classList.add('swap'); }
     };
     const pickOne = (b) => {
-      [...pickers, ownRow].forEach((x) => x?.setAttribute('aria-pressed', String(x === b)));
-      page.classList.toggle('own', isOwn());
+      [...pickers, ownRow].forEach((x) => x?.setAttribute('aria-checked', String(x === b)));
+      // A redraw patches the page in place, so the section on screen may not be this draw's own: toggle the one that holds the tapped card.
+      (b.closest('.decide') ?? page).classList.toggle('own', isOwn());
       sync(true);
     };
     pickers.forEach((b, i) => (b.onclick = () => { selected.set(d.key, opts[i].value); own.delete(d.key); pickOne(b); }));
@@ -2268,7 +2290,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     // What it carries (Priority, Its ask) sits right under when it was asked, as the prototype's sheet has it; then why, its preview and its proof.
     const about = [askProps(d), why ? el('p', { class: 'why', dir: 'auto' }, why) : '', firstDraftLinks(d), preview ? el('div', { class: 'decide-preview' }, preview, cards ? demoRow(d) : '', cards ? fullButton(d) : '') : '',
       ...(d.mocks?.length ? [annotations(d)] : []), proofLine];
-    const picks = done || !(live && opts.length) ? [] : [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
+    const picks = done || !(live && opts.length) ? [] : [el('p', { class: 'ui-dl' }, 'Your answer'), el('ul', { class: 'pick-list', role: 'radiogroup', 'aria-label': d.title }, ...pickers.map((b) => el('li', {}, b)),
       ownRow ? el('li', {}, ownRow) : ''), ownRow ? el('div', { class: 'own-field' }, el('div', {}, ownBox)) : ''];
     const words = done ? [] : [reply ? el('label', { class: 'ui-dl', for: ownBox.id }, 'Your reply') : '', reply ? ownBox : ''];
     const noteField = !done && note ? el('div', { class: 'note-field' }, note) : '';

@@ -70,7 +70,7 @@ const MEASURE = `(async () => {
     const h2 = sheet.querySelector('h2');
     ask = { sheet: [r4(box(sheet).left), r4(box(sheet).right), r4(box(sheet).top)], edges: [r4(sl), r4(sr)], title: h2.textContent, titleLines: Math.round(box(h2).height / parseFloat(getComputedStyle(h2).lineHeight)), titleWhole: h2.scrollHeight <= h2.clientHeight + 1,
       parts: parts.map((e) => ({ el: e.className || e.tagName.toLowerCase(), left: r4(box(e).left), right: r4(box(e).right), top: r4(box(e).top), height: r4(box(e).height) })),
-      button: sheet.querySelector('.decide-bar .answer')?.textContent ?? '', picked: [...sheet.querySelectorAll('.pick-option[aria-pressed="true"] .label')].map((e) => e.textContent),
+      button: sheet.querySelector('.decide-bar .answer')?.textContent ?? '', picked: [...sheet.querySelectorAll('.pick-option[aria-checked="true"] .label')].map((e) => e.textContent),
       panel: [...sheet.querySelectorAll('.ui-props .ui-pr')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim()) };
     // Every block starts on the sheet's left edge; the panels and the note end on its right edge, and the bar's buttons span it.
     for (const p of ask.parts) if (Math.abs(p.left - sl) > 0.5) fail.push('sheet left edge ' + p.el + ' ' + p.left);
