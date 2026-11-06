@@ -1457,6 +1457,20 @@
   let tkWhose = '', tkProj = '';
   const tkAll = () => state.tickets ?? [];
   const tkById = (id) => tkAll().find((t) => t.id === id);
+  /** A link may name a ticket by its key, an old id or the backlog item it was filed from, and #tickets/<name> as well as #ticket/<name>: the board says which ticket
+   *  that is (GET /api/tickets/<name>) and the address moves to it. A name no ticket has says so, once. */
+  const tkAsked = new Set();
+  function tkResolve(name) {
+    if (tkById(name)) return location.replace(`#ticket/${name}`);
+    if (FROZEN || tkAsked.has(name)) return;
+    tkAsked.add(name);
+    fetch(`/api/tickets/${encodeURIComponent(name)}`).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!location.hash.endsWith(`/${name}`)) return;
+      if (res.ok && body.ticket?.id) location.replace(`#ticket/${body.ticket.id}`);
+      else say(body.error ?? `Couldn’t open ticket ${name}: the board answered ${res.status}`, 8000, undefined, 'error');
+    }).catch((e) => { tkAsked.delete(name); say(`Couldn’t open ticket ${name}: ${why(e)}`, 8000, undefined, 'error'); });
+  }
   const tkStateOf = (t) => ({ queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' }[t.state] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo'));
   const TICKET_STUCK_SECONDS = 6 * 60 * 60;
   const tkStatus = (t) => {
@@ -2704,6 +2718,7 @@
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity' || at === 'epics';
     if (showingTickets && !ticketScreen) readTickets(true);
     ticketScreen = showingTickets;
+    if (key && tkLoad() === 'ready' && (at === 'tickets' ? key !== 'all' : at === 'ticket' && !tkById(key))) tkResolve(key);
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
     // Answered asks it opens again, newest first in its list; the arrows step through them oldest first, then through the open asks.
