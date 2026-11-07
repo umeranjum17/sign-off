@@ -45,7 +45,7 @@ as its alias.
 
 ## Design pick
 
-`post --type design` asks for a pick between up to 6 mock options, each with
+`post --type design` asks for a pick between 2 and 6 mock options on one card, each with
 an optional `--mock <value>=<path>` file (`.html`, `.svg`, `.png`, `.jpg`,
 `.jpeg`, `.webp`, 5 MB or less) shown as a tall phone frame above its button
 (the recommended one first; on a phone the frames swipe sideways, the next

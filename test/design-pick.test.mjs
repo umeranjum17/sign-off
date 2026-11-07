@@ -19,3 +19,19 @@ test('a pick refuses a page of pictures, and a repeated pick, but takes a page t
   assert.match((await post('k1', 'Which layout should it use?', 'mocks/k/live.html')).stdout, /k1/);
   await assert.rejects(post('k2', 'Which layout should it use today?', 'mocks/k/live.html'), (e) => /asks what k1 already asks/.test(e.stdout + e.stderr));
 });
+
+// A design decision is one card with its options side by side: a pick split into one card per option is refused, and the one card posts.
+test('a design pick lists at least two options on one card; a yes/no and the one three-option card post', async (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'dp-')), board = join(home, 'board.json'), env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, 'c'), XDG_STATE_HOME: join(home, 's'), XDG_DATA_HOME: join(home, 'd'), XDG_CACHE_HOME: join(home, 'k') };
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  mkdirSync(join(home, 'mocks'), { recursive: true });
+  for (const v of ['a', 'b', 'c']) writeFileSync(join(home, `mocks/${v}.html`), '<img src="data:image/png;base64,AAAA"><button onclick="document.title=1">Next</button>');
+  const post = (...args) => run(process.execPath, [cli, 'post', board, '--type', 'design', ...args], { env });
+  const refused = (e) => /at least 2 options on one card/.test(e.stdout + e.stderr) && /one card/.test(e.stdout + e.stderr);
+  await assert.rejects(post('--title', 'Should Tickets open on a dense Active list?'), refused);
+  await assert.rejects(post('--title', 'Should Tickets open on Epic cards?', '--option', 'a=A', '--recommend', 'a'), (e) => /options must be 2 to 6/.test(e.stdout + e.stderr));
+  assert.match((await post('--key', 'yn', '--title', 'Should Tickets open on a dense Active list?', '--option', 'yes=Yes', '--option', 'no=No', '--recommend', 'yes')).stdout, /yn/);
+  const card = await post('--key', 'tickets-open', '--title', 'How should Tickets open?', '--option', 'a=A: dense Active list', '--option', 'b=B: Epic cards', '--option', 'c=C: the Story',
+    ...['a', 'b', 'c'].flatMap((v) => ['--mock', `${v}=mocks/${v}.html`]), '--recommend', 'b');
+  assert.match(card.stdout, /tickets-open/);
+});
