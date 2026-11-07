@@ -260,6 +260,8 @@ body::after { content: ''; position: fixed; z-index: 1; left: 0; right: 0; botto
 .ui-lab > .ui-icon > :is(img, .mono, .icon, svg) { width: 100%; height: 100%; border-radius: inherit; }
 .ui-lab > .ui-icon .mono { font-size: 0.5rem; line-height: var(--tk-icon-s); } .ui-lab > .ui-icon .icon svg { width: 0.875rem; height: 0.875rem; }
 .ui-lab > :not(.ui-icon) { flex: 0 1 auto; min-width: 0; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A label that does not fit beside the controls wraps them to the next row; one wider than the row is cut by its own ellipsis. */
+.ui-head > .ui-lab, .ui-pane .ui-shd.ui-head > .ui-lab { flex: 1 0 auto; max-width: 100%; }
 /* A sheet's header: 44px rows, each part on its row's centre, 44px controls, its own height so the title is never cut. */
 .ui-head { display: flex; flex-wrap: wrap; align-items: center; height: auto; min-height: var(--tk-tap); }
 .ui-head > :not(.ui-lab) { flex: none; } .ui-head > .ui-lab { margin-inline-end: var(--tk-sp-2); } .ui-head > .dl-more { display: flex; align-items: center; height: var(--tk-tap); }

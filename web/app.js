@@ -1363,11 +1363,13 @@
   const projectTile = (name, fallback) => el('span', { class: 'ui-icon', role: 'img', 'aria-label': name || 'No project' }, projectPic(name, fallback));
   /** The board's own identity, which a design card with no project of its own wears: its name and app icon, never an empty tile. */
   const boardPic = () => el('img', { src: '/icon.svg', alt: '' });
+  /** A design's picture on its card; one that is missing, fails to load or is a 1px blank shows the board's mark instead of an empty white tile. */
+  const shotImg = (url) => { const img = el('img', { src: src(url), alt: '', loading: 'lazy' }), none = () => img.replaceWith(boardPic()); img.addEventListener('error', none); img.addEventListener('load', () => { if (img.naturalWidth < 2) none(); }); return img; };
   const cardTile = (d) => {
     const design = d.kind === 'design' || d.type === 'design', tile = design && !projectName(d) ? projectTile('Sign-off', boardPic) : projectTile(projectName(d), () => design ? boardPic() : d.type === 'plan' ? icon('plan') : d.kind === 'report' || d.type === 'explainer' ? glyph('layers') : icon(d.type === 'evidence' ? 'evidence' : d.reply ? 'reply' : 'yesno'));
     const frame = design && designFrame(d), demo = isPick(d) && demoThumb(d);
     if (demo) tile.replaceChildren(demo);
-    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); img.addEventListener('error', () => img.replaceWith(projectPic(projectName(d), boardPic))); tile.replaceChildren(img); }
+    else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); const none = () => img.replaceWith(projectPic(projectName(d), boardPic)); img.addEventListener('error', none); img.addEventListener('load', () => { if (img.naturalWidth < 2) none(); }); tile.replaceChildren(img); }
     return tile;
   };
   /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
@@ -2050,7 +2052,7 @@
     if (!phone() && reviews.length) {
       const cur = reviews.find((d) => d.key === key) ?? reviews[0], [open, info] = designReview(cur, el('h2', { class: 'dz-t', dir: 'auto' }, cur.title), true);
       const card = (d) => el('a', { class: 'dz-card', id: `item-${d.key}`, href: designHref(d), 'aria-label': `Open design, ${d.title}`, ...(d === cur && { 'aria-current': 'true' }) },
-        el('span', { class: 'dz-shot' }, pic(d) ? el('img', { src: src(pic(d)), alt: '', loading: 'lazy' }) : ''), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
+        el('span', { class: 'dz-shot' }, pic(d) ? shotImg(pic(d)) : boardPic()), el('span', { class: 'dz-ct', dir: 'auto' }, d.title),
         el('span', { class: 'dz-cm' }, [plainGroup(d), d.filed && day(d.filed)].filter(Boolean).join(' · ')), el('span', { class: 'dz-tag' }, designStatus(d)), selMark(d.key));
       // Where it stands fades out at its foot while it holds more than it shows.
       const ib = info.querySelector('.dz-ib'), fade = () => ib.classList.toggle('fades', ib.scrollHeight - ib.scrollTop - ib.clientHeight > 1);

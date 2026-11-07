@@ -2402,7 +2402,7 @@ test('Reports on a desk: the list beside the newest report, J moves and reads, U
   // The newest report is shown beside the list, not yet marked read; its head line says what it is and the day, beside Mark read and Archive.
   await until(async () => (await seen()) === `#reports|alpha|Alpha report|4`);
   // The bar names the report's kind (an older report's, other), then its day.
-  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
+  assert.match(await evaluate('[document.querySelector(".rp-bar .rkc").textContent, document.querySelector(".rp-bar .ui-lab > span[dir]").textContent].join("|")'), /^Other report\|\d{1,2} [A-Z][a-z]{2}$/);
   assert.equal(await evaluate('[...document.querySelectorAll(".rp-bar > button")].map((b) => b.textContent).join(",") + "|" + !!document.querySelector(".split-detail .read iframe")'), 'Mark read,Archive|true');
   assert.equal(await rows(), `alpha,beta,${guided.key},gamma`);
   assert.equal(reads(), '');
@@ -4948,7 +4948,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(() => evaluate('!!document.querySelector(".decide .ui-props a[href^=\'#ticket/\']")'));
     await evaluate('document.querySelector(".decide .ui-props a[href^=\'#ticket/\']").click()');
     await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll(".tk-sheet .tk-in li").length')) === 7);
-    const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd p > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
+    const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd .ui-lab > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
       props: [...document.querySelectorAll('.tk-sheet > .ui-props > .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
       rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
       tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
@@ -5599,7 +5599,7 @@ test('detail sequence follows the originating list across phone sheets, desk pan
       const routes = await evaluate('[...document.querySelectorAll(".dl-face[data-row]")].map(a => a.hash)');
       await evaluate('document.querySelector("#item-beta").click()');
       await until(async () => (await evaluate('document.querySelector(".detail-sequence .position")?.textContent')) === '2 of 3');
-      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar > span[dir], .rp-shd .rp-when")].every(n => n.scrollWidth <= n.clientWidth + 1)');
+      const metadataFits = () => evaluate('[...document.querySelectorAll(".ask-sheet .sh-lab, .rp-bar .ui-lab > span[dir], .rp-shd .rp-when")].every(n => n.scrollWidth <= n.clientWidth + 1)');
       assert.equal(await metadataFits(), true, 'the full who/when label fits beside navigation');
       const key = (key) => send('Input.dispatchKeyEvent', { type: 'keyDown', key });
       await key('j'); await until(async () => (await evaluate('location.hash')) === routes[2]);
