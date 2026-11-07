@@ -2429,3 +2429,49 @@ dialog.ch-full{position:fixed;margin:auto 1rem auto auto;max-height:calc(100dvh 
 @media (min-width: 64rem) { .tk-story-grid.tk-epics-grid { grid-template-columns: minmax(0, 1fr); } }
 .tk-hero .hv { flex-wrap: wrap; height: auto; min-height: 2rem; }
 .tk-hero-sub { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-variant-numeric: tabular-nums; }
+/* New ticket: the round + in a Tickets header and the sheet it opens (a dialog on a desk). Fields are the board's own inset boxes; Create ticket is the ink button. */
+.tk-newb { color: var(--tk-ink); }
+.tk-nform { display: flex; flex-direction: column; gap: var(--tk-sp-3); margin-top: var(--tk-sp-3); }
+.tk-nf { display: flex; flex-direction: column; gap: var(--tk-sp-1); min-width: 0; }
+.tk-nl { color: var(--tk-text-secondary); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); font-weight: 500; }
+.tk-ni { display: block; width: 100%; max-width: none; min-height: 2.75rem; margin: 0; padding: 0.625rem 0.75rem; border: 0; border-radius: var(--tk-r-icon); background: var(--tk-inset); color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-body); box-sizing: border-box; }
+textarea.tk-ni { min-height: 4.5rem; resize: vertical; }
+.tk-ni::placeholder { color: var(--tk-text-tertiary); }
+.tk-ni:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
+.tk-nsel { appearance: none; text-overflow: ellipsis; padding-right: 2rem; background-image: linear-gradient(45deg, transparent 50%, var(--tk-text-tertiary) 50%), linear-gradient(135deg, var(--tk-text-tertiary) 50%, transparent 50%);
+  background-repeat: no-repeat; background-size: 0.3125rem 0.3125rem; background-position: calc(100% - 1.125rem) 50%, calc(100% - 0.8125rem) 50%; }
+.tk-nsel:disabled { opacity: 0.5; }
+.tk-nrow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--tk-sp-3); }
+.t-sheet .tk-nseg { margin-top: 0; background: var(--tk-inset); box-shadow: none; }
+.t-sheet .tk-nseg button[aria-pressed="true"] { background: var(--tk-card); }
+.tk-nerr { margin: 0; padding: 0.625rem 0.75rem; border-radius: var(--tk-r-icon); background: var(--tk-p0); color: var(--tk-p0-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+.tk-nerr[hidden] { display: none; }
+.tk-ngo { display: inline-flex; align-items: center; justify-content: center; gap: var(--tk-sp-2); min-height: 2.75rem; border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-weight: 600; cursor: pointer; }
+.tk-ngo:disabled { opacity: 0.5; cursor: default; } .tk-ngo[aria-busy="true"] { opacity: 1; cursor: progress; }
+.tk-nmore { min-height: 2.75rem; border: 0; background: none; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; }
+.tk-nmore:disabled { opacity: 0.5; }
+@media (min-width: 64rem) {
+  #tk-new { max-width: 30rem; margin: auto; border-radius: 1.75rem; }
+  #tk-new::before { content: none; }
+}
+/* Epics: the tickets still open under an epic on its card, and New ticket in this epic on its page. */
+.tk-ekids { display: flex; flex-direction: column; gap: var(--tk-sp-1); margin: var(--tk-sp-1) 0; padding-top: var(--tk-sp-2); border-top: 1px solid var(--tk-line); }
+.tk-ekid { display: flex; align-items: baseline; gap: var(--tk-sp-2); min-width: 0; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+.tk-ekid i { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--tk-track); box-shadow: inset 0 0 0 1.5px var(--tk-text-tertiary); align-self: center; }
+.tk-ekid.s-moving i { background: var(--tk-mid); box-shadow: none; } .tk-ekid.s-hold i { background: var(--tk-warn); box-shadow: none; }
+.tk-ekid b { flex: none; color: var(--tk-text-secondary); font-family: ui-monospace, monospace; font-size: var(--tk-fs-meta); font-weight: 500; }
+.tk-emore { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
+.tk-addin { display: inline-flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; margin: var(--tk-sp-3) 0 0; padding: 0 var(--tk-sp-4); border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-size: var(--tk-fs-row); font-weight: 600; cursor: pointer; }
+.tk-addin .glyph { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2; }
+/* All tickets, grouped by epic: Group by, then each epic's head (key, title, how many are done) over its tickets, and the tickets under none. */
+.tk-gby { display: flex; align-items: center; gap: var(--tk-sp-3); margin: var(--tk-sp-3) 0; }
+.tk-gl { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
+.tk-gseg { flex: 1; max-width: 14rem; margin: 0; }
+.tk-eb { margin: var(--tk-sp-4) 0 0; }
+.tk-eh { display: flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; padding: 0 var(--tk-sp-1); color: var(--tk-ink); text-decoration: none; }
+.tk-et { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tk-fs-head); font-weight: 500; letter-spacing: -0.014em; }
+.tk-eh small { flex: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-variant-numeric: tabular-nums; }
+.tk-eh .glyph { flex: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; color: var(--tk-text-tertiary); }
+.tk-ebs { min-height: 0; overflow: auto; }
+@media (min-width: 64rem) { .tk-ebs .tk-eb:first-child { margin-top: 0; } .tk-et { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
+.tk-filters { flex-wrap: wrap; } .tk-filters .tk-sel { flex: 1 1 8rem; }
