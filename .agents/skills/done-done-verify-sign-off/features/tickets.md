@@ -49,3 +49,9 @@ A tap that began on a section's See all or Show fewer does that button's work ev
 ## Empty, loading and error states
 
 Every list, feed and card that can hold nothing shows one shared state (`emptyState` in `web/app-more.js`, `.es` in `web/app.css`): a quiet mark, what goes here, one next step where there is one; a read still on its way shows a skeleton and a line, and a failed read says what failed and offers Try again. The Activity card on a phone is never a bare title: closed it shows its count and newest event. Drive `node .agents/skills/done-done-verify-sign-off/empty-states-shots.mjs <new folder> light|dark 390|1280` (bare and full throwaway boards, reads held and failed through the DevTools Fetch domain; every frame measured in the browser; `TICKETS_SIDE=before SIGN_OFF_REPO=<base build>` captures the base build's Tickets). The CLI refuses a second open ticket for the same project and title, and a `--release` that is a time word; an old twin or time word already on a board is collapsed or dropped when read (`test/tickets-api.test.mjs`).
+
+## Create, assign and epic grouping
+
+The round **+** in every Tickets header (and **C** on a desk) opens New ticket: a title, a description, Type (Ticket, Bug, Epic), Epic, Project, Assignee and Priority. Create ticket makes it by the owner (`POST /api/tickets`), opens it and says Created; a refusal keeps every word and says why. The fleet reads what was made with `sign-off-axi ticket --created`. Epics lists every epic, however few tickets it holds, with the tickets still open on its card; an epic's page groups its tickets by status and offers New ticket in this epic. All tickets has Group by Status or Epic. Activity names who made each change and filters by person.
+
+Drive it: `node .agents/skills/done-done-verify-sign-off/tickets-create-shots.mjs <folder> <light|dark> <360|390|445|1280|1440>`; it asserts each state in the browser and writes `steps.json`.

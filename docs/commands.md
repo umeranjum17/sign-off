@@ -130,6 +130,7 @@ without it gets the same `401` as the rest.
 |---|---|
 | `GET /api/tickets` | `{"tickets": [...]}`: every ticket, in the order each was first written |
 | `GET /api/tickets/<id>` | `{"ticket": {...}}`: that ticket and the cards that name it; `404` for an id not on the board |
+| `POST /api/tickets` | The board's owner makes a ticket from the Tickets screen's **New ticket** sheet. Send JSON: `{"title": "..."}` and, optionally, `"type"` (`ticket`, `bug` or `epic`), `"parent"` (the epic's id), `"priority"`, `"project"`, `"description"` and `"assignee"` (a lead). It answers `{"ticket": {...}}`, written as a ticket line by `owner`; `400` with the reason for a bad value; `403` on a read-only board. An answers-only board takes it as it takes an answer, for the fleet to read with `sign-off-axi ticket --created`. |
 
 Each ticket carries the fields of its line in the file: `id`, `title`, `progress` (rolled up: an
 epic is as far along as the tickets under it, on average), `at`, and, when set, `parent`,
