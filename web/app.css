@@ -2077,7 +2077,7 @@
   .tk-none { color: var(--tk-text-tertiary); }
   .tk-av { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
   .tk-worker { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tk-release { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  :is(.tk-release, .tk-blocker) { display: inline-block; width: auto; max-width: 110px; padding: 0 6px; background: var(--tk-inset); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
   .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }

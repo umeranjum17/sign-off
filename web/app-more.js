@@ -655,6 +655,11 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The Tickets screen's own state: which ticket is open, and which lists are shown in full. */
   let tkShown = '';
   const tkMore = new Set();
+  /** The tickets a ticket waits on that the board knows, in the order Beads lists them. */
+  const tkBlockers = (t) => (t.blocked_by ?? []).map((id) => tkById(id)).filter(Boolean);
+  const tkBlockName = (w) => w.key ?? w.title;
+  /** A row's state words: a queued ticket with a live blocker reads waiting; a held ticket keeps its own word. */
+  const tkWords = (t) => tkStatus(t).map((x) => { if (x && tkStateOf(t) === 'todo' && tkBlockers(t).length && x.classList?.contains('tk-stage')) x.textContent = 'waiting'; return x; });
   /** A ticket's row: type tile, title, a bar, the line saying where it stands, and the quiet line under it. */
   function tkRow(t, heldList = false) {
     const kids = tkUnder(t), done = kids.filter((x) => tkStateOf(x) === 'done').length, s = tkStateOf(t), epic = tkType(t) === 'epic';
@@ -666,12 +671,12 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const stands = s === 'hold' ? `on hold${t.hold_reason ? `, ${t.hold_reason}` : ', no reason recorded'}` : `${TK_WORDS[s].toLowerCase()}${progress === undefined ? '' : `, ${progress}% done`}`;
     const label = `${tkType(t)}${t.key ? ` ${t.key}` : ` ${t.id}`}${t.priority ? `, ${t.priority}` : ''}${t.release ? `, ${t.release}` : ''}: ${t.title}, ${stands}, ${t.assignee ? [t.assignee.lead, t.assignee.model ?? t.assignee.tool, t.assignee.live && 'live'].filter(Boolean).join(' ') : s === 'moving' ? 'no assignee' : 'not assigned'}`;
     const link = el('a', { class: `ui-row tk-row${epic ? ' is-epic' : ''}${t.assignee ? ' has-asg' : ''}`, href: `#ticket/${t.id}`, ...(t.id === tkShown && { 'aria-current': 'true' }), 'aria-label': label },
-      ...uiRow({ tile: tkTypeTile(t), title: t.title, priority: t.priority, progress, lead: el('span', { class: 'tk-status' }, ...tkStatus(t)), meta }));
+      ...uiRow({ tile: tkTypeTile(t), title: t.title, priority: t.priority, progress, lead: el('span', { class: 'tk-status' }, ...tkWords(t)), meta }));
     // The row's title line leads with the ticket's readable name; its slug is the small line under it, in the sheet.
     if (t.key) link.querySelector('.l1').prepend(tkKey(t.key));
     if (t.release) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-release', title: t.release }, t.release));
     // The second line, one shape per kind of row: a hold's reason, an epic's whole roll-up (bar and counts), or progress and where it stands.
-    const l2 = link.querySelector('.l2'), stage = el('span', { class: 'tk-status' }, ...tkStatus(t));
+    const l2 = link.querySelector('.l2'), stage = el('span', { class: 'tk-status' }, ...tkWords(t));
     const bar = progress === undefined ? '' : el('span', { class: 'ui-bar' }, el('i', { style: `width: ${progress}%` }));
     if (s === 'hold') l2.replaceChildren(el('span', { class: 'meta', dir: 'auto' }, meta));
     else if (epic) l2.replaceChildren(stage, el('span', { class: 'tk-roll', role: 'img', 'aria-label': counts }, ...kids.map((x) => el('i', { class: { done: 'd', moving: 'm', hold: 'h' }[tkStateOf(x)] ?? '' }))),
@@ -684,6 +689,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     if (t.key && !t.key_derived && s !== 'hold') l2.prepend(el('span', { class: 'tk-row-slug', dir: 'ltr' }, t.id));
     if (chip) who.append(chip);
     link.querySelector('.rm').append(who);
+    // A ticket with a live blocker names it after the title: one chip, +N for the rest; the sheet's Waiting on row lists them all.
+    const stuck = tkBlockers(t);
+    if (s === 'todo' && stuck.length) link.querySelector('.l1').append(el('span', { class: 'ui-pc tk-blocker', title: stuck.map((w) => w.title).join(', ') }, tkBlockName(stuck[0]) + (stuck.length > 1 ? ` +${stuck.length - 1}` : '')));
     return el('li', {}, link);
   }
   /** One list of tickets under its head: three with See all on a phone, a scrolling card on a desk. In the hold list the row drops the words the head says. */
