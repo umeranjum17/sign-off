@@ -37,7 +37,9 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // diff and the phone's foot bar in app-more.js and app.css, all after the first paint. First-paint bytes and the request count are unchanged.
 // Re-recorded on 7 November 2026 in the change that gives the Inbox its Done gesture and Done view, on main's 99,215 B / 330,716 B: +530 B before the first paint (the row's thread key,
 // the swipe branch and the lists read's done field in app.js) and +1,911 B whole (the Done control, mark, view and returned unread thread in app-more.js and app.css, after the first paint).
-const baseline = { bytesBeforePaint: 99_745, requestsBeforePaint: 5, bytesWhole: 332_627, paintMs: 900 };
+// Re-recorded on 7 November 2026 in the change that puts the proof, ticket, report and design headers on the shared header rule, on main's 99,745 B / 332,627 B: +131 B before the first paint
+// (the blank-tile fallback in app.js) and +279 B whole (header markup and Close rules in app-more.js and app.css, after the first paint).
+const baseline = { bytesBeforePaint: 99_876, requestsBeforePaint: 5, bytesWhole: 332_906, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

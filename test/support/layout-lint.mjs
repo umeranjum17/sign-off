@@ -27,12 +27,12 @@ export const lint = (scope = 'body', heads = '.sh-head') => `(() => {
       else if (hid && wide && c.textOverflow !== 'ellipsis') out.push('clipped text ' + name(e) + ' "' + e.textContent.trim().slice(0, 40) + '"');
       else if (hid && tall && c.whiteSpace !== 'nowrap') out.push('cut at the foot ' + name(e) + ' "' + e.textContent.trim().slice(0, 40) + '"');
     }
-    // An icon and the label after it: the gap on the token scale, the icon on the label's first line's centre.
+    // An icon and the label after it (a chip's own edge counts as its start): the gap on the token scale, the icon on the label's first line's centre.
     if (/flex|grid/.test(c.display)) for (const k of e.children) {
       const n = k.nextElementSibling; if (!n || !icon(k) || !shown(k) || !shown(n) || icon(n) || !n.textContent.trim()) continue;
       const ki = ink(k), line = lineOf(n); if (!line) continue;
       // A tile beside a block of lines (a row's title over its meta) sits on the block's centre; beside one label, on its line's.
-      const nb = box(n), gap = r1(line.left - ki.right), c = (ki.top + ki.bottom) / 2, mid = r1(Math.abs(c - (nb.top + nb.height / 2)) < 1 ? 0 : c - (line.top + line.height / 2));
+      const nb = box(n), nc = getComputedStyle(n), chip = parseFloat(nc.paddingLeft) > 0 || nc.backgroundColor !== 'rgba(0, 0, 0, 0)' || nc.boxShadow !== 'none', gap = r1((chip ? nb.left : line.left) - ki.right), c = (ki.top + ki.bottom) / 2, mid = r1(Math.abs(c - (nb.top + nb.height / 2)) < 1 ? 0 : c - (line.top + line.height / 2));
       if (!${JSON.stringify(GAPS)}.some((g) => Math.abs(gap - g) <= 0.5)) out.push('icon gap ' + gap + 'px off the scale: ' + name(k) + ' before ' + name(n));
       if (Math.abs(mid) > 1) out.push('icon ' + mid + 'px off its label line: ' + name(k) + ' beside ' + name(n));
     }

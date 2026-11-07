@@ -210,7 +210,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   function evidenceItem(d) {
     const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
     return el('div', { class: 'ev-scroll' }, el('div', { class: 'ev-item' },
-      el('div', { class: 'ev-shd' }, el('span', { class: 'lab' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
+      el('div', { class: 'ev-shd ui-head' }, el('span', { class: 'ui-lab' }, projectTile(project), el('span', { class: 'pt', dir: 'auto' }, [project || 'No project', d.filed && (isToday(d.filed) ? hhmm(d.filed) : stamp(d.filed))].filter(Boolean).join(' · '))),
         el('a', { class: 'ev-x', href: '#evidence', 'aria-label': 'Close' }, glyph('x'))),
       el('h1', { class: 'ev-title', id: 'reader-title', tabindex: '-1', dir: 'auto' }, name),
       captures(d, 'ev-hero') || el('div', { class: 'ev-hero none' }, evGlyph('image'), (d.status ? 'Frame pending' : 'Text only: no capture was filed')), attachments(d),
@@ -445,7 +445,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       e.priority ? tkProp('flag', 'Priority', el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority)) : '', e.stage && !/^(stage|merged)$/.test(e.kind) ? tkProp('half', 'Stage', el('span', { class: 'ui-pc tk-stage' }, e.stage)) : '',
       name && e.kind !== 'state' ? tkProp('half', 'State', el('span', {}, name)) : '', e.by ? tkProp('person', 'Made by', el('span', { dir: 'auto' }, plainWho(e.by))) : '', ticket, tkProp('clock', 'Time', el('time', { datetime: e.at }, EXACT.format(new Date(e.at))))].filter(Boolean);
     actSheet.dataset.ev = actKey(e); evFrom = from; evGo = false;
-    actSheet.replaceChildren(el('div', {}, el('div', { class: 'tk-shd' }, el('p', {}, projectTile(proj, () => icon('pick')), el('span', {}, [proj, EV_KIND[e.kind]].filter(Boolean).join(' · '))), close),
+    actSheet.replaceChildren(el('div', {}, el('div', { class: 'tk-shd ui-head' }, el('span', { class: 'ui-lab' }, projectTile(proj, () => icon('pick')), el('span', {}, [proj, EV_KIND[e.kind]].filter(Boolean).join(' · '))), close),
       el('h2', { id: 'tk-ev-h', class: 'tk-dt', tabindex: '-1', dir: 'auto' }, e.title), el('p', { class: 'tk-evt', dir: 'auto' }, e.text), el('div', { class: 'ui-props' }, ...rows),
       ...(e.earlier?.length ? [el('p', { class: 'ui-dl' }, 'Changes'), el('ul', { class: 'tk-chg' }, ...burst(e).map((c) => el('li', { dir: 'auto' }, c.text, c.from === undefined ? '' : ` (${c.from === 'none' ? 'not set' : c.from} → ${c.to === 'none' ? 'not set' : c.to})`)))] : []),
       ...(e.ask ? [el('p', { class: 'ui-dl' }, 'Asked'), el('blockquote', { class: 'tk-ask', dir: 'auto' }, e.ask.text, el('time', { datetime: e.ask.at }, EXACT.format(new Date(e.ask.at))))] : []),
@@ -697,7 +697,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return el('section', { 'aria-label': name }, el('h2', { class: 'ui-sec' }, name, el('small', {}, String(list.length)), list.length > 3 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? rows : rows.slice(0, 3))));
   }
   /** A card that names a ticket wears its type's mark: a proof is evidence, a pull request is a merge, and the rest are decisions. */
-  const tkKindTile = (k) => el('span', { class: `ui-icon tk-tile t-${k}`, role: 'img', 'aria-label': k });
+  const tkKindTile = (k) => { const s = el('span', { class: `ui-icon tk-tile t-${k}`, role: 'img', 'aria-label': k }); s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#tk-${{ decision: 'd', evidence: 'v', merge: 'm' }[k]}"/></svg>`; return s; };
   /** The Assigned block of a ticket page, as its task record says it: who owns it and what runs it first (lead · model), then the record's own detail.
    *  A ticket moving with no record is a defect and says so in the warning colour; one that has not started reads quietly. */
   function tkAssignee(t) {
@@ -724,7 +724,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const steps = [...(state.ticketActivity ?? []).filter((e) => e.ticket === t.id).flatMap((e) => [e, ...[...(e.earlier ?? [])].reverse()]), ...cards.flatMap((d) => threadOf(d, true).filter((e) => !e.posted).map((e) => ({ ...e, card: d })).reverse())]
       .sort((x, y) => bySecond(y, x)), said = trailOf(t.id, 'ticket');
     seeReply(t.id, 'ticket');
-    return [el('div', { class: 'tk-shd' }, el('p', {}, tkTypeTile(t), ...(t.key ? [tkKey(t.key)] : []), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
+    return [el('div', { class: 'tk-shd ui-head' }, el('span', { class: 'ui-lab' }, tkTypeTile(t), ...(t.key ? [tkKey(t.key)] : []), el('span', {}, [proj, TK_WORDS[s]].filter(Boolean).join(' · '))), close),
       el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       t.key && !t.key_derived ? el('p', { class: 'tk-slug', dir: 'ltr' }, t.id) : '',
       t.release ? el('span', { class: 'ui-pc tk-release', title: t.release }, t.release) : '',
@@ -1034,13 +1034,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const told = [...(said.length ? [el('p', { class: 'ui-dl' }, 'What you said'), ...said.map((n) => el('blockquote', { class: 'dz-said', dir: 'auto' }, screenName(n) ? el('cite', {}, screenName(n)) : '', el('span', { class: 'q' }, n.note)))] : []),
       ...(sent ? [said.length ? '' : el('p', { class: 'ui-dl' }, 'What you sent'), trailTrack(sent)] : [])];
     seeReply(d.key);
-    const lab = el('p', { class: 'dz-lab' }, plainGroup(d) ? el('span', { class: 'dz-pic' }, projectPic(plainGroup(d))) : '', el('span', {}, [plainGroup(d) || 'Sign-off', d.filed && day(d.filed)].filter(Boolean).join(' · ')));
+    const lab = el('p', { class: 'dz-lab ui-lab' }, plainGroup(d) ? el('span', { class: 'ui-icon dz-pic' }, projectPic(plainGroup(d))) : '', el('span', {}, [plainGroup(d) || 'Sign-off', d.filed && day(d.filed)].filter(Boolean).join(' · ')));
     const about = d.about ? el('p', { class: 'about dz-about', dir: 'auto' }, d.about) : '', original = d.link ? el('a', { class: 'dz-link', href: d.link, target: '_blank', rel: 'noopener noreferrer' }, 'Open original design') : '';
     const screenPick = screenSelect ? el('label', {}, 'Screen for note', screenSelect) : '';
     let root;
     if (asked && desk) {
       h1.id = 'dz-open-title';
-      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab), h1, el('div', { class: 'dz-fill' }, preview)),
+      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh ui-head' }, lab), h1, el('div', { class: 'dz-fill' }, preview)),
         el('section', { class: 'dz-info', 'aria-label': 'Your answer' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Your answer'), controls, err, about ? el('p', { class: 'ui-dl' }, 'What changed') : '', about,
           el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
           thread(d), original, reopenBtn(d), xBtn(d, 'Discard')), yesLine, foot)];
@@ -1048,7 +1048,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told, thread(d), original, reopenBtn(d), xBtn(d, 'Discard'));
     else if (desk) {
       h1.id = 'dz-open-title';
-      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
+      root = [el('section', { class: 'dz-open', 'aria-labelledby': h1.id }, el('div', { class: 'dz-oh ui-head' }, lab, fullPreview, screens.length ? open : ''), h1, el('div', { class: 'dz-fill' }, preview || '')),
         el('section', { class: 'dz-info', 'aria-label': 'Where it stands' }, el('div', { class: 'dz-ib' }, el('h2', {}, 'Where it stands'), stands, ticketRow(d), ...told,
           el('p', { class: 'ui-dl' }, 'Your review'), screenPick, controls, err, about ? el('p', { class: 'ui-dl' }, 'What it shows') : '', about, thread(d), original, reopenBtn(d), xBtn(d, 'Discard')), foot)];
     } else root = el('div', { class: 'design-review' }, lab, h1, about, preview, fullPreview, screens.length ? open : '', el('p', { class: 'ui-dl' }, 'Where it stands'), stands, ticketRow(d), ...told,
@@ -2363,7 +2363,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const next = d.guided && d.next ? [el('p', { class: 'ui-dl' }, 'Next step'), el('div', { class: 'ui-props rp-next' }, el('b', { dir: 'auto' }, plain(d.next.heading)), ...(d.next.lines ?? []).map((l) => el('p', { dir: 'auto' }, plain(l))))] : [];
     return split(top, sub, [page], el('section', { class: `ui-card ui-pane s8 split-detail${d.guided ? ' two' : ''}`, 'aria-labelledby': 'report-title' },
       // The bar names the report's kind beside its project and day; under the title, what this kind of report is for.
-      el('div', { class: 'ui-shd split-bar rp-bar' }, cardTile(d), kindChip(d, true), el('span', { dir: 'auto' }, what), read, gone),
+      el('div', { class: 'ui-shd split-bar rp-bar ui-head' }, el('span', { class: 'ui-lab' }, cardTile(d), kindChip(d, true), el('span', { dir: 'auto' }, what)), read, gone),
       // The page is kept across redraws while this signature holds, so marking it read or a change elsewhere on the board does not load its frame again.
       el('div', { class: 'pmain read', 'data-sig': JSON.stringify([d.key, url, d.title, d.about, found]) }, el('h1', { id: 'report-title', class: 'dt', dir: 'auto' }, plain(d.title)), purposeLine(d),
         d.about ? el('p', { class: 'dp', dir: 'auto' }, plain(d.about)) : '', found ? el('p', { class: 'ui-dl' }, d.guided ? 'What it found' : 'What it decided') : '', found ? el('div', { class: 'ui-props rp-found', dir: 'auto' }, plain(found)) : '',
