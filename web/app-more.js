@@ -395,8 +395,37 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       ...[...old].map(([m, n]) => el('p', { class: 'meta' }, `${n} comment${n > 1 ? 's' : ''} on an earlier version of “${name(m)}” ${n > 1 ? 'are' : 'is'} hidden`)), err);
   }
 
+  /** The ticket roll-up is the largest part of the board and only the Tickets screen shows it: it is read when that screen first opens. The Story, the first view,
+   *  reads only its own figures and the rows it lists (`story`); every other view of Tickets, and a ticket opened, reads the whole roll-up. */
+  let ticketsRead = false, storyRead = false, ticketsFailed = '', ticketRequest;
+  const ticketTags = {};
+  /** The Story and a link being looked up need only the Story's read: #tickets and #tickets/<name>, never #tickets/all. */
+  const tkStoryOnly = () => /^#tickets(?:\/(?!all$)[\w.~-]+)?$/.test(location.hash);
+  function readTickets(force = false, story = false) {
+    const view = story && !ticketsRead ? 'story' : 'tickets';
+    if (!force && (ticketsRead || (view === 'story' && storyRead))) return Promise.resolve(false);
+    // A Story read on its way does not hold the roll-up: a screen that needs it reads it once that one lands.
+    if (ticketRequest) return view === 'tickets' && ticketRequest.view === 'story' ? ticketRequest.then(() => readTickets()) : ticketRequest;
+    ticketRequest = fetch(`/api/decisions?view=${view}`, { headers: ticketTags[view] ? { 'if-none-match': ticketTags[view] } : {} }).then(async (res) => {
+      if (res.status === 304) return false;
+      const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
+      if (!res.ok) throw new Error(body.error);
+      ticketTags[view] = res.headers.get('etag') ?? '';
+      storyRead = true; if (view === 'tickets') ticketsRead = true;
+      ticketsFailed = '';
+      mergeView(body);
+      renderKeepingFocus();
+      return true;
+    }).catch((e) => { ticketsFailed = why(e); renderKeepingFocus(); return false; }).finally(() => { ticketRequest = undefined; });
+    ticketRequest.view = view;
+    return ticketRequest;
+  }
+  /** Where the ticket roll-up stands, so a screen never calls a read still on its way, or one that failed, an empty board. A frozen copy holds it already. */
+  const tkLoad = () => (FROZEN || ticketsRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
+  /** The same for the Story, which needs only its own read. */
+  const tkStoryLoad = () => (FROZEN || storyRead ? 'ready' : ticketsFailed ? 'error' : 'loading');
   /** The Tickets screen's own read, said as an empty state's words: what is on its way, what failed, and the step that tries again. */
-  const tkRetry = () => { ticketsFailed = ''; render(); readTickets(true); };
+  const tkRetry = () => { ticketsFailed = ''; render(); readTickets(true, tkStoryOnly()); };
   const tkNote = (what, mark, title, text, small, act) => {
     const load = tkLoad();
     return load === 'loading' ? emptyState('loading', { title: `Loading ${what}`, small })
@@ -517,7 +546,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       const kids = tkUnder(e), c = tkSplit(kids), next = kids.find((x) => tkStateOf(x) === 'moving') ?? kids.find((x) => tkStateOf(x) === 'todo'), lead = kids.find((x) => x.assignee)?.assignee;
       return el('a', { class: 'ui-card tk-ecard', href: `#epics/${e.id}`, 'aria-label': `Epic ${e.key ?? ''} ${e.title}, ${c.done} of ${kids.length} done` },
         el('span', { class: 'tk-ecard-h' }, tkKey(e.key ?? e.id), e.priority ? el('span', { class: `ui-pc ${e.priority.toLowerCase()}` }, e.priority) : ''), el('span', { class: 'tk-ecard-t', dir: 'auto' }, e.title),
-        el('span', { class: 'tk-ms-v' }, `${c.done} of ${kids.length}`, el('small', {}, ' done')), tkSeg(kids),
+        el('span', { class: 'tk-ms-v' }, `${c.done} of ${kids.length}`, el('small', {}, ' done')), tkSeg(c),
         el('span', { class: 'meta' }, [c.moving && `${c.moving} in progress`, c.hold && `${c.hold} on hold`].filter(Boolean).join(' · ') || 'nothing in progress'),
         el('span', { class: 'meta tk-ecard-o' }, tkMark(lead ? 'person' : 'no-person'), lead ? [lead.lead, lead.model].filter(Boolean).join(' · ') : 'no owner recorded'),
         el('span', { class: 'meta tk-ecard-n', dir: 'auto' }, next ? `Next: ${next.key ? next.key + ' ' : ''}${next.title}` : 'Nothing left to do'));
@@ -530,43 +559,45 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       el('div', { class: 'acts' }, pick, tkTabs('epics'), tkFilter(tkLists()), themeButton())), el('div', { class: 'tk-story-grid tk-epics-grid' }, el('div', {}, ...body)))];
   }
   /* ---- Story: where Tickets opens. What ships (the releases with their progress), what is in flight, what is blocked and why, and what shipped this week; the flat list is one tap away under All tickets.
-     Every figure is the board's own: the roll-up for the counts, the ticket history for the week (state.week), and where the board holds nothing the page says so. ---- */
+     Every figure is the board's own, worked out by the server over every ticket (state.story) and from the ticket history for the week (state.week); where the board holds nothing the page says so. ---- */
   const WEEKDAY = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
-  const tkSplit = (list) => ({ done: list.filter((t) => tkStateOf(t) === 'done').length, moving: list.filter((t) => tkStateOf(t) === 'moving').length, hold: list.filter((t) => tkStateOf(t) === 'hold').length });
-  function tkSeg(list) {
-    const c = tkSplit(list), n = list.length || 1, seg = (cls, v) => (v ? el('i', { class: cls, style: `flex: ${v / n}` }) : '');
-    return el('span', { class: 'tk-seg-bar', role: 'img', 'aria-label': `${c.done} of ${list.length} done, ${c.moving} in progress, ${c.hold} on hold` }, seg('d', c.done), seg('m', c.moving), seg('h', c.hold), seg('', list.length - c.done - c.moving - c.hold));
+  const tkSplit = (list) => ({ total: list.length, done: list.filter((t) => tkStateOf(t) === 'done').length, moving: list.filter((t) => tkStateOf(t) === 'moving').length, hold: list.filter((t) => tkStateOf(t) === 'hold').length });
+  /** A bar of how a group stands, from its counts: done, in progress, on hold and the rest. */
+  function tkSeg(c) {
+    const n = c.total || 1, seg = (cls, v) => (v ? el('i', { class: cls, style: `flex: ${v / n}` }) : '');
+    return el('span', { class: 'tk-seg-bar', role: 'img', 'aria-label': `${c.done} of ${c.total} done, ${c.moving} in progress, ${c.hold} on hold` }, seg('d', c.done), seg('m', c.moving), seg('h', c.hold), seg('', c.total - c.done - c.moving - c.hold));
   }
   const storyHead = (name, ...rest) => el('h2', { class: 'ui-sec' }, name, ...rest);
   function storyPage(id) {
-    const all = tkAll(), leaves = all.filter((t) => !tkUnder(t).length), desk = !phone(), picked = id && tkById(id), week = state.week;
-    const open = all.filter((t) => tkStateOf(t) !== 'done'), owned = open.filter((t) => t.assignee).length;
-    const groups = new Map();
-    for (const t of leaves) if (/^v?\d+(\.\d+){1,3}$/.test(t.release ?? '')) { const k = `${tkProject(t) ?? ''}\n${t.release}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
-    const releases = [...groups].map(([k, list]) => ({ project: k.split('\n')[0], release: list[0].release, list, done: tkSplit(list).done, at: Math.max(...list.map((t) => Date.parse(t.at) || 0)) }))
-      .filter((g) => g.list.length >= 3 && g.done < g.list.length).sort((x, y) => y.at - x.at).slice(0, 4);
-    const moving = leaves.filter((t) => tkStateOf(t) === 'moving').sort((x, y) => (y.last_event_at ?? 0) - (x.last_event_at ?? 0));
-    const held = leaves.filter((t) => tkStateOf(t) === 'hold').sort((x, y) => !!y.hold_reason - !!x.hold_reason || (y.last_event_at ?? 0) - (x.last_event_at ?? 0)), why = held.filter((t) => t.hold_reason);
+    // The server works the Story out over every ticket (state.story) and sends the rows it lists; the page draws them and holds no other ticket.
+    const st = state.story, desk = !phone(), picked = id && tkById(id), week = state.week, rowOf = (ids) => ids.map(tkById).filter(Boolean);
+    const moving = st ? rowOf(st.moving) : [], why = st ? rowOf(st.blocked) : [];
     const rows = (list) => el('ul', { class: 'ui-card ui-list tk-story-rows' }, ...list.map((t) => tkRow(t, true)));
-    const empty = tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work. The story shows here once they do.');
-    const ms = el('section', { 'aria-label': 'Milestones' }, storyHead('Milestones', el('small', {}, 'recorded releases')), releases.length ? el('div', { class: 'tk-ms-grid' }, ...releases.map((g) => el('div', { class: 'ui-card tk-ms' },
-      el('p', { class: 'tk-ms-n', dir: 'auto' }, [g.project, g.release].filter(Boolean).join(' · ')), el('p', { class: 'tk-ms-v' }, `${g.done} of ${g.list.length}`), tkSeg(g.list),
-      el('p', { class: 'meta' }, [tkSplit(g.list).hold && `${tkSplit(g.list).hold} on hold`, 'no target date recorded'].filter(Boolean).join(' · '))))) : el('p', { class: 'meta tk-note' }, 'No release with open work is recorded yet.'));
-    const fl = el('section', { 'aria-label': 'In flight' }, storyHead('In flight', el('small', {}, `${Math.min(6, moving.length)} of ${moving.length}`)), moving.length ? rows(moving.slice(0, 6)) : el('p', { class: 'meta tk-note' }, 'Nothing is in progress right now.'),
-      el('p', { class: 'meta tk-note' }, `${owned} of ${open.length} open tickets have an owner recorded; the rest show none.`));
+    const empty = tkStoryLoad() === 'ready' ? emptyState('empty', { mark: 'pick', title: 'No tickets yet', text: 'Agents add tickets as they plan work. The story shows here once they do.' })
+      : tkStoryLoad() === 'error' ? emptyState('error', { title: 'Couldn’t load tickets', text: ticketsFailed, act: ['Try again', tkRetry] }) : emptyState('loading', { title: 'Loading tickets' });
+    if (!st?.total) {
+      if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('story'), empty, picked ? tkSheet(picked) : (tkUp = '')];
+      return [el('div', { class: 'ui-desk tk-desk tk-story' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets')),
+        el('div', { class: 'acts' }, tkTabs('story'), themeButton())), empty), ...(picked ? [tkSheet(picked)] : [])];
+    }
+    const ms = el('section', { 'aria-label': 'Milestones' }, storyHead('Milestones', el('small', {}, 'recorded releases')), st.releases.length ? el('div', { class: 'tk-ms-grid' }, ...st.releases.map((g) => el('div', { class: 'ui-card tk-ms' },
+      el('p', { class: 'tk-ms-n', dir: 'auto' }, [g.project, g.release].filter(Boolean).join(' · ')), el('p', { class: 'tk-ms-v' }, `${g.done} of ${g.total}`), tkSeg(g),
+      el('p', { class: 'meta' }, [g.hold && `${g.hold} on hold`, 'no target date recorded'].filter(Boolean).join(' · '))))) : el('p', { class: 'meta tk-note' }, 'No release with open work is recorded yet.'));
+    const fl = el('section', { 'aria-label': 'In flight' }, storyHead('In flight', el('small', {}, `${moving.length} of ${st.moving_total}`)), moving.length ? rows(moving) : el('p', { class: 'meta tk-note' }, 'Nothing is in progress right now.'),
+      el('p', { class: 'meta tk-note' }, `${st.owned} of ${st.open} open tickets have an owner recorded; the rest show none.`));
     const stuck = (t) => el('li', {}, el('a', { class: 'ui-row tk-blocked', href: `#ticket/${t.id}` }, tkTypeTile(t), el('span', { class: 'rm' }, el('span', { class: 'l1' }, tkKey(t.key), el('span', { class: 't', dir: 'auto' }, t.title)), el('span', { class: 'tk-why', dir: 'auto' }, t.hold_reason))));
-    const bk = el('section', { 'aria-label': 'Blocked' }, storyHead('Blocked', el('small', {}, String(held.length))), why.length ? el('ul', { class: 'ui-card ui-list tk-story-rows' }, ...why.slice(0, 4).map(stuck)) : '',
-      el('p', { class: 'meta tk-note' }, held.length ? `${held.length - why.length} on hold with no reason recorded.` : 'Nothing is on hold.'));
+    const bk = el('section', { 'aria-label': 'Blocked' }, storyHead('Blocked', el('small', {}, String(st.held_total))), why.length ? el('ul', { class: 'ui-card ui-list tk-story-rows' }, ...why.map(stuck)) : '',
+      el('p', { class: 'meta tk-note' }, st.held_total ? `${st.held_total - st.held_with_reason} on hold with no reason recorded.` : 'Nothing is on hold.'));
     const peak = Math.max(1, ...(week?.days ?? []).map((d) => d.done)), top = (week?.projects ?? []).slice(0, 5), most = Math.max(1, ...top.map((p) => p.done));
     const wk = el('section', { 'aria-label': 'Shipped this week' }, storyHead('Shipped this week', el('small', {}, week ? String(week.done) : '')), !week ? el('p', { class: 'meta tk-note' }, 'The week is on its way.') : el('div', { class: 'ui-card tk-wk' },
       el('div', { class: 'tk-days', role: 'img', 'aria-label': `Done each day: ${week.days.map((d) => `${WEEKDAY.format(new Date(d.day))} ${d.done}`).join(', ')}` }, ...week.days.map((d, i) => el('div', { class: i === 6 ? 'today' : '' },
         el('b', {}, String(d.done)), el('i', { style: `height: ${Math.max(2, (d.done / peak) * 100)}%` }), el('span', {}, i === 6 ? 'Today' : WEEKDAY.format(new Date(d.day)))))),
       el('ul', { class: 'tk-pbar' }, ...top.map((p) => el('li', {}, el('span', { dir: 'auto' }, p.project || 'No project'), el('i', { style: `--w: ${(p.done / most) * 100}%` }), el('b', {}, String(p.done)))))));
-    const head = el('p', { class: 'tk-total', role: 'status' }, `${all.length} tickets · ${all.length - open.length} done · ${open.length} open`);
-    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('story'), ...(all.length ? [head, wk, ms, fl, bk] : [tkNote('tickets', 'pick', 'No tickets yet', 'Agents add tickets as they plan work.')]), picked ? tkSheet(picked) : (tkUp = '')];
+    const head = el('p', { class: 'tk-total', role: 'status' }, `${st.total} tickets · ${st.total - st.open} done · ${st.open} open`);
+    if (!desk) return [el('header', { class: 'ui-top tk-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), themeButton()), tkTabs('story'), head, wk, ms, fl, bk, picked ? tkSheet(picked) : (tkUp = '')];
     tkShown = picked?.id ?? '';
     return [el('div', { class: 'ui-desk tk-desk tk-story' }, el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), head),
-      el('div', { class: 'acts' }, tkTabs('story'), themeButton())), all.length ? el('div', { class: 'tk-story-grid' }, el('div', {}, ms, fl), el('div', {}, wk, bk)) : empty), ...(picked ? [tkSheet(picked)] : [])];
+      el('div', { class: 'acts' }, tkTabs('story'), themeButton())), el('div', { class: 'tk-story-grid' }, el('div', {}, ms, fl), el('div', {}, wk, bk))), ...(picked ? [tkSheet(picked)] : [])];
   }
   function tickets(by, id, subpage) {
     if (subpage === 'activity') return activityPage();
@@ -643,6 +674,20 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     });
   }
   /** Who works on a ticket: model mark, `lead · Model`, Live dot (the amber defect when moving with nobody). Drawn here, after the first paint. */
+  /** A link may name a ticket by its key, an old id or the backlog item it was filed from, and #tickets/<name> as well as #ticket/<name>: the board says which ticket
+   *  that is (GET /api/tickets/<name>) and the address moves to it. A name no ticket has says so, once. Drawn here, after the first paint: a ticket's address waits for this file anyway. */
+  const tkAsked = new Set();
+  tkResolve = (name) => {
+    if (tkById(name)) return location.replace(`#ticket/${name}`);
+    if (FROZEN || tkAsked.has(name)) return;
+    tkAsked.add(name);
+    fetch(`/api/tickets/${encodeURIComponent(name)}`).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!location.hash.endsWith(`/${name}`)) return;
+      if (res.ok && body.ticket?.id) location.replace(`#ticket/${body.ticket.id}`);
+      else say(body.error ?? `Couldn’t open ticket ${name}: the board answered ${res.status}`, 8000, undefined, 'error');
+    }).catch((e) => { tkAsked.delete(name); say(`Couldn’t open ticket ${name}: ${why(e)}`, 8000, undefined, 'error'); });
+  };
   tkOwnerLine = (t) => {
     const a = t.assignee;
     if (!a) return tkStateOf(t) === 'moving' ? el('span', { class: 'tk-as missing' }, tkMark('no-person'), 'No assignee') : el('span', { class: 'tk-as none' }, 'Not assigned yet');

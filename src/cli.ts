@@ -21,7 +21,7 @@ import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
-import { homeOf, readTask, type Assignee } from './fleet.js';
+import { fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
 import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -1457,6 +1457,26 @@ const withKeys = <T extends { id: string; key?: string; project?: string }>(tick
     return { ...t, key: `${prefix.get(p)}-${n}`, key_derived: true };
   });
 };
+/** Where a ticket stands, in the four words the Tickets screen sorts by (web/app.js tkStateOf): its state when it names one, else its progress and hold. */
+const STANDING: Record<string, 'todo' | 'moving' | 'hold' | 'done'> = { queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' };
+const standing = (t: Pick<Ticket, 'state' | 'progress' | 'hold'>) => STANDING[t.state ?? ''] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo');
+/** What the Story, the first view of Tickets, shows, worked out over every ticket so the page needs none of them: the totals, up to four recorded releases with open work
+ *  (three or more tickets each), the six in flight that moved last and the four held with a reason, by id, and how many of each there are. */
+function storyOf(tickets: (Ticket & { assignee?: Assignee })[]) {
+  const byId = new Map(tickets.map((t) => [t.id, t])), parents = new Set(tickets.flatMap((t) => (t.parent && byId.has(t.parent) ? [t.parent] : [])));
+  // A ticket under another takes the project of the ticket at the top of its line unless it names its own; a loop of parents ends where it comes back round.
+  const projectOf = (t: Ticket) => { let x: Ticket | undefined = t; const seen = new Set<string>(); while (x && !x.project && x.parent && !seen.has(x.id)) seen.add(x.id), x = byId.get(x.parent); return t.project ?? x?.project; };
+  const leaves = tickets.filter((t) => !parents.has(t.id)), open = tickets.filter((t) => standing(t) !== 'done');
+  const split = (list: Ticket[]) => ({ total: list.length, done: list.filter((t) => standing(t) === 'done').length, moving: list.filter((t) => standing(t) === 'moving').length, hold: list.filter((t) => standing(t) === 'hold').length });
+  const groups = new Map<string, Ticket[]>();
+  for (const t of leaves) if (/^v?\d+(\.\d+){1,3}$/.test(t.release ?? '')) { const k = `${projectOf(t) ?? ''}\n${t.release}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
+  const releases = [...groups].map(([k, list]) => ({ project: k.split('\n')[0]!, release: list[0]!.release!, ...split(list), at: Math.max(...list.map((t) => Date.parse(t.at) || 0)) }))
+    .filter((g) => g.total >= 3 && g.done < g.total).sort((x, y) => y.at - x.at).slice(0, 4).map(({ at, ...g }) => g);
+  const moving = leaves.filter((t) => standing(t) === 'moving').sort((x, y) => (y.last_event_at ?? 0) - (x.last_event_at ?? 0));
+  const held = leaves.filter((t) => standing(t) === 'hold').sort((x, y) => +!!y.hold_reason - +!!x.hold_reason || (y.last_event_at ?? 0) - (x.last_event_at ?? 0)), why = held.filter((t) => t.hold_reason);
+  return { total: tickets.length, open: open.length, owned: open.filter((t) => t.assignee).length, releases, moving: moving.slice(0, 6).map((t) => t.id), moving_total: moving.length,
+    blocked: why.slice(0, 4).map((t) => t.id), held_total: held.length, held_with_reason: why.length };
+}
 /** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
  * `ticket --json` and the board's /api/tickets say it the same way. */
 const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
@@ -1465,14 +1485,25 @@ const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind:
 function ticketsApi(path: string): [number, unknown] | undefined {
   const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
   if (path !== '/api/tickets' && !one) return undefined;
-  const all = withRecords(rollUp(readTickets(file, warn)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
+  const folded = new Map<string, string>(), all = withRecords(rollUp(readTickets(file, warn, folded)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
   // Newest card first, as the CLI and the ticket's page list them.
   const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
   if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
-  let id: string;
-  try { id = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
-  const t = all.find((x) => x.id === id);
-  return t ? [200, { ticket: { ...t, cards: cardsOf(id).map(ticketCard) } }] : [404, { error: 'No ticket with that id' }];
+  let handle: string;
+  try { handle = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
+  // A key is read as the Tickets view shows it, so the keys are made over the whole board, in its order; the ticket itself is sent as the list has it.
+  const id = ticketNamed(withKeys(all), handle, folded)?.id, t = all.find((x) => x.id === id);
+  return t ? [200, { ticket: { ...t, cards: cardsOf(t.id).map(ticketCard) } }] : [404, { error: `No ticket named ${handle} on this board` }];
+}
+/** The ticket a link names, whichever name the link was given: its id, its key in any case (SO-453), a unique start of at least 8 of a fleet id's hex (with or
+ * without its jg- or fm- prefix, so an id from before the fleet re-keyed its tickets still opens the ticket), or the slug of the backlog item it was filed from.
+ * An id the board folded into the open ticket that already tracks its work (`folded`, from readTickets) opens that ticket. */
+function ticketNamed<T extends { id: string; key?: string }>(all: T[], handle: string, folded: Map<string, string>): T | undefined {
+  const shown = (id: string) => all.find((t) => t.id === (folded.get(id) ?? id)), hex = /^(?:(?:jg|fm)-)?([0-9a-f]{8,32})$/i.exec(handle)?.[1]?.toLowerCase();
+  const hits = hex ? [...all.map((t) => t.id), ...folded.keys()].filter((id) => /^(?:jg|fm)-[0-9a-f]{32}$/.test(id) && id.slice(3).startsWith(hex)) : [];
+  // One piece of work can sit under both prefixes: jg- is the id the fleet writes now, so it wins. Two different hashes that start alike name no one ticket.
+  const one = new Set(hits.map((id) => id.slice(3))).size === 1 ? hits.find((id) => id.startsWith('jg-')) ?? hits[0] : undefined;
+  return shown(handle) ?? all.find((t) => t.key?.toUpperCase() === handle.toUpperCase()) ?? (one ? shown(one) : undefined) ?? fleetIdsOf(handle).map(shown).find(Boolean);
 }
 /** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
  * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
@@ -3043,6 +3074,7 @@ const state = () => {
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
+  const tickets = withKeys(withRecords(rollUp(readTickets(file, warn)), file));
   const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [], kinds = readKinds(file, warn);
   return {
     file,
@@ -3076,7 +3108,9 @@ const state = () => {
     promoted: readPromoted(file, warn),
     // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
-    tickets: withKeys(withRecords(rollUp(readTickets(file, warn)), file)),
+    tickets,
+    // The Story, the first view of Tickets, worked out over every ticket: the first view reads this and its rows, never the whole roll-up.
+    story: storyOf(tickets),
     projects: readProjects(file, warn),
     // A report's own three actions, as the person took them, and the rules their rejections left on the owners.
     report_actions: readReportActions(file),
@@ -3124,7 +3158,7 @@ const rowOf = (d: any) => {
   return card ? { ...row, evidenceCard: { ...card, media: (card.media ?? []).filter((m: any) => m.type?.startsWith('image/')).slice(0, 1) } } : row;
 };
 /** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, one card in full, or the ticket roll-up. */
-type View = { name: 'asks' | 'items' | 'card' | 'tickets' | 'lists'; offset: number; limit: number; key: string };
+type View = { name: 'asks' | 'items' | 'card' | 'tickets' | 'story' | 'lists'; offset: number; limit: number; key: string };
 /** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
 function viewOf(url: string): View | undefined {
   const q = new URL(url, 'http://board').searchParams, name = q.get('view');
@@ -3132,8 +3166,8 @@ function viewOf(url: string): View | undefined {
   const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
   const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
   if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
-  if (name === 'asks' || name === 'items' || name === 'tickets' || name === 'lists') return { name, offset, limit, key: '' };
-  throw new InputError(`unknown view ${name}: use asks, items, card, tickets or lists`);
+  if (name === 'asks' || name === 'items' || name === 'tickets' || name === 'story' || name === 'lists') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items, card, tickets, story or lists`);
 }
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
@@ -3171,6 +3205,10 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded, done: s.done,
       dismissed: s.dismissed, promoted: s.promoted, reopened: s.reopened, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
+  } else if (view.name === 'story') {
+    // The first view of Tickets: the Story's figures and the ten rows it lists, never the roll-up of every ticket behind them, which is what made it 2.4 MB.
+    const byId = new Map(((s.tickets ?? []) as any[]).map((t) => [t.id, t])), rows = [...s.story.moving, ...s.story.blocked].map((id: string) => byId.get(id));
+    body = { counts, version: s.version, story: s.story, week: readTicketWeek(file), tickets: rows, decisions: [], page: { view: 'story', offset: 0, limit: rows.length, total: (s.tickets ?? []).length } };
   } else if (view.name === 'tickets') {
     // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
     body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), week: readTicketWeek(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],

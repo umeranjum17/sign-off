@@ -129,7 +129,7 @@ without it gets the same `401` as the rest.
 | Request | Answers |
 |---|---|
 | `GET /api/tickets` | `{"tickets": [...]}`: every ticket, in the order each was first written |
-| `GET /api/tickets/<id>` | `{"ticket": {...}}`: that ticket and the cards that name it; `404` for an id not on the board |
+| `GET /api/tickets/<name>` | `{"ticket": {...}}`: that ticket and the cards that name it. The name may be its id, its key in any case, a unique start of at least 8 of a `jg-`/`fm-` id's hex (either prefix), an id folded into the open ticket that tracks the same work, or a Juggernaut backlog slug; `404` with `No ticket named <name> on this board` otherwise |
 
 Each ticket carries the fields of its line in the file: `id`, `title`, `progress` (rolled up: an
 epic is as far along as the tickets under it, on average), `at`, and, when set, `parent`,

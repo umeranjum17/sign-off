@@ -39,12 +39,16 @@ try {
   assert.ok(epic && detail, 'the board has an epic of three or more tickets and a ticket with a description');
   assert.equal(api.week.days.length, 7);
   const states = [['story', 'tickets', 'Shipped this week'], ['epics', 'epics', '3 or more tickets'], ['drill', `epics/${epic.id}`, 'All epics'], ['all', 'tickets/all', 'tickets ·'], ['detail', `ticket/${detail}`, 'Description']];
+  // A new chrome-devtools-axi session (0.1.34) opens with no page selected and refuses open until one is: select its first tab.
+  try { browser('open', 'about:blank'); } catch { browser('selectpage', '1'); }
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) for (const [name, hash, wait] of states) {
     browser('open', `${base}#${hash}`);
-    browser('resize', String(width), width === 390 ? '844' : '800');
+    // resize cannot make a window narrower than 500 px, so the width is the page's own, set as a device.
+    browser('emulate', '--viewport', width === 390 ? '390x844x2,mobile,touch' : '1280x800x1');
     browser('eval', `() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); }`);
     browser('wait', wait);
-    const facts = JSON.parse(JSON.parse(browser('eval', `() => ({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, cards: document.querySelectorAll('.tk-ecard').length, months: document.querySelectorAll('.tk-ms').length, days: document.querySelectorAll('.tk-days > div').length, hasList: !!document.querySelector('.tk-hero') })`).split('\n')[0].slice('result: '.length)));
+    const facts = JSON.parse(JSON.parse(browser('eval', `() => ({ overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, cards: document.querySelectorAll('.tk-ecard').length, months: document.querySelectorAll('.tk-ms').length, days: document.querySelectorAll('.tk-days > div').length, hasList: !!document.querySelector('.tk-hero'), width: innerWidth })`).split('\n')[0].slice('result: '.length)));
+    assert.equal(facts.width, width, `${name} is drawn ${width} px wide`);
     assert.equal(facts.overflow, false, `${name} at ${width} has no sideways overflow`);
     if (name === 'story') assert.equal(facts.days, 7), assert.equal(facts.hasList, false, 'the Story is not the flat list');
     if (name === 'epics') assert.ok(facts.cards > 0, 'epic cards');

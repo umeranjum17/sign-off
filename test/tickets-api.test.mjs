@@ -280,3 +280,71 @@ test('a week counts a ticket that moves to done from a state it had, never one t
   assert.deepEqual(week.projects, [{ project: 'Beacon', done: 1 }]);
   assert.equal(week.days.filter((d) => d.done).length, 1);
 });
+
+test('a link opens its ticket by id, key, an id from before the fleet re-keyed, a short hash or the backlog slug it was filed from, and a ticket filed now is in the feed', async () => {
+  // Fleet ids as Juggernaut's tickets sync makes them: jg- and the first 32 hex of sha256("main/<backlog slug>"); fm- is the same work before the re-key.
+  const { createHash } = await import('node:crypto');
+  const fleet = (slug) => createHash('sha256').update(`main/${slug}`).digest('hex').slice(0, 32);
+  const file = join(scratch, 'links.json'), share = fleet('bots-share-build'), live = fleet('tickets-page-jira-basics');
+  writeFileSync(file, '{"schema":2,"items":[]}\n');
+  axi('ticket', file, '--id', `fm-${share}`, '--description', 'Summary line.', '--title', 'Build the bots share one computer plan', '--project', 'crewhouse', '--state', 'done', '--progress', '100');
+  axi('ticket', file, '--id', `jg-${share}`, '--description', 'Summary line.', '--title', 'Build the bots share one computer plan: all eight slices', '--project', 'crewhouse');
+  axi('ticket', file, '--id', `jg-${live}`, '--description', 'Summary line.', '--title', 'Live Tickets page: real links, no grid', '--project', 'sign-off', '--key', 'SO-77');
+  // The fleet appends its own lines too: an open ticket filed again under a new id is folded into the first one, and a link to the second id opens the first.
+  const again = fleet('settle-muxr-dependency-twice'), first = fleet('settle-muxr-dependency');
+  appendFileSync(join(scratch, 'links.tickets.jsonl'), [{ id: `fm-${first}`, title: 'Settle the muxr dependency', progress: 0, project: 'muxr', at: '2026-11-06T01:00:00Z' },
+    { id: `fm-${again}`, title: 'Settle the muxr dependency', progress: 0, project: 'muxr', at: '2026-11-06T02:00:00Z' }].map((t) => JSON.stringify(t) + '\n').join(''));
+  const child = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(child);
+  let out = '';
+  for await (const chunk of child.stdout) { out += chunk; if (/url: "http:\/\/[^"]+\/"/.test(out)) break; }
+  const base = /url: "(http:\/\/[^"]+)\/"/.exec(out)[1];
+  const open = async (name) => { const res = await fetch(`${base}/api/tickets/${encodeURIComponent(name)}`); return res.ok ? (await res.json()).ticket.id : res.status; };
+  assert.equal(await open(`jg-${live}`), `jg-${live}`);
+  assert.equal(await open('SO-77'), `jg-${live}`);
+  assert.equal(await open('so-77'), `jg-${live}`);
+  assert.equal(await open('tickets-page-jira-basics'), `jg-${live}`);
+  assert.equal(await open('bots-share-build'), `jg-${share}`);
+  assert.equal(await open(live.slice(0, 10)), `jg-${live}`);
+  // The fm- row is the same work: the jg- row the fleet writes now is the one a short hash opens, and the fm- id itself still opens its own row.
+  assert.equal(await open(share.slice(0, 8)), `jg-${share}`);
+  assert.equal(await open(`fm-${share}`), `fm-${share}`);
+  assert.equal(await open(`fm-${again}`), `fm-${first}`);
+  assert.equal(await open('settle-muxr-dependency-twice'), `fm-${first}`);
+  assert.equal(await open('no-such-backlog-item'), 404);
+  assert.match((await (await fetch(`${base}/api/tickets/no-such-backlog-item`)).json()).error, /No ticket named no-such-backlog-item/);
+  // A ticket filed while the board is up is in the feed at once, and its slug opens it.
+  const today = fleet('ticket-filed-in-this-run');
+  axi('ticket', file, '--id', `jg-${today}`, '--description', 'Summary line.', '--title', 'A ticket filed in this run', '--project', 'sign-off', '--state', 'queued');
+  const { tickets } = await (await fetch(`${base}/api/tickets`)).json();
+  assert.ok(tickets.some((t) => t.id === `jg-${today}` && t.title === 'A ticket filed in this run'));
+  assert.equal(await open('ticket-filed-in-this-run'), `jg-${today}`);
+  await stopAll();
+});
+
+test('the first view of Tickets reads the Story: its figures over every ticket and only the rows it lists', async () => {
+  // A board of its own, so the tickets the tests above add do not move its figures: an epic, two tickets under it (one with a sub-task), as at the top of this file.
+  const file = join(scratch, 'story.json');
+  writeFileSync(file, '{"schema":2,"items":[]}\n');
+  axi('ticket', file, '--id', 'E-1', '--description', 'Summary line.', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings');
+  axi('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Build the page', '--progress', '40', '--parent', 'E-1');
+  axi('ticket', file, '--id', 'T-2', '--description', 'Summary line.', '--title', 'Publish it', '--progress', '80', '--parent', 'E-1', '--hold', 'yes', '--hold-reason', 'waiting on the review');
+  axi('ticket', file, '--id', 'S-1', '--description', 'Summary line.', '--title', 'Wire the save button', '--progress', '20', '--parent', 'T-1');
+  await stopAll();
+  const child = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(child);
+  let out = '';
+  for await (const chunk of child.stdout) { out += chunk; if (/url: "http:\/\/[^"]+\/"/.test(out)) break; }
+  const base = /url: "(http:\/\/[^"]+)\/"/.exec(out)[1];
+  const whole = await (await fetch(`${base}/api/state?view=tickets`)).json(), first = await (await fetch(`${base}/api/state?view=story`)).json();
+  // E-1 and T-1 have tickets under them, so the Story lists the leaves: S-1, in progress at 20%, and T-2, on hold with its reason.
+  assert.deepEqual(first.story, whole.story);
+  assert.equal(first.story.total, whole.tickets.length);
+  assert.deepEqual(first.story.moving, ['S-1']);
+  assert.deepEqual(first.story.blocked, ['T-2']);
+  assert.deepEqual(first.tickets.map((t) => t.id), ['S-1', 'T-2']);
+  assert.equal(first.tickets.find((t) => t.id === 'T-2').hold_reason, 'waiting on the review');
+  assert.equal(first.week.days.length, 7);
+  assert.ok(JSON.stringify(first).length < JSON.stringify(whole).length / 2, 'the first view is a fraction of the roll-up');
+  await stopAll();
+});
