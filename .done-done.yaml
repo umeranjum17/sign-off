@@ -295,6 +295,8 @@ journeys:
   # A held ticket from Beads names what it waits on (the ticket sheet's Hold row and a Waiting on row), at 390 and 1280, light and dark; then the Designs capture at 1440, dark.
   beads-waiting:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-waiting-proof.sh'
+  beads-waiting-row:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-waiting-row-proof.sh'
   board-actions:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-actions-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
