@@ -38,6 +38,15 @@ export function workerTitle(id: string, named?: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+/** An assignee as a ticket line carries it, in the board's words: the fleet writes the raw model and tool ids and says "no worker yet" for none, and the owner's own
+ *  pick names only a lead. A model or tool reads as the task record's would; a placeholder is left out. */
+export function assigneeFrom(raw: { lead: string; [field: string]: string | boolean }): Assignee {
+  const text = (k: string) => { const v = raw[k]; return typeof v === 'string' && v.trim() && !/^no worker yet$/i.test(v.trim()) ? v.trim() : undefined; };
+  const model = text('model'), harness = text('tool') ?? text('harness'), tool = harness ? TOOLS[harness.toLowerCase()] : undefined, family = model ? modelOf(model) : undefined, worker = text('worker');
+  return { lead: raw.lead, ...(worker && { worker: workerTitle(worker), worker_id: worker }), ...(family && { model: family.label, model_logo: family.logo }),
+    ...(harness && { tool: tool ? tool[0] : harness, tool_logo: logo(tool ? tool[1] : GENERIC) }), live: raw.live === true };
+}
+
 /** The `key=value` lines of a task record; a line of another shape is skipped. Lines that name an endpoint as `endpoint:` are kept under that key too. */
 function lines(text: string): Map<string, string> {
   const out = new Map<string, string>();
