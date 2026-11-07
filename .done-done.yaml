@@ -132,6 +132,10 @@ journeys:
   # approved design-pick listing (designs.1440.dark.png) in the same run. TICKETS_LINKS_BOARD=<a copy of a real board's folder> drives real links.
   tickets-links:
     command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-links-proof.sh'
+  # The first view of Tickets reads only the Story (its figures and the rows it lists), never the whole roll-up: payload.json holds the read before and after in rows
+  # and bytes; 390 and 1280, light and dark, All tickets reading the roll-up on demand, then designs.1440.dark.png. TICKETS_FIRST_VIEW_BOARD=<a copy of a real board's folder>.
+  tickets-first-view:
+    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-first-view-proof.sh'
   # The Inbox as a conversation with everyone: the people rail, a one-to-one thread with sent/read/replied, #fleet muted with
   # the agents' own talk, a mention that opens the ticket it names, and a search that finds what an agent said; 390 and 1280,
   # light and dark, then the approved design-pick listing (designs.1440.dark.png) in the same run.

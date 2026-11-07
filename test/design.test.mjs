@@ -4769,8 +4769,11 @@ test('the board paints its first screen from one page of asks, and never asks fo
     await click(box);
     await until(() => evaluate('!!document.querySelector("#board .ev-open .ev-go")'));
     await until(async () => (await reads()).some(([path]) => path.startsWith('/api/decisions?view=card&key=')));
-    // The Tickets screen asks for its own roll-up, which no page carries.
+    // The Tickets screen opens on the Story, which reads its own figures and rows; the whole roll-up, which no page carries, comes with All tickets.
     await evaluate('location.hash = "#tickets"');
+    await until(() => evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=story"))'));
+    assert.equal(await evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=tickets"))'), false, 'the Story never reads the whole roll-up');
+    await evaluate('location.hash = "#tickets/all"');
     await until(() => evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=tickets"))'));
     assert.deepEqual(await asked(), [], 'still no read of the whole board');
     console.log(`first screen: ${first[0][1]} B of a ${whole} B board; reads: ${(await reads()).map(([p, b]) => `${p} ${b}B`).join(', ')}`);

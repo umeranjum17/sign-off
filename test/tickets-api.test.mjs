@@ -321,3 +321,30 @@ test('a link opens its ticket by id, key, an id from before the fleet re-keyed, 
   assert.equal(await open('ticket-filed-in-this-run'), `jg-${today}`);
   await stopAll();
 });
+
+test('the first view of Tickets reads the Story: its figures over every ticket and only the rows it lists', async () => {
+  // A board of its own, so the tickets the tests above add do not move its figures: an epic, two tickets under it (one with a sub-task), as at the top of this file.
+  const file = join(scratch, 'story.json');
+  writeFileSync(file, '{"schema":2,"items":[]}\n');
+  axi('ticket', file, '--id', 'E-1', '--description', 'Summary line.', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings');
+  axi('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Build the page', '--progress', '40', '--parent', 'E-1');
+  axi('ticket', file, '--id', 'T-2', '--description', 'Summary line.', '--title', 'Publish it', '--progress', '80', '--parent', 'E-1', '--hold', 'yes', '--hold-reason', 'waiting on the review');
+  axi('ticket', file, '--id', 'S-1', '--description', 'Summary line.', '--title', 'Wire the save button', '--progress', '20', '--parent', 'T-1');
+  await stopAll();
+  const child = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  procs.push(child);
+  let out = '';
+  for await (const chunk of child.stdout) { out += chunk; if (/url: "http:\/\/[^"]+\/"/.test(out)) break; }
+  const base = /url: "(http:\/\/[^"]+)\/"/.exec(out)[1];
+  const whole = await (await fetch(`${base}/api/state?view=tickets`)).json(), first = await (await fetch(`${base}/api/state?view=story`)).json();
+  // E-1 and T-1 have tickets under them, so the Story lists the leaves: S-1, in progress at 20%, and T-2, on hold with its reason.
+  assert.deepEqual(first.story, whole.story);
+  assert.equal(first.story.total, whole.tickets.length);
+  assert.deepEqual(first.story.moving, ['S-1']);
+  assert.deepEqual(first.story.blocked, ['T-2']);
+  assert.deepEqual(first.tickets.map((t) => t.id), ['S-1', 'T-2']);
+  assert.equal(first.tickets.find((t) => t.id === 'T-2').hold_reason, 'waiting on the review');
+  assert.equal(first.week.days.length, 7);
+  assert.ok(JSON.stringify(first).length < JSON.stringify(whole).length / 2, 'the first view is a fraction of the roll-up');
+  await stopAll();
+});
