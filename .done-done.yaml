@@ -259,6 +259,9 @@ journeys:
   images:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/image-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
   # The Tickets tab and a ticket in the new look, one width per run (TICKETS_WIDTH=390|1280|1440), light and dark, measured in the browser; TICKETS_PROTO and TICKETS_PROTO_TREE (the prototypes' index.html) save each state beside the prototype's.
+  # Create, assign and epic grouping, one width and theme per run (CREATE_WIDTH=360|390|445|1280|1440, CREATE_THEME=light|dark); the required Designs capture rides in the same run.
+  tickets-create:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-create-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${CREATE_THEME:-light}" "${CREATE_WIDTH:-390}" && node .agents/skills/done-done-verify-sign-off/designs-1440-dark.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   ticket-stage:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/ticket-stage-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Every empty, loading and error state, one width and theme per run (EMPTY_WIDTH=390|1280, EMPTY_THEME=light|dark), measured in the browser, with the populated Tickets screen.

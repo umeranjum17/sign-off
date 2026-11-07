@@ -14,14 +14,14 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, readOwnerCreated, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
-import { fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
+import { assigneeFrom, fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
 import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -337,6 +337,7 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
        sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--type epic|ticket|bug|decision|evidence|merge] [--key <PREFIX-N>] [--description <text>] [--hold yes|no] [--hold-reason <text>] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>] [--filer <id>]
        sign-off-axi ticket [board.json] --backfill [--json]
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
+       sign-off-axi ticket [board.json] --created [--json]
 A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
 whether it is on hold and whether you asked for it (the board's Tickets screen then marks it From you in its filter). It stands alone: nothing else needs it.
 An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
@@ -359,6 +360,8 @@ It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
 --comment hands over a comment the person made on the ticket elsewhere (the fleet dashboard), in that dashboard's thread record: {"id","at","text","error","picked","replies":[{"at","text","by"}]},
 times in whole seconds since 1970. Send it again as it moves: the board shows it Sent, Delivered (no error), Read (picked) and Replied (the last reply) on the ticket, and a reply in Today.
 It writes one line to <board>.ticket-comments.jsonl; the latest line for a comment id wins.
+--created lists the tickets the board's owner made on its Tickets screen (New ticket), oldest first: each ticket, title, type, epic, priority, project, assignee and description.
+The board writes those as ticket lines of its own (by: owner); the fleet reads them here and files each in its backlog.
 examples:
   sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
   sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9 --priority P0
@@ -1438,16 +1441,18 @@ function fleetHomeOf(board: string) {
 }
 /** The tickets with what each one's task record names (see fleet.ts): its `assignee`, its `type` while the record names one the board knows, and the `hold_reason`
  * of a hold the record explains. The ticket's own line always wins, and with no home configured, or no record, a ticket is unchanged and reads as unassigned. */
-const withRecords = <T extends { id: string; type?: string; key?: string; hold?: boolean; state?: Ticket['state']; hold_reason?: string }>(tickets: T[], board: string): (T & { assignee?: Assignee })[] => {
+const withRecords = <T extends { id: string; type?: string; key?: string; hold?: boolean; state?: Ticket['state']; hold_reason?: string; assignee?: Ticket['assignee'] }>(tickets: T[], board: string): (Omit<T, 'assignee'> & { assignee?: Assignee })[] => {
   const home = fleetHomeOf(board);
-  return home ? tickets.map((t) => {
-    const rec = readTask(home, t.id);
-    if (!rec) return t;
+  // The line's own assignee (the fleet's, or the owner's pick) is the ticket's: its record fills in only a line that says nothing, and null is the owner's Unassigned.
+  const own = ({ assignee, ...t }: T) => ({ ...t, ...(assignee && { assignee: assigneeFrom(assignee) }) });
+  return tickets.map((t) => {
+    const rec = home ? readTask(home, t.id) : undefined;
+    if (!rec) return own(t);
     const type = t.type ?? ((TICKET_TYPES as readonly string[]).includes(rec.type ?? '') ? rec.type : undefined);
     // A reason belongs to a hold: the record explains a hold the ticket already says it is on, and never invents one.
     const reason = t.hold_reason ?? (ticketHeld(t) ? rec.hold_reason : undefined);
-    return { ...t, ...(rec.assignee && { assignee: rec.assignee }), ...(type && { type }), ...(t.key ?? rec.key ? { key: t.key ?? rec.key } : {}), ...(reason && { hold_reason: reason }) };
-  }) : tickets;
+    return { ...own(t), ...(t.assignee === undefined && rec.assignee && { assignee: rec.assignee }), ...(type && { type }), ...(t.key ?? rec.key ? { key: t.key ?? rec.key } : {}), ...(reason && { hold_reason: reason }) };
+  });
 };
 /** A ticket no key was given reads PROJECT-n: the project's short name and its place among that project's tickets, counted in the order they were first written, so a key never moves. */
 const withKeys = <T extends { id: string; key?: string; project?: string }>(tickets: T[]): (T & { key_derived?: boolean })[] => {
@@ -1520,9 +1525,15 @@ function ticketNamed<T extends { id: string; key?: string }>(all: T[], handle: s
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
   const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, filer: { type: 'string' }, backfill: { type: 'boolean' }, json: { type: 'boolean' } });
+    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, created: { type: 'boolean' }, filer: { type: 'string' }, backfill: { type: 'boolean' }, json: { type: 'boolean' } });
   if (values.comment !== undefined) return ticketComment(file, values, on);
   if (values.backfill) return ticketBackfill(file, values, on);
+  if (values.created) {
+    // What the board's owner made on the page, oldest first: the fleet files each in its backlog (the board never writes the backlog itself).
+    const created = readOwnerCreated(file).map((t) => ({ ticket: t.id, title: t.title, type: t.type ?? 'ticket', parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', assignee: t.assignee?.lead ?? 'nobody', description: t.description ?? '', at: t.at }));
+    if (values.json) return JSON.stringify({ board: file, created });
+    return toon({ board: tilde(file), created: created.length ? created : '0 tickets made on the board' }, ['File each in the backlog; its assignee is the lead that owns the item']);
+  }
   const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.type, values.key, values.description, values.hold, values['hold-reason'], values.asked, values.release, values.state, values.pr, values.stage, values['last-event-at']].some((v) => v !== undefined);
   if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --type, --key, --description, --hold, --hold-reason, --asked, --release, --state, --pr, --stage and --last-event-at need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
   // The board is read once per command, and its warnings print once, however many tickets name cards.
@@ -1601,6 +1612,26 @@ function ticketBackfill(file: string, values: Record<string, any>, on: string) {
   });
 }
 
+
+/** The board's owner makes a ticket on the page (POST /api/tickets): one line written `by: owner`, so the page shows it at once and the fleet reads it with `ticket --created`.
+ *  A title, and optionally its type (ticket, bug or epic), the ticket it sits under, a priority, a project, a description and the lead who works on it. */
+const OWNER_TYPES = ['ticket', 'bug', 'epic'];
+function ownerCreate(file: string, input: any) {
+  const keys = ['title', 'description', 'type', 'parent', 'priority', 'project', 'assignee'];
+  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some((k) => !keys.includes(k))) throw new InputError(`Send one object with "title" and, optionally, ${keys.slice(1).map((k) => `"${k}"`).join(', ')}`);
+  const text = (k: string) => (typeof input[k] === 'string' && input[k].trim() ? input[k].trim() : undefined);
+  const title = text('title');
+  if (!title) throw new InputError('A ticket needs a title');
+  if (input.type !== undefined && input.type !== null && !OWNER_TYPES.includes(input.type)) throw new InputError('type must be ticket, bug or epic');
+  const all = readTickets(file, warn), parent = text('parent'), lead = text('assignee');
+  if (parent && !all.some((t) => t.id === parent)) throw new InputError(`No ticket ${parent} to put it under`);
+  const id = `${slug(title).slice(0, 48).replace(/-+$/, '') || 'ticket'}-${randomBytes(3).toString('hex')}`;
+  const next: any = { id, title, progress: 0, state: 'queued', asked: true, by: 'owner', ...(input.type && input.type !== 'ticket' && { type: input.type }), ...(parent && { parent }), ...(text('priority') && { priority: text('priority') }),
+    ...(text('project') && { project: text('project') }), description: text('description') ?? title, ...(lead && { assignee: { lead, live: false } }) };
+  const fault = ticketFault(next);
+  if (fault) throw new InputError(fault);
+  return appendTicket(file, next);
+}
 function releaseTicketHold(file: string, id: string) {
   const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
   if (ticket && ticketHeld(ticket)) appendTicket(file, { ...ticket, by: undefined, hold: false, hold_reason: undefined,
@@ -3555,6 +3586,16 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
   const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
   if (tickets) return tickets;
+  if (req.method === 'POST' && req.url === '/api/tickets') {
+    // An answers-only board (one the fleet feeds) takes a ticket too: like an answer, it is the person's input for the fleet to read, with `ticket --created`.
+    if (readOnly()) return [403, { error: 'This board is read-only' }];
+    if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    let input: any;
+    try { input = JSON.parse(body); } catch { return [400, { error: 'Send one JSON object: {"title": "...", "type"?, "parent"?, "priority"?, "project"?, "description"?, "assignee"?}' }]; }
+    try { return [200, { ticket: await locked(`${file}.lock`, () => ownerCreate(file, input)) }]; } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
+  }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/done', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.

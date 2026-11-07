@@ -62,8 +62,8 @@ test('the ticket API lists every ticket with its roll-up and reads one with its 
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets/T-1?x=1`)).status, 200);
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets/nope`)).status, 404);
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets/%E0%A4%A`)).status, 404);
-  // Read only: nothing writes a ticket over HTTP.
-  assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets`, { method: 'POST', body: '{}' })).status, 404);
+  // Only the owner's New ticket writes one over HTTP (JSON only, see ticket-create.test.mjs); an existing ticket's address takes no write.
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/tickets/T-1`, { method: 'POST', body: '{}' })).status, 404);
 });
 
 // A ticket's own additions (a hold that says why, a readable key, a description) are proved on a board of their own, so this file's other reads stay exact.
