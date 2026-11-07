@@ -104,7 +104,7 @@ try {
   const reset = () => { post('api/reads', { keys: ['settings-move', 'release-train', 'next-question'], read: true }); post('api/reads', { keys: [base.key, 'settings-speed', 'chat-retry', 'release-notes', guided.key], read: false }); };
   for (const part of ['this', 'understood']) post('api/reads', { key: guided.key, part });
   // The guided report names ticket T-29: the ticket is on the board, and a comment on the report gives it Activity.
-  so('ticket', board, '--id', 'T-29', '--title', 'Make sign-in quicker on a phone', '--progress', '60');
+  so('ticket', board, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Make sign-in quicker on a phone', '--progress', '60');
   post('api/messages', { kind: 'comment', key: guided.key, text: 'Is 2.8 minutes the median of all 200?' });
 
   let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }

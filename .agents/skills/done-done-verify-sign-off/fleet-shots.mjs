@@ -32,7 +32,7 @@ const ask = (filer, key, title, why) => cli('post', board, '--filer', filer, '--
 ask('addons-lead', 'release-notes', 'Ship the release notes this week?', 'The notes are written and checked.');
 ask('signoff-worker', 'fleet-history', 'Read #fleet from one record?', 'The board reads the fleet feed already.');
 ask('release-agent', 'digest', 'Keep the weekly digest?', 'The paid plan renews Monday.');
-cli('ticket', board, '--id', 'T-29', '--title', 'Move the ticket owner before release', '--project', 'Settings', '--progress', '40');
+cli('ticket', board, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Move the ticket owner before release', '--project', 'Settings', '--progress', '40');
 // The fleet's own feed: what the agents said to each other, a ticket and a report mentioned by name.
 const feed = join(dir, 'feed.jsonl'), now = Math.floor(Date.now() / 1000);
 writeFileSync(feed, [

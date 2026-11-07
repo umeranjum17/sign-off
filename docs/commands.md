@@ -104,9 +104,9 @@ are on average. It stands alone: no card needs one, and a board with none works 
 `raise` and `post` (every `--type` and `--kind`), or `"ticket"` in a message:
 
 ```sh
-sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
-sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9
-sign-off-axi ticket --id T-31 --title "Publish to npm" --parent T-29 --hold yes
+sign-off-axi ticket --id T-9 --title "The new settings page" --description "Settings in one place." --priority P1 --project Settings --asked yes
+sign-off-axi ticket --id T-29 --title "Ship the new settings page" --description "Ship the page. # Ask - the owner wants it # Why - users look for it # Done when - it opens from the profile" --progress 40 --parent T-9
+sign-off-axi ticket --id T-31 --title "Publish to npm" --description "Publish the package." --parent T-29 --hold yes
 sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 \
   --title "Ship the settings page on Friday?" ...
 sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" ...

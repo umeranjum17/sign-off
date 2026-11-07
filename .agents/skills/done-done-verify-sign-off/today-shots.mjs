@@ -100,8 +100,8 @@ try {
     else if (d.key === 'export') d.ticket = 'export-label'; else if (d.key === 'onboarding') d.ticket = 'onboarding';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
   // Two tickets, so a row on one shows its bar: the export label half done, the onboarding finished (a full bar).
-  cli('ticket', board, '--id', 'export-label', '--title', 'Export button label', '--progress', '60');
-  cli('ticket', board, '--id', 'onboarding', '--title', 'Chat app onboarding', '--progress', '100');
+  cli('ticket', board, '--id', 'export-label', '--description', 'Summary line.', '--title', 'Export button label', '--progress', '60');
+  cli('ticket', board, '--id', 'onboarding', '--description', 'Summary line.', '--title', 'Chat app onboarding', '--progress', '100');
   copyFileSync(join(repo, 'web/icon-192.png'), join(dir, 'chat-app.png'));
   cli('project', board, '--name', 'Chat app', '--icon', 'chat-app.png');
   writeFileSync(join(dir, 'settings.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#E8590C"/><circle cx="12" cy="12" r="3" fill="none" stroke="#fff" stroke-width="2"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>');

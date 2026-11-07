@@ -182,7 +182,7 @@ try {
   const b = JSON.parse(readFileSync(board, 'utf8'));
   for (const d of b.items) if (d.key === 'today-desk') d.ticket = 'today-desk';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
-  cli('ticket', board, '--id', 'today-desk', '--title', 'Today on a desk', '--progress', '100');
+  cli('ticket', board, '--id', 'today-desk', '--description', 'Summary line.', '--title', 'Today on a desk', '--progress', '100');
   // Three proofs filed, so the sidebar's Evidence count is the board's own.
   for (const [f, title] of [['phone-decide', 'The ask fits a phone'], ['phone-signin', 'A sign-in waits on Today'], ['phone-reports', 'Reports reads well on a phone']])
     cli('post', board, '--type', 'evidence', '--title', title, '--about', 'Umer checks the screen.', '--media', join(dir, 'design', `${f}.webp`));

@@ -14,7 +14,7 @@ const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.
 const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `tickets-story-${process.pid}` };
 const cli = (...a) => execFileSync(process.execPath, [join(repo, 'dist/cli.js'), ...a], { env, encoding: 'utf8' });
 const browser = (...a) => execFileSync('chrome-devtools-axi', a, { env: browserEnv, encoding: 'utf8', timeout: 60000 });
-const ticket = (id, title, ...flags) => cli('ticket', board, '--id', id, '--title', title, ...flags);
+const ticket = (id, title, ...flags) => cli('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, ...flags);
 try {
   let base;
   if (copy) {

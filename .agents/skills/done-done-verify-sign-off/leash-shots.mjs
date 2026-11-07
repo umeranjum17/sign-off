@@ -33,9 +33,9 @@ try {
   so('project', board, '--name', 'sign-off', '--icon', 'sign-off.svg');
   const projects = { crew: 'sign-off', draft: 'sign-off' };
   if (icons) for (const [k, name, file] of [['crew', 'Crewhouse', 'crewhouse.svg'], ['draft', 'first-draft', 'first-draft.svg']]) { copyFileSync(join(icons, file), join(dir, file)); so('project', board, '--name', name, '--icon', file); projects[k] = name; }
-  so('ticket', board, '--id', 'T-41', '--title', 'Ship the settings page', '--project', 'sign-off');
-  so('ticket', board, '--id', 'T-12', '--title', 'Weekly digest', '--project', projects.crew);
-  so('ticket', board, '--id', 'T-7', '--title', 'Reports export', '--project', projects.draft);
+  so('ticket', board, '--id', 'T-41', '--description', 'Summary line.', '--title', 'Ship the settings page', '--project', 'sign-off');
+  so('ticket', board, '--id', 'T-12', '--description', 'Summary line.', '--title', 'Weekly digest', '--project', projects.crew);
+  so('ticket', board, '--id', 'T-7', '--description', 'Summary line.', '--title', 'Reports export', '--project', projects.draft);
   // Act, then tell me: the raise takes the agent's own recommended pick at once and says so.
   leash('act');
   const picked = raise('release-day', 'release-agent', 'T-12', 'Which day should the release ship?', 'Two fixes are still in review: A, B or C.',

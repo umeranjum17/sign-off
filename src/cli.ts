@@ -334,6 +334,7 @@ Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
        sign-off-axi ticket [board.json] --id <id> [--json]
        sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--type epic|ticket|bug|decision|evidence|merge] [--key <PREFIX-N>] [--description <text>] [--hold yes|no] [--hold-reason <text>] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>] [--filer <id>]
+       sign-off-axi ticket [board.json] --backfill [--json]
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
 A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
 whether it is on hold and whether you asked for it (the board's Tickets screen then marks it From you in its filter). It stands alone: nothing else needs it.
@@ -348,6 +349,7 @@ A card whose ticket is not on the board shows no row; a ticket with no cards sho
 --release labels the release (up to 40 characters). --state is queued, "in progress", "on hold" or done; it takes precedence over progress/hold for grouping.
 --type says what the row is, and gives it that type's own glyph and colour on the Tickets screen: epic, ticket, bug, decision, evidence or merge. Without one a ticket is a ticket, or an epic once tickets sit under it.
 --key is the ticket's readable name, a prefix and a number as JG-101: rows, the sheet and search show it in place of the long id, which drops to a small line under it. Without one the id is the name.
+A new ticket needs --description (refused without one); \`ticket --backfill\` gives every old ticket without one its title as the summary.
 --description is the ticket's own words, as the sheet draws them: a summary paragraph first, then lines starting "# " for a heading, "- " for a list item, "> " for a quote, and [words](https://link) for a link. A description with none of those reads as plain text.
 --hold yes (or --state "on hold") needs --hold-reason, the words that say why: a hold with no reason is refused, and the reason shows in its row and on the ticket. Empty --hold-reason clears the reason, and releasing a hold clears it too.
 --pr takes full HTTP(S) URLs, repeatable or comma separated; it replaces the linked PR list. Empty --release, --state or --pr clears that field.
@@ -1477,8 +1479,9 @@ function ticketsApi(path: string): [number, unknown] | undefined {
  * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
 function ticket(args: string[]) {
   const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, filer: { type: 'string' }, json: { type: 'boolean' } });
+    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, filer: { type: 'string' }, backfill: { type: 'boolean' }, json: { type: 'boolean' } });
   if (values.comment !== undefined) return ticketComment(file, values, on);
+  if (values.backfill) return ticketBackfill(file, values, on);
   const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.type, values.key, values.description, values.hold, values['hold-reason'], values.asked, values.release, values.state, values.pr, values.stage, values['last-event-at']].some((v) => v !== undefined);
   if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --type, --key, --description, --hold, --hold-reason, --asked, --release, --state, --pr, --stage and --last-event-at need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
   // The board is read once per command, and its warnings print once, however many tickets name cards.
@@ -1533,6 +1536,8 @@ function ticket(args: string[]) {
     if (!held && values['hold-reason'] === undefined) delete next.hold_reason;
     const fault = ticketFault(next);
     if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|type|key|description|hold_reason|hold|asked|release|state|stage|last_event_at|prs|by)/, '--$1').replace(/^--prs\b/, '--pr').replace(/^--by\b/, '--filer').replace(/^--last_event_at\b/, '--last-event-at').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
+    // A new ticket says what it is in words a person can read: its description opens with a one-line summary.
+    if (!had && !values.description?.trim()) throw fail(`ticket ${id}: a new ticket needs --description, a one-line summary first, then short "# Ask", "# Why" and "# Done when" sections`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "${title}" --description "Ship the page. # Ask - the captain wants it # Why - users look for it # Done when - it opens from the profile"`);
     // A release names what ships, not when: a word like "later" would sit beside the priority and read as a contradiction.
     if (values.release && releaseIsWhen(values.release)) throw fail(`ticket ${id}: --release names a release such as v1.4 or 2026-11, not when; set --priority P0-P3 for how soon it matters`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --priority P1`);
     // The same open work under another id is one ticket, not two: write to the one that has it.
@@ -1541,6 +1546,17 @@ function ticket(args: string[]) {
     const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
     if (!same) appendTicket(file, next);
     return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
+  });
+}
+
+/** ticket --backfill: gives every ticket that has no description its title as the summary, so no old ticket reads blank. Tickets with words are left alone. */
+function ticketBackfill(file: string, values: Record<string, any>, on: string) {
+  if (Object.entries(values).some(([k, v]) => v !== undefined && !['backfill', 'json'].includes(k))) throw fail('--backfill is run on its own, with no other ticket field', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --backfill`);
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  return locked(`${file}.lock`, () => {
+    const blank = readTickets(file, warn).filter((t) => !t.description?.trim());
+    for (const t of blank) appendTicket(file, { ...t, by: undefined, description: t.title });
+    return values.json ? JSON.stringify({ board: file, backfilled: blank.map((t) => t.id) }) : toon({ board: tilde(file), backfilled: blank.length, ids: blank.map((t) => t.id) }, ['Each now opens with its title as the summary; rewrite one with `sign-off-axi ticket --id <id> --description "<summary> # Ask ... # Why ... # Done when ..."`']);
   });
 }
 

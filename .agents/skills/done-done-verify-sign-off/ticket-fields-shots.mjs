@@ -14,10 +14,10 @@ const browser = (...a) => execFileSync('chrome-devtools-axi', a, { env: browserE
 try {
   const seed = execFileSync('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env, encoding: 'utf8' });
   const base = seed.match(/http:\/\/127\.0\.0\.1:\d+\//g).at(-1);
-  cli('ticket', board, '--id', 'release', '--title', 'Ship the owner board sync', '--project', 'Sign-off', '--priority', 'P1', '--progress', '40', '--asked', 'yes');
+  cli('ticket', board, '--id', 'release', '--description', 'Summary line.', '--title', 'Ship the owner board sync', '--project', 'Sign-off', '--priority', 'P1', '--progress', '40', '--asked', 'yes');
   if (side === 'after') cli('ticket', board, '--id', 'release', '--release', '0.6.1', '--state', 'in progress', '--pr', 'https://github.com/umeranjum17/sign-off/pull/1,https://github.com/umeranjum17/sign-off/pull/2');
   for (const [id, title, args] of [['queue', 'Sync queued work', ['--state', 'queued']], ['hold', 'Review the sync with Umer', ['--state', 'on hold', '--hold-reason', 'waiting on the review call']], ['done', 'Read fleet backlogs', ['--state', 'done']]]) {
-    cli('ticket', board, '--id', id, '--title', title, '--asked', 'yes', ...(side === 'after' ? args : []));
+    cli('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, '--asked', 'yes', ...(side === 'after' ? args : []));
   }
   writeFileSync(join(out, 'cli.json'), cli('ticket', board, '--json'));
   writeFileSync(join(out, 'records.jsonl'), readFileSync(join(dir, 'board.tickets.jsonl')));

@@ -19,7 +19,7 @@ const records = [], reportsOnly = process.env.SEQUENCE_ONLY === 'reports'; // th
 try {
   const base = run('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env }).trim().split('\n').at(-1);
   copyFileSync('docs/logo.svg', join(dir, 'project.svg')); cli('project', join(dir, 'board.json'), '--name', 'sign-off', '--icon', 'project.svg');
-  for (const id of ['T-1', 'T-2']) cli('ticket', join(dir, 'board.json'), '--id', id, '--title', id === 'T-1' ? 'Ship the settings page' : 'Prepare release notes', '--asked', 'yes', '--progress', '40');
+  for (const id of ['T-1', 'T-2']) cli('ticket', join(dir, 'board.json'), '--id', id, '--description', 'Summary line.', '--title', id === 'T-1' ? 'Ship the settings page' : 'Prepare release notes', '--asked', 'yes', '--progress', '40');
   const design = JSON.parse(readFileSync(join(dir, 'design-message.json'), 'utf8'));
   writeFileSync(join(dir, 'second-design.json'), JSON.stringify({ ...design, key: 'settings-review', title: 'Approve the settings review?' }));
   cli('post', join(dir, 'board.json'), '--kind', 'design', '--from', join(dir, 'second-design.json'));
