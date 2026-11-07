@@ -242,7 +242,7 @@ An ask, posted with --kind ask, in a --from file, or changed in a --replace feed
 Listing --option needs --recommend <value>, on every type: the option you would pick, shown first and marked. --from --replace feeds are not held to it.
 --filer names who posts (your agent session or any id of 1-128 of A-Z a-z 0-9 . _ -), saved on the item; then \`wait --filer <id>\` gets the answer.
 SIGN_OFF_FILER sets it for every command; with neither, the Claude Code session id is saved when there is one.
---type design is a pick between up to 6 options shown side by side, each with an optional board-relative mock file
+--type design is a pick between 2 and 6 options shown side by side on ONE card (fewer than 2 --option is refused, never one card per option; a yes/no names --option yes=Yes --option no=No), each with an optional board-relative mock file
 (.html, .svg, .png, .jpg, .jpeg, .webp, 5 MB or less), a --tradeoff line and a --recommend badge.
 One --link <value>=<url> per option (http or https) is that option's reference, drawn under its mock as a Reference link, outside its sandboxed frame; the option needs a --mock.
 Open live is not the reference: it opens that option's own prototype (its --mock page) in a new tab, worked out in one place from the card's key and the option's value.
@@ -2054,12 +2054,24 @@ function checkAskRefs(incoming: Decision[], raw: any[], current: Decision[]) {
   }
 }
 
+/** One design decision is one card with its options side by side: a new design pick (post --type design) names 2 to 6 itself, so a pick split into one card per option
+ * (each left to the default Yes and No) is refused. A yes/no named outright (--option yes=Yes --option no=No) is two options and passes; a card already on the board re-posts as it was. */
+function checkDesignOptions(incoming: Decision[], raw: any[], current: Decision[]) {
+  for (const [i, d] of incoming.entries()) {
+    const named = Array.isArray(raw[i]?.options) ? raw[i].options.length : 0;
+    if (d.type !== 'design' || d.kind || named >= 2 || current.some((c) => c.key === d.key)) continue;
+    throw fail(`key ${d.key}: a design pick lists at least 2 options on one card, and this one lists ${named}`, 'VALIDATION_ERROR',
+      'Post the whole decision as one card: sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=<page> --mock b=<page> --recommend a. For a yes/no name it: --option yes=Yes --option no=No');
+  }
+}
+
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
 function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), reopened = reopenedNow(file), now = new Date().toISOString();
     checkAskRefs(incoming, raw, current);
+    checkDesignOptions(incoming, raw, current);
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
     const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
