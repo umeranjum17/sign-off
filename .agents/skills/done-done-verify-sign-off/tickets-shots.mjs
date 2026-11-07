@@ -161,7 +161,7 @@ const errors = [], failed = [], report = [], problems = [], shots = [];
 try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo }).trim().split('\n').pop();
   // The tickets, through the real CLI. Your asks: an epic with three tickets, one of them with four sub-tasks (two done), and eight more; then three system tickets.
-  const T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--title', title, ...flags);
+  const T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, ...flags);
   T('settings-epic', 'Ship the new settings page', '--priority', 'P0', '--project', 'settings', '--asked', 'yes', '--key', 'JG-101',
     '--description', 'Ship the settings page to both stores, with the listings written and the packages built.\n# What ships\n- The settings page itself\n- The store listings\n- The release packages\n# Who signs it off\n> The captain: keep this one small, and ship it with support on hand.\nThe run book is [in the release notes](https://example.com/releases/settings).');
   T('settings-publish', 'Publish the settings page to the app stores', '--parent', 'settings-epic', '--priority', 'P0', '--key', 'JG-102');

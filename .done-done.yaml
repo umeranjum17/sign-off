@@ -352,6 +352,9 @@ journeys:
   upgrade:
     command: node .agents/skills/done-done-verify-sign-off/core-journey.mjs "$DONE_DONE_EVIDENCE_ROOT" --upgrade
     upgrade: true
+  # A new ticket needs a summary and old ones get one (CLI only, screen: none): refused without --description, ticket --backfill; then the Designs capture at 1440, dark.
+  ticket-summary:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/ticket-summary-proof.sh'
 approved_requirements:
   - kind: spec
     name: design-pick-listing

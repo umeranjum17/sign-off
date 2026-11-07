@@ -76,10 +76,10 @@ try {
   const bareServer = await serve(bare);
   mkdirSync(rich, { recursive: true });
   const richUrl = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), rich], { cwd: repo }).trim().split('\n').pop();
-  const board = join(rich, 'board.json'), T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--title', title, ...flags);
+  const board = join(rich, 'board.json'), T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, ...flags);
   // The fleet's duplicate and its contradictory release, as the writes now meet them.
   T('mig-a', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--project', 'Juggernaut', '--priority', 'P0', '--progress', '30', '--stage', 'building', '--asked', 'yes');
-  const twin = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-b', '--title', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--project', 'Juggernaut', '--progress', '70', '--stage', 'review']);
+  const twin = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-b', '--description', 'Summary line.', '--title', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--project', 'Juggernaut', '--progress', '70', '--stage', 'review']);
   const later = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-a', '--release', 'later']);
   facts.twin = { status: twin.status, said: (twin.stdout + twin.stderr).trim() }; facts.later = { status: later.status, said: (later.stdout + later.stderr).trim() };
   T('mig-a', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--release', 'v1.4');

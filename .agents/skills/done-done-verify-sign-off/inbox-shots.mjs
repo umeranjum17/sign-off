@@ -39,7 +39,7 @@ cli('post', board, '--kind', 'plan', '--from', join(dir, 'plan.json'));
 const report = { ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8')), filed: new Date(Date.now() - 150 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z') };
 writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'));
-cli('ticket', board, '--id', 'T-1', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
+cli('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
 
 const server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
 let base = '';
@@ -173,7 +173,7 @@ try {
     await api('/api/messages', { kind: 'comment', key: 'ship', text: 'Is QA booked for Thursday?' });
     // One agent, one topic, two cards: export-agent asks which teams get the export first (the person answers in words and gets a reply), then asks about its copy (the person answers in words, and the agent's wait reads it).
     // Each step waits a second, so the two cards and what was said on them read in the order they happened.
-    cli('ticket', board, '--id', 'T-5', '--title', 'Roll out the export to every team', '--project', 'Settings', '--progress', '20');
+    cli('ticket', board, '--id', 'T-5', '--description', 'Summary line.', '--title', 'Roll out the export to every team', '--project', 'Settings', '--progress', '20');
     ask('export-agent', 'teams', 'Which teams get the export first?', 'Two teams asked for it this month.', 'Settings goes first.', 'Everyone at once.', 'T-5');
     await wait(1100);
     await api('/api/answers', { key: 'teams', answer: 'text', note: 'Start with Settings, then Billing.' });

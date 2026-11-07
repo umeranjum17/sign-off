@@ -32,7 +32,7 @@ try {
   icon('beacon', '#0f766e', '#fff', '<circle cx="32" cy="32" r="8" fill="B"/><circle cx="32" cy="32" r="17" fill="none" stroke="B" stroke-width="4" opacity=".7"/><circle cx="32" cy="32" r="26" fill="none" stroke="B" stroke-width="3" opacity=".4"/>');
   icon('harbor', '#b45309', '#fff', '<path d="M32 12v34M20 24h24M14 40c4 10 12 12 18 12s14-2 18-12" fill="none" stroke="B" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="14" r="4" fill="B"/>');
   for (const [n, f] of [['sign-off', 'sign-off.svg'], ['Beacon', 'beacon.svg'], ['Harbor', 'harbor.svg']]) so('project', board, '--name', n, '--icon', f);
-  const tk = (id, title, project, extra = []) => so('ticket', board, '--id', id, '--title', title, '--project', project, ...extra);
+  const tk = (id, title, project, extra = []) => so('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, '--project', project, ...extra);
   tk('E-1', 'Settings page, start to finish', 'sign-off', ['--asked', 'yes', '--priority', 'P1', '--release', '0.6.5']);
   tk('T-41', 'Ship the new settings page', 'sign-off', ['--parent', 'E-1', '--progress', '70', '--pr', 'https://github.com/umeranjum17/sign-off/pull/241', '--state', 'in progress']);
   tk('T-42', 'Settings on a phone', 'sign-off', ['--parent', 'T-41', '--progress', '100', '--state', 'done', '--pr', 'https://github.com/umeranjum17/sign-off/pull/239']);

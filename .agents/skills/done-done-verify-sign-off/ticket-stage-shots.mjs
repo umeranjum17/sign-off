@@ -17,7 +17,7 @@ const titles = ['Sync queued work', 'Build the owner board', 'Review the ticket 
 try {
   const seed = execFileSync('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env, encoding: 'utf8' });
   const base = seed.match(/http:\/\/127\.0\.0\.1:\d+\//g).at(-1);
-  for (const [i, stage] of stages.entries()) cli('ticket', board, '--id', stage, '--title', titles[i], '--progress', '17', '--state', 'in progress', '--stage', stage,
+  for (const [i, stage] of stages.entries()) cli('ticket', board, '--id', stage, '--description', 'Summary line.', '--title', titles[i], '--progress', '17', '--state', 'in progress', '--stage', stage,
     ...(stage === 'building' ? [] : ['--last-event-at', String(now - (stage === 'review' ? 3600 : stage === 'merging' ? 49 * 3600 : 7 * 3600))]));
   const state = await (await fetch(`${base}api/state`)).json();
   assert.equal(state.tickets.find(t => t.id === 'queued').last_event_at, now - 7 * 3600);
@@ -48,7 +48,7 @@ try {
     const errors = browser('console', '--type', 'error');
     writeFileSync(join(out, `console.${theme}.${width}.txt`), errors);
   }
-  cli('ticket', board, '--id', 'epic', '--title', 'Ship the owner sync', '--stage', 'done', '--progress', '90');
+  cli('ticket', board, '--id', 'epic', '--description', 'Summary line.', '--title', 'Ship the owner sync', '--stage', 'done', '--progress', '90');
   cli('ticket', board, '--id', 'queued', '--parent', 'epic');
   const epic = JSON.parse(cli('ticket', board, '--id', 'epic', '--json')).ticket;
   assert.equal(epic.progress, 17); assert.equal(epic.stage, 'done');

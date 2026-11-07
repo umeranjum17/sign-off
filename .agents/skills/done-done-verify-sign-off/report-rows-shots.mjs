@@ -25,11 +25,11 @@ try {
   cpSync(join(repo, 'docs/logo.svg'), join(dir, 'project.svg'));
   cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   so('project', board, '--name', 'sign-off', '--icon', 'project.svg');
-  so('ticket', board, '--id', 'T-1', '--title', 'Release the project icons', '--project', 'sign-off', '--progress', '70', '--priority', 'P0');
-  so('ticket', board, '--id', 'T-9', '--title', 'Clear project identity everywhere', '--project', 'sign-off');
-  so('ticket', board, '--id', 'T-29', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40', '--parent', 'T-9');
-  so('ticket', board, '--id', 'T-30', '--title', 'Check inherited project icons', '--parent', 'T-29', '--progress', '40');
-  if (process.env.REPORT_ROWS_MUXR_ICON) { cpSync(process.env.REPORT_ROWS_MUXR_ICON, join(dir, 'muxr.svg')); so('project', board, '--name', 'Muxr', '--icon', 'muxr.svg'); so('ticket', board, '--id', 'T-39', '--title', 'Make Muxr notifications clear', '--project', 'Muxr', '--progress', '20'); }
+  so('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Release the project icons', '--project', 'sign-off', '--progress', '70', '--priority', 'P0');
+  so('ticket', board, '--id', 'T-9', '--description', 'Summary line.', '--title', 'Clear project identity everywhere', '--project', 'sign-off');
+  so('ticket', board, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40', '--parent', 'T-9');
+  so('ticket', board, '--id', 'T-30', '--description', 'Summary line.', '--title', 'Check inherited project icons', '--parent', 'T-29', '--progress', '40');
+  if (process.env.REPORT_ROWS_MUXR_ICON) { cpSync(process.env.REPORT_ROWS_MUXR_ICON, join(dir, 'muxr.svg')); so('project', board, '--name', 'Muxr', '--icon', 'muxr.svg'); so('ticket', board, '--id', 'T-39', '--description', 'Summary line.', '--title', 'Make Muxr notifications clear', '--project', 'Muxr', '--progress', '20'); }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', project: process.env.REPORT_ROWS_MUXR_ICON ? 'Muxr' : 'sign-off', ticket: process.env.REPORT_ROWS_MUXR_ICON ? 'T-39' : 'T-29', filed: now });
   post('report', { ...fx('report.v4/valid-minimal.json'), key: 'retro', title: 'Why messages were sent twice: a retro', purpose: 'incident', project: 'Beacon', filed: now });

@@ -52,7 +52,7 @@ test('the board lists the tickets Beads holds, with their hold reason, pull requ
 });
 
 test('a write goes to Beads through the wrapper and the board file gets no tickets file', () => {
-  axi('ticket', board, '--id', 'build-demo', '--title', 'Build the demo', '--progress', '10', '--project', 'alpha');
+  axi('ticket', board, '--id', 'build-demo', '--description', 'Summary line.', '--title', 'Build the demo', '--progress', '10', '--project', 'alpha');
   axi('ticket', board, '--id', 'jg-1', '--progress', '70');
   const by = Object.fromEntries(JSON.parse(readFileSync(rows, 'utf8')).map((r) => [r.id, r]));
   assert.deepEqual([by['build-demo'].title, by['build-demo'].labels, by['build-demo'].metadata.progress], ['Build the demo', ['project:alpha'], 10]);

@@ -51,18 +51,18 @@ try {
   const base = sh('bash', [join(repo, '.agents/skills/done-done-verify-sign-off/seed-board.sh'), dir], { cwd: repo, env: seedEnv }).trim().split('\n').pop();
   // Ticket histories, then one card of each kind on T-29 and one ask naming a ticket the board has not got.
   const ask = ['--ask-ref', 'message-demo', '--outcome', 'yes=It ships on Friday.', '--outcome', 'no=It waits a week.', '--recommend', 'yes', '--recommend-reason', 'Every check passed on a phone.', '--default', 'no'];
-  so('ticket', board, '--id', 'T-9', '--title', 'The new settings page', '--progress', '45');
-  so('ticket', board, '--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9');
-  so('ticket', board, '--id', 'T-30', '--title', 'Settings copy review', '--progress', '100', '--parent', 'T-9');
-  so('ticket', board, '--id', 'T-31', '--title', 'Ship the settings release', '--stage', 'queued');
+  so('ticket', board, '--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--progress', '45');
+  so('ticket', board, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9');
+  so('ticket', board, '--id', 'T-30', '--description', 'Summary line.', '--title', 'Settings copy review', '--progress', '100', '--parent', 'T-9');
+  so('ticket', board, '--id', 'T-31', '--description', 'Summary line.', '--title', 'Ship the settings release', '--stage', 'queued');
   so('ticket', board, '--id', 'T-31', '--stage', 'building', '--progress', '25');
   so('ticket', board, '--id', 'T-31', '--stage', 'review', '--progress', '60');
   so('ticket', board, '--id', 'T-31', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('ticket', board, '--id', 'T-31', '--stage', 'done', '--progress', '100');
   so('ticket', board, '--id', 'T-31', '--stage', '');
-  so('ticket', board, '--id', 'T-32', '--title', 'Choose the rollout date', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
+  so('ticket', board, '--id', 'T-32', '--description', 'Summary line.', '--title', 'Choose the rollout date', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('raise', board, '--ticket', 'T-32', '--key', 'hold-answer', '--title', 'When should the rollout ship?', '--why', 'Choose the rollout date.', ...ask);
-  so('ticket', board, '--id', 'T-33', '--title', 'Validate ticket sync', '--stage', 'queued', '--progress', '25');
+  so('ticket', board, '--id', 'T-33', '--description', 'Summary line.', '--title', 'Validate ticket sync', '--stage', 'queued', '--progress', '25');
   so('ticket', board, '--id', 'T-33', '--stage', 'building');
   so('ticket', board, '--id', 'T-33', '--hold', 'yes', '--hold-reason', 'waiting on the rollout date');
   so('ticket', board, '--id', 'T-33', '--hold', 'no');
@@ -141,7 +141,7 @@ try {
     browser('screenshot', join(out, `${name}.png`));
     const m = seen[state] = value(browser('eval', probe));
     if (state === 'tickets-activity' && width >= 1024) {
-      so('ticket', board, '--id', 'T-34', '--title', 'Polling update for board Activity');
+      so('ticket', board, '--id', 'T-34', '--description', 'Summary line.', '--title', 'Polling update for board Activity');
       await wait(25000);
       const polled = value(browser('eval', `() => JSON.stringify([...document.querySelectorAll('.tk-day .tk-ev')].map((b) => b.getAttribute('aria-label')))`));
       assert.ok(polled.some((line) => line.includes('Polling update for board Activity, ') && line.includes('Ticket created')), 'desktop Activity did not refresh with polled ticket state');

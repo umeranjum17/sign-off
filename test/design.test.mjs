@@ -2463,7 +2463,7 @@ test('report kinds and their workflows: post names what a report is for and hold
     sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback', { items: [{ title: 'Old links break', text: 'Mitigation: the old address redirects for 30 days.' }] }), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
   writeFileSync(join(dir, 'muxr.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
   assert.equal(run('project', file, '--name', 'Muxr', '--icon', 'muxr.svg').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Move settings', '--project', 'Muxr').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Move settings', '--project', 'Muxr').code, 0);
   plan.group = plan.project = 'Muxr'; plan.ticket = 'T-29';
   assert.equal(post('plan', plan).code, 0);
   assert.equal(post('research', { ...base, key: 'k-research', filed: at(2) }).code, 0);
@@ -4821,14 +4821,22 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
   // A ticket stands alone: a new one needs a title, a later write changes only what it gives, and a bad value is refused before anything is written.
   assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '20').code, 2);
   assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
-  assert.equal(run('ticket', file, '--id', 'T-9', '--title', 'The new settings page', '--progress', '45').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '20', '--parent', 'T-9').code, 0);
+  // A new ticket with no summary is refused and writes nothing; --backfill gives an old one without words its title.
+  const noSummary = run('ticket', file, '--id', 'T-8', '--title', 'No words yet');
+  assert.equal(noSummary.code, 2); assert.match(noSummary.out, /needs --description/); assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
+  writeFileSync(join(dir, 'board.tickets.jsonl'), JSON.stringify({ id: 'T-old', title: 'An old ticket', progress: 10, at: new Date().toISOString() }) + '\n');
+  assert.match(run('ticket', file, '--backfill').out, /backfilled: 1/);
+  assert.equal(JSON.parse(run('ticket', file, '--id', 'T-old', '--json').out).ticket.description, 'An old ticket');
+  assert.match(run('ticket', file, '--backfill').out, /backfilled: 0/);
+  rmSync(join(dir, 'board.tickets.jsonl'));
+  assert.equal(run('ticket', file, '--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--progress', '45').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '20', '--parent', 'T-9').code, 0);
   assert.match(run('ticket', file, '--id', 'T-29', '--progress', '60').out, /status: updated/);
   for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
   // A ticket may carry a priority, a project, whether it is on hold and whether the user asked for it; an empty value takes one off, and a bad one is refused.
   assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--stage', 'building', '--last-event-at', String(Math.floor(Date.now() / 1000) - 18 * 3600)).code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-32', '--title', 'Choose the rollout date', '--progress', '25', '--state', 'on hold', '--hold-reason', 'waiting on the rollout date', '--asked', 'yes').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-31', '--description', 'Summary line.', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--stage', 'building', '--last-event-at', String(Math.floor(Date.now() / 1000) - 18 * 3600)).code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-32', '--description', 'Summary line.', '--title', 'Choose the rollout date', '--progress', '25', '--state', 'on hold', '--hold-reason', 'waiting on the rollout date', '--asked', 'yes').code, 0);
   assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
   // Sync fields round-trip through the public CLI, preserve old flags and clear independently.
   const getTicket = () => JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
@@ -4983,7 +4991,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'In progress #ticket/T-9,#ticket/T-32,On hold #ticket/T-31');
     await who('Fleet upkeep');
     await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
-    assert.equal(run('ticket', file, '--id', 'new-arrival', '--title', 'A newly synced ticket').code, 0);
+    assert.equal(run('ticket', file, '--id', 'new-arrival', '--description', 'Summary line.', '--title', 'A newly synced ticket').code, 0);
     // No manual refresh: the open Tickets page finds this standalone ticket on its next 20-second poll.
     await until(async () => JSON.parse(await evaluate(tab)).lists.includes('To do #ticket/new-arrival'));
     // Activity is collapsed by default on a phone; open it before checking its entries.
@@ -5005,7 +5013,7 @@ test('a card names its ticket: --ticket on every post, a Ticket row that opens t
     assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
     assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
     await until(() => evaluate('document.querySelector(".tk-activity").open && !!document.querySelector(".tk-activity .tk-ev[aria-label*=\\"Hold released\\"]")'));
-    for (let i = 0; i < 51; i++) assert.equal(run('ticket', file, '--id', `feed-cap-${i}`, '--title', `Feed cap ${i}`).code, 0);
+    for (let i = 0; i < 51; i++) assert.equal(run('ticket', file, '--id', `feed-cap-${i}`, '--description', 'Summary line.', '--title', `Feed cap ${i}`).code, 0);
     await evaluate('refresh()');
     await until(() => evaluate('document.querySelectorAll(".tk-activity .tk-ev").length === 50'));
     // A row of the phone's card opens the same view as a sheet over the board; Escape closes it and the focus is back on that row.
@@ -5121,7 +5129,7 @@ test('a ticket says who works on it: the tool\'s mark, the model and the lead on
   mkdirSync(state, { recursive: true });
   assert.equal(run('raise', file, '--title', 'Ship the page on Friday?', '--why', 'The page is ready.', '--outcome', 'yes=It ships.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'Every check passed.', '--default', 'no', '--ask-ref', 'assignee-test').code, 0);
   // Three tickets: a running Claude Code worker, a Pi task that finished, and one no task record names.
-  for (const [id, title, progress] of [['A-1', 'Build the page', '40'], ['A-2', 'Publish it', '70'], ['A-3', 'Write the notes', '10']]) assert.equal(run('ticket', file, '--id', id, '--title', title, '--progress', progress).code, 0);
+  for (const [id, title, progress] of [['A-1', 'Build the page', '40'], ['A-2', 'Publish it', '70'], ['A-3', 'Write the notes', '10']]) assert.equal(run('ticket', file, '--id', id, '--description', 'Summary line.', '--title', title, '--progress', progress).code, 0);
   writeFileSync(join(state, 'A-1.meta'), 'window=default:w1:p1\nendpoint_task_id=A-1\ntitle=Build the page\nproject=~/fleet/projects/web-app\nharness=claude\nmodel=claude-opus-5-5\n');
   writeFileSync(join(state, 'A-1.status'), 'working [at=1]: building\n');
   writeFileSync(join(state, 'A-2.meta'), 'window=default:w1:p2\nproject=~/fleet/projects/notes\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n');
@@ -5175,7 +5183,7 @@ test('Tickets on a phone: with one section expanded, See all on each other secti
   mkdirSync(dir, { recursive: true });
   writeFileSync(file, JSON.stringify({ schema: 2, items: [] }));
   for (const [list, n, flags] of [['mv', 7, ['--progress', '30']], ['hold', 8, ['--hold', 'yes', '--hold-reason', 'waiting on the store review']], ['todo', 6, []], ['done', 7, ['--progress', '100']]])
-    for (let i = 0; i < n; i++) assert.equal(run('ticket', file, '--id', `${list}${i}`, '--title', `${list} ticket ${i}`, '--asked', 'yes', ...flags).code, 0);
+    for (let i = 0; i < n; i++) assert.equal(run('ticket', file, '--id', `${list}${i}`, '--description', 'Summary line.', '--title', `${list} ticket ${i}`, '--asked', 'yes', ...flags).code, 0);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
@@ -5261,7 +5269,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
   assert.match(run('feedback', 'beta', file, '--reply', 'Kept it to ten teams until the import fix lands.', '--link', 'https://github.com/example/settings/pull/245', '--filer', 'settings-agent').out, /shows: Replied/);
   assert.deepEqual((await trail('beta')).reply, { at: (await trail('beta')).reply.at, text: 'Kept it to ten teams until the import fix lands.', link: 'https://github.com/example/settings/pull/245' });
   // A comment the person made on a ticket in the fleet dashboard arrives in the dashboard's own thread record, again as it moves: delivered, then picked up and answered.
-  assert.equal(run('ticket', file, '--id', 'T-1', '--title', 'Ship the CSV export').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export').code, 0);
   const sec = Math.floor(Date.now() / 1000), said = { id: '3f9a1c2e7b6d4a10', at: sec - 600, text: 'Is the export in this release?', to: 'release-agent', error: null, picked: null, replies: [] };
   for (const [args, why] of [[['--id', 'T-2', '--comment', JSON.stringify(said)], /no ticket T-2/], [['--id', 'T-1', '--comment', '{'], /one JSON object/], [['--id', 'T-1', '--comment', JSON.stringify({ ...said, at: 'now' })], /at must be/],
     [['--id', 'T-1', '--title', 'x', '--comment', JSON.stringify(said)], /on its own/]]) { const r = run('ticket', file, ...args); assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' ')); }
@@ -5509,8 +5517,8 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
   // A board with every kind of card on it: asks with and without a priority, a pick-one, a plan, a guided report, a design on a ticket, a proof and a sign-in,
   // an epic with a ticket under it, a ticket on hold and a system one, so each screen draws its chips, bars, dots and rows.
-  for (const args of [['--id', 'T-9', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0', '--stage', 'review', '--last-event-at', '1790000000'],
-    ['--id', 'T-31', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--asked', 'yes', '--stage', 'building', '--last-event-at', '1790000000'], ['--id', 'T-40', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
+  for (const args of [['--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0', '--stage', 'review', '--last-event-at', '1790000000'],
+    ['--id', 'T-31', '--description', 'Summary line.', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--asked', 'yes', '--stage', 'building', '--last-event-at', '1790000000'], ['--id', 'T-40', '--description', 'Summary line.', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
   for (const args of [
     ['raise', file, '--ticket', 'T-29', '--priority', 'P0', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
     ['raise', file, '--priority', 'P1', '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
@@ -5745,7 +5753,7 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
   const dir = join(scratch, 'inbox'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
   for (const [key, title] of [['open', 'Keep the weekly digest?'], ['asked', 'Ship the settings page Friday?'], ['built', 'Open the beta to every team?'], ['taken', 'Turn on the CSV export?'], ['old', 'Send the digest on Mondays?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'inbox-agent').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-1', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40').code, 0);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1], state = async () => (await fetch(`${url}api/decisions`)).json();
@@ -5886,7 +5894,7 @@ test('the inbox has #fleet: the agents talking to each other, muted by its own c
   const dir = join(scratch, 'inbox-fleet'), file = join(dir, 'board.json'), feed = join(dir, 'feed.jsonl'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
   assert.equal(run('raise', file, '--key', 'notes', '--title', 'Ship the release notes this week?', '--filer', 'addons-lead').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-9', '--title', 'Move the ticket owner', '--project', 'Settings').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-9', '--description', 'Summary line.', '--title', 'Move the ticket owner', '--project', 'Settings').code, 0);
   const sec = Math.floor(Date.now() / 1000);
   writeFileSync(feed, [
     { ts: sec - 300, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'sign-off', kind: 'status', text: 'It is parked on #tickets/T-9 until the owner move ships.' },
@@ -5938,7 +5946,7 @@ test('the inbox has #fleet: the agents talking to each other, muted by its own c
 test('the inbox groups threads by agent and topic: an agent\'s cards on one ticket share one thread named by the ticket, another agent or a card with no ticket is its own, and both unread counts, the filters and a card\'s own address still work', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-groups'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
-  assert.equal(run('ticket', file, '--id', 'T-7', '--title', 'Ship the CSV export', '--project', 'Settings').code, 0);
+  assert.equal(run('ticket', file, '--id', 'T-7', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings').code, 0);
   // Two cards of one agent on T-7, one card of another agent on T-7, and one lone ask of the first agent.
   for (const [key, title, filer, ticket] of [['plan', 'Which columns does the export have?', 'csv-agent', 'T-7'], ['proof', 'Is the export tested?', 'csv-agent', 'T-7'], ['other', 'Who reviews the export?', 'review-agent', 'T-7'], ['lone', 'Rename the export button?', 'csv-agent', '']]) {
     assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer, ...(ticket ? ['--ticket', ticket] : [])).code, 0);

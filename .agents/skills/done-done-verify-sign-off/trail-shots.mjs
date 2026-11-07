@@ -41,7 +41,7 @@ for (const f of ['phone-today.webp', 'phone-today-dark.webp', 'desk-today.webp']
 const report = { ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8')), filed: new Date(Date.now() - 150 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z') };
 writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'));
-cli('ticket', board, '--id', 'T-1', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
+cli('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
 writeFileSync(join(dir, 'design.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8')), key: 'dashboard', title: 'Ship the fleet dashboard redesign?',
   preview: 'design/phone-today.webp', journeys: [{ id: 'dashboard', title: 'Dashboard', screens: [{ id: 'today', title: 'Today', views: { phone_light: 'design/phone-today.webp', phone_dark: 'design/phone-today-dark.webp', computer_light: 'design/desk-today.webp' } }] }],
   filer: 'dashboard-agent', group: 'Dashboard', filed: new Date(Date.now() - 3 * 3600_000).toISOString().replace(/\.\d+Z$/, 'Z') }));
