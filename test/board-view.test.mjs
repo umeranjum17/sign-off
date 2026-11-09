@@ -33,6 +33,11 @@ for (let i = 0; i < ASKS; i++) board.decisions.push({ key: `plan-${i}`, title: `
   sections: [{ id: 's1', stage: 'overview', heading: 'Detail', body: 'x'.repeat(9_000), blocks: [] }],
   decisions: [{ key: 'q1', title: 'Which way?', options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }] });
 board.decisions.find((d) => d.key === 'plan-0').evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'after.png' };
+const proofHash = createHash('sha256').update(png).digest('hex');
+const receipt = JSON.stringify({ schema: 2, head: commit, tree: 'a'.repeat(40), result: 'pass', runs: [{ run_id: runId, commit }], files: [{ path: 'after.png', sha256: proofHash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'after.png', sha256: proofHash, verdict: 'pass' }] } });
+writeFileSync(join(root, 'receipt.json'), receipt);
+Object.assign(board.decisions.find((d) => d.key === 'plan-0').evidence, { proof_verdict: 'pass', proof_ref: { path: 'receipt.json', sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true } });
+
 writeFileSync(file, JSON.stringify(board));
 
 const procs = [];

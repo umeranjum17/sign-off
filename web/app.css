@@ -421,6 +421,7 @@
   .ev-verdict .choices { display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0.5rem; }
   .ev-verdict .choices button { display: flex; align-items: center; justify-content: center; height: 3.25rem; min-height: 0; padding: 0 0.5rem; border: 0; border-radius: 1.625rem;
     background: var(--tk-raised); color: var(--tk-ink); box-shadow: var(--tk-elev-raised); font-size: var(--tk-fs-secondary); font-weight: 500; white-space: nowrap; }
+  @media (min-width: 64rem) { .split-detail .ev-verdict .choices button { font-size: 0.75rem; } }
   .ev-verdict .choices .v-fail { color: var(--tk-critical); }
   .ev-verdict .choices .ink { background: var(--tk-ink); color: var(--tk-canvas); box-shadow: none; }
   .ev-verdict .choices button[aria-pressed="true"] { padding: 0 0.5rem; font-weight: 500; } .ev-verdict .choices button[aria-pressed="true"]::before { position: static; translate: none; margin-right: 0.375rem; }

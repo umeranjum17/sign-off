@@ -30,7 +30,7 @@ export type DesignJourney = { id: string; title: string; screens: { id: string; 
 export const screenViews = (s: DesignJourney['screens'][number]): string[] => [...Object.values(s.views ?? {}), ...(s.frames ?? []).flatMap((f) => Object.values(f.views))];
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
-export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
+export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string; proof_series_id?: string; current_head?: string; proof_verdict?: 'pass' | 'fail' | 'inconclusive'; proof_ref?: { path: string; sha256: string; issuer: 'done-done'; validated: true }; release_state?: { state: 'unknown' | 'unreleased' | 'released'; version?: string; destination?: string } };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; ask_ref?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string;

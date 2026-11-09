@@ -22,6 +22,11 @@ writeFileSync(recordPath, JSON.stringify({ schema: 1, run_id: runId, journey: 's
 copyFileSync(new URL('../fixtures/sample-decisions.json', import.meta.url), file);
 const seeded = JSON.parse(readFileSync(file, 'utf8'));
 seeded.decisions[0].evidence = { run_id: runId, commit, outcome: 'Umer can see the updated sign-in screen.', repro: 'repro: n/a: no bug', proof: 'done-done: real browser journey', evidence: 'after.png' };
+const proofHash = createHash('sha256').update(png).digest('hex');
+const receipt = JSON.stringify({ schema: 2, head: commit, tree: 'a'.repeat(40), result: 'pass', runs: [{ run_id: runId, commit }], files: [{ path: 'after.png', sha256: proofHash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'after.png', sha256: proofHash, verdict: 'pass' }] } });
+writeFileSync(join(root, 'receipt.json'), receipt);
+Object.assign(seeded.decisions[0].evidence, { proof_verdict: 'pass', proof_ref: { path: 'receipt.json', sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true } });
+
 writeFileSync(file, JSON.stringify(seeded));
 const procs = [];
 after(async () => {

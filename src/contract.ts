@@ -126,13 +126,20 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
   const checkRun = (fields: string[]) => {
     const r = m.run;
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw bad('run', 'must be an object', `Set "run" to {${fields.map(show).join(', ')}}`);
-    const odd = Object.keys(r).find((f) => !fields.includes(f));
+    const optional = m.kind === 'evidence' ? ['proof_series_id', 'current_head', 'proof_verdict', 'proof_ref', 'release_state'] : [];
+    const odd = Object.keys(r).find((f) => !fields.includes(f) && !optional.includes(f));
     if (odd !== undefined) throw bad(`run.${escaped(odd) || '""'}`, 'is not a field of run', `Remove ${show(odd)}; run has only ${fields.join(', ')}`);
     const missing = fields.find((f) => !Object.hasOwn(r, f));
     if (missing) throw bad(`run.${missing}`, 'is required', `Add "${missing}" to "run"`);
     if (!isKey(r.run_id)) throw bad('run.run_id', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "run_id" to the done-done run id');
     if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
     for (const f of fields.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
+    if (r.proof_series_id !== undefined && !isKey(r.proof_series_id)) throw bad('run.proof_series_id', 'must be a stable key', 'Set a stable series id');
+    if (r.current_head !== undefined && !/^[a-f0-9]{40}$/.test(r.current_head)) throw bad('run.current_head', 'must be a full commit', 'Set the authoritative current head');
+    if (r.proof_verdict !== undefined && !['pass', 'fail', 'inconclusive'].includes(r.proof_verdict)) throw bad('run.proof_verdict', 'is invalid', 'Use pass, fail or inconclusive');
+    if (r.proof_ref !== undefined && (!r.proof_ref || typeof r.proof_ref.path !== 'string' || !r.proof_ref.path || /^(?:[\\/]|[A-Za-z]:)/.test(r.proof_ref.path) || r.proof_ref.path.split(/[\\/]/).includes('..') || !/^[a-f0-9]{64}$/.test(r.proof_ref.sha256 ?? '') || (r.proof_ref.issuer !== 'done-done' || r.proof_ref.validated !== true) || Object.keys(r.proof_ref).some((k) => !['path', 'sha256', 'issuer', 'validated'].includes(k)))) throw bad('run.proof_ref', 'is invalid', 'Set the result path and sha256');
+    const release = r.release_state;
+    if (release !== undefined && (!release || !['unknown', 'unreleased', 'released'].includes(release.state) || Object.keys(release).some((k) => !['state', 'version', 'destination'].includes(k)) || (release.state === 'released' ? ![release.version, release.destination].every((x) => typeof x === 'string' && x.trim() && x.length <= 200) : release.version !== undefined || release.destination !== undefined))) throw bad('run.release_state', 'is invalid', 'Name the state and, when released, version and destination');
   };
   /** A list of min to max objects, each with only `fields`: a plan's sections, decisions and steps, or `v` for a list inside one. */
   const list = (f: string, min: number, max: number, fields: string[], example: string, v: any = m[f]): any[] => {

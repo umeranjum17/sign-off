@@ -3075,13 +3075,15 @@ const state = () => {
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
   const tickets = withKeys(withRecords(rollUp(readTickets(file, warn)), file));
+  const heads = new Map<string, Set<string>>();
+  for (const { evidence: e } of items) if (e?.proof_series_id) { const set = heads.get(e.proof_series_id) ?? new Set<string>(); set.add(/^[a-f0-9]{40}$/.test(e.current_head ?? '') ? e.current_head! : 'unknown'); heads.set(e.proof_series_id, set); }
   const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [], kinds = readKinds(file, warn);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), ...(lapsed(d) && { expired: true }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), ...(lapsed(d) && { expired: true }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null, ...(d.evidence && { proofHead: d.evidence.proof_series_id && /^[a-f0-9]{40}$/.test(d.evidence.current_head ?? '') && heads.get(d.evidence.proof_series_id)?.size === 1 ? (d.evidence.commit === d.evidence.current_head ? 'Current' : 'History') : 'Unknown' }),
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
@@ -3358,26 +3360,37 @@ function checkProof(link: NonNullable<Decision['evidence']>, root: string, recor
     if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
     return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
   });
-  const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
-  return { status: 'verified' as const, result, commit: run.commit, media };
+  let result = 'UNVERIFIED', reason = '';
+  try { if (link.proof_ref?.issuer === 'done-done' && link.proof_ref.validated === true && link.proof_verdict) {
+    const candidate = resolve(root, link.proof_ref.path);
+    if (candidate.startsWith(resolve(root) + sep)) {
+      const parent = realpathSync(dirname(candidate)), safeRoot = realpathSync(root);
+      if ((parent === safeRoot || parent.startsWith(safeRoot + sep)) && !lstatSync(candidate, { throwIfNoEntry: false })?.isSymbolicLink()) builtFrom(candidate);
+    }
+    const ref = contained(root, link.proof_ref.path, 'The verified result is missing.');
+    builtFrom(ref);
+    if (statSync(ref).size > 1_000_000) throw new EvidenceError('The verified result is too large.');
+    const bytes = readFileSync(ref), record = JSON.parse(bytes.toString('utf8'));
+    if (sha256(bytes) !== link.proof_ref.sha256) throw new EvidenceError('The verified result changed.');
+    const runs = Array.isArray(record.runs) && record.runs.some((r: any) => r.run_id === link.run_id && r.commit === link.commit);
+    const verdicts = record.judge?.verdicts;
+    const pass = run.exit === 0 && !run.dirty && run.files.length > 0 && record.schema === 2 && record.result === 'pass' && record.head === link.commit && record.tree === run.tree && runs && typeof record.judge?.route === 'string' && typeof record.judge?.model === 'string' && ['agent', 'model', 'session-only'].includes(record.judge?.independence) && Array.isArray(record.files) && record.files.length && Array.isArray(verdicts) && verdicts.length && verdicts.every((v: any) => v.verdict === 'pass' && record.files.some((f: any) => f.path === v.path && f.sha256 === v.sha256) && run.files.some((f: any) => f.sha256 === v.sha256));
+    const negative = record.schema === 1 && record.run_id === link.run_id && record.commit === link.commit && record.result === link.proof_verdict && typeof record.reason === 'string' && record.reason.trim();
+    if (link.proof_verdict === 'pass' && pass) result = 'RUN PASS';
+    else if (link.proof_verdict !== 'pass' && negative) { result = link.proof_verdict === 'fail' ? 'RUN FAIL' : 'INCONCLUSIVE'; reason = record.reason; }
+  } } catch { /* Missing or invalid references cannot substantiate a verdict. */ }
+  return { status: result === 'UNVERIFIED' ? 'unverified' as const : 'verified' as const, result, ...(reason && { reason }), commit: run.commit, media, runState: run.exit === null ? 'Running' : run.exit === 0 ? 'Completed' : `Failed (exit ${run.exit})` };
+
 }
-/** A run's card, kept beside the stamp of its record and of each picture: checking one hashes every picture once, and every board read after that
- * pays for the stats. A kept card says what a fresh check would while those files are unchanged; a changed one is checked again from its record. */
-const proofCards = new Map<string, { record: string; media: { path: string; stamp: string }[]; card: ReturnType<typeof checkProof> }>();
 /** A linked run as the board checked it; the reason a check failed is a plain sentence for the card.
  * With no --evidence-root the board looks in done-done's own folder for the app; a run it finds nowhere cannot be checked, so the card shows no result rather than one that blames the run. */
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
   const root = rootOf(link.run_id);
   if (!root) return null;
   try {
-    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.'), record = builtFrom(recordPath);
-    const kept = proofCards.get(link.run_id);
-    if (kept && kept.record === record && kept.media.every((m) => builtFrom(m.path) === m.stamp)) return kept.card;
-    const card = checkProof(link, root, recordPath), media = card.media.flatMap((m) => {
-      try { const path = contained(root, m.path); return [{ path, stamp: stampOf(path) }]; } catch { return []; }
-    });
-    proofCards.set(link.run_id, { record, media, card });
-    return card;
+    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
+    builtFrom(recordPath);
+    return checkProof(link, root, recordPath);
   } catch (e: any) {
     const reason = e instanceof EvidenceError ? e.message : 'The proof for this run cannot be read.';
     return { status: 'unverified' as const, result: 'UNVERIFIED', reason, commit: '', media: [] };
@@ -3436,7 +3449,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const decision = loadDecisions(file).find((d) => d.evidence?.run_id === runId);
     if (!decision?.evidence || !path) return [404, { error: 'Evidence is unavailable' }];
     const card = evidenceCard(decision.evidence);
-    if (card?.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
+    if (!card?.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
     const actual = contained(rootOf(runId), path), type = mediaTypes[extname(path).toLowerCase()];
     return [200, { media: readFileSync(actual), type }];
   }

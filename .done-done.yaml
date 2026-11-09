@@ -270,6 +270,8 @@ journeys:
   ticket:
     command: 'npm run build > /dev/null && export TICKET_REVIEW_ROOT="${SIGNOFF_TICKET_ACTIVITY_ROOT:?set SIGNOFF_TICKET_ACTIVITY_ROOT to the authorized data/signoff-ticket-activity directory}/ticket-matrix-$DONE_DONE_RUN_ID" && for w in 390 1280; do for t in light dark; do TICKET_WIDTH=$w node .agents/skills/done-done-verify-sign-off/ticket-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   # Evidence's inline previews on a throwaway board of eight proofs: the list at 390 in light and dark (each row's project icon, done-done's word and first capture), one row opened in place with its captures in a strip, Previews on, and the list on a 1280 desk.
+  proof-state:
+    command: 'npm run build > /dev/null && test -n "$PROOF_BASE_REPO" && mkdir -p "$DONE_DONE_EVIDENCE_ROOT/before" && SIGN_OFF_REPO="$PROOF_BASE_REPO" PROOF_STATE_BEFORE=1 node .agents/skills/done-done-verify-sign-off/proof-state-shots.mjs "$DONE_DONE_EVIDENCE_ROOT/before" && node .agents/skills/done-done-verify-sign-off/designs-listing-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" && node .agents/skills/done-done-verify-sign-off/proof-state-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   evidence-previews:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/evidence-previews-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Concern cards on a throwaway board of three cards (Fixed and In progress with before and after captions, one with its frame pending): the list at 390 in light and dark, the Fixed card opened at 390, and the list beside it at 1280.

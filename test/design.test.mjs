@@ -3658,7 +3658,7 @@ test('Evidence: an update with no run is never waiting on you, and is listed und
   proc.kill();
 });
 
-test('Evidence: with no --evidence-root a linked run is found in done-done\'s own folder for its app, so a passed run says Passed, and a run found nowhere is listed as not run rather than claimed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: linked runs need a matching verified receipt, and missing or changed results stay unverified', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'store'), file = join(dir, 'board.json'), home = join(dir, 'home'), app = join(home, '.done-done', 'evidence', 'sign-off');
   const shot = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url)), commit = 'c0ffee'.padEnd(40, '0'), runId = '20261011T120000Z-a1b2c3d4';
   mkdirSync(join(app, '.done-done', 'runs'), { recursive: true });
@@ -3667,7 +3667,17 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   writeFileSync(join(app, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0,
     files: [{ path: `${runId}/after.png`, sha256: createHash('sha256').update(shot).digest('hex'), bytes: shot.length }] }));
   const link = (run_id) => ({ run_id, commit, outcome: 'You can read every card on a phone.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, phone, 390, passed', evidence: 'after.png' });
+  const hash = createHash('sha256').update(shot).digest('hex');
+  const receipt = JSON.stringify({ schema: 2, result: 'pass', head: commit, tree: 'a'.repeat(40), runs: [{ run_id: runId, commit }], files: [{ path: 'after.png', sha256: hash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'after.png', sha256: hash, verdict: 'pass' }] } });
+  writeFileSync(join(app, 'receipt.json'), receipt);
+  const ref = { path: 'receipt.json', sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true };
+  const failedId = 'failed-run';
+  writeFileSync(join(app, '.done-done', 'runs', `${failedId}.json`), JSON.stringify({ schema: 1, run_id: failedId, commit, tree: 'a'.repeat(40), dirty: false, exit: 1, files: [{ path: `${runId}/after.png`, sha256: hash, bytes: shot.length }] }));
+  const negative = JSON.stringify({ schema: 1, run_id: failedId, commit, result: 'fail', reason: 'The screen did not load.' });
+  writeFileSync(join(app, 'negative.json'), negative);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'failed', type: 'evidence', number: 4, title: 'Failed proof', filed: new Date().toISOString(), evidence: { ...link(failedId), proof_verdict: 'fail', proof_ref: { path: 'negative.json', sha256: createHash('sha256').update(negative).digest('hex'), issuer: 'done-done', validated: true } } },
+    { key: 'passed', type: 'evidence', number: 3, title: 'Verified run', filed: new Date().toISOString(), evidence: { ...link(runId), proof_verdict: 'pass', proof_ref: ref, proof_series_id: 'series', current_head: commit, release_state: { state: 'unreleased' } } },
     { key: 'found', type: 'evidence', number: 1, title: 'Run in the store', filed: new Date().toISOString(), evidence: link(runId) },
     { key: 'lost', type: 'evidence', number: 2, title: 'Run nowhere', filed: new Date().toISOString(), evidence: link('20261011T130000Z-b2c3d4e5') },
   ] }));
@@ -3675,16 +3685,29 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const api = await (await fetch(`${url}api/decisions`)).json();
-  assert.deepEqual(api.decisions.map((d) => [d.key, d.evidenceCard?.result ?? null]), [['found', 'RUN PASS'], ['lost', null]]);
+  assert.deepEqual(api.decisions.map((d) => [d.key, d.evidenceCard?.result ?? null]), [['failed', 'RUN FAIL'], ['passed', 'RUN PASS'], ['found', 'UNVERIFIED'], ['lost', null]]);
   // The run's own capture is served from the folder the record was found in.
-  assert.equal((await fetch(`${url}${api.decisions[0].evidenceCard.media[0].url.slice(1)}`)).status, 200);
+  assert.equal((await fetch(`${url}${api.decisions[1].evidenceCard.media[0].url.slice(1)}`)).status, 200);
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   const result = (key) => evaluate(`(() => { const a = document.querySelector("#item-${key}"); return a ? [a.querySelector(".ev-ok")?.className ?? "", a.getAttribute("aria-label").split(", ")[1]] : null; })()`);
-  await until(async () => (await result('found'))?.[0] === 'ev-ok held');
-  assert.deepEqual(await result('found'), ['ev-ok held', 'Holds up']);
+  await until(async () => (await result('found')) !== null);
+  assert.deepEqual(await result('found'), ['', 'Unverified']);
+  assert.deepEqual(await result('passed'), ['ev-ok held', 'Holds up']);
+  assert.deepEqual(await result('failed'), ['ev-ok not', 'Failed']);
+  await evaluate('document.querySelector("#item-passed").click()');
+  assert.match(await evaluate('document.querySelector(".ev-open").textContent'), /Current/);
+  assert.match(await evaluate('document.querySelector(".ev-open").textContent'), /Not released/);
+  writeFileSync(join(app, 'receipt.json'), receipt + ' ');
+  const changed = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(changed.decisions.find((d) => d.key === 'passed').evidenceCard.result, 'UNVERIFIED');
+  const conflicting = JSON.parse(readFileSync(file, 'utf8'));
+  conflicting.items.push({ ...conflicting.items.find((d) => d.key === 'passed'), key: 'conflict', number: 5, evidence: { ...conflicting.items.find((d) => d.key === 'passed').evidence, current_head: 'b'.repeat(40) } });
+  writeFileSync(file, JSON.stringify(conflicting));
+  const ambiguous = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(ambiguous.decisions.find((d) => d.key === 'passed').proofHead, 'Unknown');
   // A run found nowhere is claimed as nothing: its update is on Evidence, saying nothing checked it.
-  assert.deepEqual(await result('lost'), ['', 'Not checked']);
+  assert.deepEqual(await result('lost'), ['', 'Unverified']);
   close();
   proc.kill();
 });
@@ -3758,8 +3781,8 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   // On Evidence the same proof is a row of its claim with done-done's check at its tile's corner, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
-  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className]; })()'),
-    [true, 0, 'It works.', 'ev-ok held']);
+  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className ?? ""]; })()'),
+    [true, 0, 'It works.', '']);
   // With no designs filed, Designs still opens from Decide's Designs; the dock keeps its six and lights Decide, and the pill slides there.
   await evaluate('location.hash = "#waiting"');
   await until(async () => !!(await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]")')));
@@ -3919,7 +3942,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is not listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -3938,16 +3961,17 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
   for (const [runId, exit, sha] of [[runs[0], 0, hash], [runs[1], 0, hash], [runs[2], 1, hash], [runs[3], 0, 'b'.repeat(64)]]) writeFileSync(join(dir, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit,
     files: [{ path: 'wide.png', sha256: sha, bytes: wideBytes.length }] }));
+  const verified = (id, proof) => { const receipt = JSON.stringify({ schema: 2, head: commit, tree: 'a'.repeat(40), result: 'pass', runs: [{ run_id: id, commit }], files: [{ path: 'wide.png', sha256: hash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'wide.png', sha256: hash, verdict: 'pass' }] } }); const path = `${id}.receipt.json`; writeFileSync(join(dir, path), receipt); return { ...link(id, proof), proof_verdict: 'pass', proof_ref: { path, sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true } }; };
   Object.assign(doc.items[0], { evidence: link(runs[2]) });
-  Object.assign(doc.items[1], { evidence: link(runs[1], 'npm test, phone, passed') });
-  Object.assign(doc.items[2], { title: 'sign-off board verify: pass', about: outcome, evidence: link(runs[1], 'verify-Sign-Off: npm test, phone, 390, passed') });
+  Object.assign(doc.items[1], { evidence: verified(runs[1], 'npm test, phone, passed') });
+  Object.assign(doc.items[2], { title: 'sign-off board verify: pass', about: outcome, evidence: verified(runs[1], 'verify-Sign-Off: npm test, phone, 390, passed') });
   // A link that is not a full URL stays text: the update it is on still opens.
   doc.items[1].link = 'http://%';
   mkdirSync(join(dir, '.sign-off', 'evidence', '4'), { recursive: true });
   writeFileSync(join(dir, '.sign-off', 'evidence', '4', '1.png'), wideBytes);
   const pr = 'https://github.com/umeranjum17/sign-off/pull/12';
   doc.items.push({ key: 'update-4', type: 'evidence', number: 4, title: 'sign-off board verify: pass', about: outcome, filed: new Date().toISOString(), link: pr,
-    media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: link(runs[0]) });
+    media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: verified(runs[0]) });
   // A plain update with its own capture and no linked run is not proof, but it is still evidence and never an ask.
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
     link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
@@ -3969,13 +3993,13 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.equal(await evaluate('document.querySelector(".ar-line")'), null);
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed), when = (i) => (at(i).toDateString() === new Date().toDateString() ? clock(at(i)) : at(i).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
-  // Evidence lists every proof in one list, newest first, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
+  // Evidence lists every proof, including the failed run; the first six appear before See all.
   // Both proof-prefix forms name one project, a capture with no run takes its linked repository, and a proof with neither names none.
   assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', '', `Not checked · sign-off · ${when(5)}`, 0], ['item-update-4', outcome, 'ev-ok held', `Holds up · sign-off · ${when(4)}`, 0],
-    ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Could not check · sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', `Not checked · ${when(7)}`, 0]]);
+    ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Unverified · sign-off · ${when(6)}`, 0], ['item-update-1', outcome, '', `Unverified · sign-off · ${when(1)}`, 0]]);
   // One head over the list, Latest proof; no project or day headings break it.
   assert.deepEqual(await evaluate('[...document.querySelectorAll("#board h2, #board h3")].map((h) => h.firstChild.textContent)'), ['Latest proof']);
-  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
+  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '7');
   // The head: the title with the project filter, Newest and By priority, and Held up today over the proofs filed today, one square each, ink where the check passed.
   const today = doc.items.filter((d) => new Date(d.filed).toDateString() === new Date().toDateString()), held = today.filter((d) => ['update-2', 'update-3', 'update-4'].includes(d.key)).length;
   assert.deepEqual(await evaluate('[document.querySelector(":is(.ev-top, .ui-dhead) h1").textContent, !!document.querySelector(":is(.ev-top, .ui-dhead) .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
@@ -3985,10 +4009,10 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
     const opts = [...document.querySelectorAll("#sheet .ev-pick button")].map((b) => [b.querySelector(".pn").textContent, b.querySelector(".n").textContent]);
     [...document.querySelectorAll("#sheet .ev-pick button")].find((b) => b.querySelector(".pn").textContent === ${JSON.stringify(name)}).click(); await new Promise((r) => setTimeout(r, 200));
     return [opts, document.querySelector(".ev-pill > span[dir]")?.textContent ?? "", !!document.querySelector(".ev-held"), [...document.querySelectorAll(".ev-card")].map((a) => a.id)]; })()`);
-  assert.deepEqual(await pick('No project'), [[['sign-off', '4'], ['No project', '2']], 'No project', false, ['item-update-2', 'item-update-7']]);
+  assert.deepEqual(await pick('No project'), [[['sign-off', '5'], ['No project', '2']], 'No project', false, ['item-update-2', 'item-update-7']]);
   await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']]);
+  assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6', 'item-update-1']]);
   await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Today's Proofs today counts each update filed today, the failed run too, and opens Evidence; on a desk its tiles sit under Up next in the left column.
@@ -4023,7 +4047,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await until(async () => (await evaluate('!!document.querySelector(".t-tiles")')));
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")).join() + "|" + !!document.querySelector(".t-up.clear")'), `Cleared today: 0 of 0,${filedToday}|true`);
   // A failed or unchecked update still opens on Evidence with done-done's word, the reason a run could not be checked, and the verdicts, Pass last.
-  for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
+  for (const [k, result, why] of [['update-1', 'Unverified', ''], ['update-6', 'Unverified', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".split-detail .ev-title")')));
     assert.deepEqual(await evaluate('[document.querySelector(".ev-props .ev-word").textContent, document.querySelector(".ev-why")?.textContent ?? "", [...document.querySelectorAll(".ev-verdict .choices button")].map((b) => b.textContent)]'),
@@ -4053,7 +4077,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // The selection follows the click and the list stays beside the update.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id)'), ['item-update-4']);
   const props = '[...document.querySelectorAll(".ev-props .ui-pr")].map((p) => [p.querySelector(".k").textContent, p.querySelector(".v").textContent])';
-  assert.deepEqual(await evaluate(props), [['done-done', 'Holds up'], ['Pull request', '#12']]);
+  assert.deepEqual(await evaluate(props), [['Proof head', 'Unknown'], ['Release', 'Unknown'], ['Run', 'Completed'], ['done-done', 'Holds up'], ['Pull request', '#12']]);
   assert.deepEqual(await evaluate('[document.querySelector(".split-detail .split-bar .pt").textContent, document.querySelector(".ev-props a.ui-pr").getAttribute("href")]'), [`sign-off · ${clock(at(4))}`, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
@@ -4143,7 +4167,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate('document.querySelector(".ev-open .ev-go").click()');
   await until(async () => (await evaluate('!!document.querySelector(".ev-item") && document.querySelectorAll(".ev-hero img").length === 2')));
   // A proof with no project says so in its head, and a link that is not a full URL is no Pull request row.
-  assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['done-done', 'Holds up']], 48]);
+  assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['Proof head', 'Unknown'], ['Release', 'Unknown'], ['Run', 'Completed'], ['done-done', 'Holds up']], 48]);
   assert.equal(await evaluate(verdictRow), 1);
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
@@ -4166,7 +4190,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // Discarded from its sheet, the proof goes under Archived; at the list's scroll end the last row, Select or clear all and Archived all end above the dock, which rises over the home bar.
   await iphone.evaluate('document.querySelector(".ev-verdict > .dis").click()');
   await iphone.evaluate('document.querySelector("#dc-sheet [data-reason=not-relevant]").click()');
-  await until(async () => (await iphone.evaluate('document.querySelector("main .ar-line")?.textContent')) === 'Archived · 1' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 5);
+  await until(async () => (await iphone.evaluate('document.querySelector("main .ar-line")?.textContent')) === 'Archived · 1' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 6);
   const end = await iphone.evaluate(`(() => { scrollTo(0, document.documentElement.scrollHeight); const bottom = (s) => Math.round(document.querySelector(s).getBoundingClientRect().bottom), dock = document.querySelector(".tabs").getBoundingClientRect();
     return { dockTop: Math.round(dock.top), dockBottom: Math.round(dock.bottom), lastRow: bottom(".ev-list > li:last-child"), more: bottom(".ev-more"), archived: bottom("main .ar-line") }; })()`);
   assert.equal(end.dockBottom, 844 - 24 - 34, JSON.stringify(end));

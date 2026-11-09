@@ -893,7 +893,7 @@
     : kind === 'bad' ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 9 6 6m0-6-6 6"/></svg>'
     : '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 7v6"/><path d="M12 16.2v.1"/></svg>'; return s; };
   /** The board's reason a run could not be checked, with the next step the docs promise. */
-  const unchecked = (d) => (d.evidenceCard?.status === 'unverified' && d.evidenceCard.reason ? `${d.evidenceCard.reason} Ask the agent to run the check again.` : '');
+  const unchecked = (d) => (d.evidenceCard?.status === 'unverified' && d.evidenceCard.reason ? `${d.evidenceCard.reason} Ask the agent to run the check again.` : d.evidenceCard?.reason ?? '');
   /** The project an update proves something for, read from the check line its run recorded: "verify-margin: …" names margin. */
   const projectOf = (d) => /^(?:done-done-)?verify-([\w-]{1,40}):/i.exec((d.evidence?.proof ?? '').trim())?.[1]?.toLowerCase()
     // A capture with no run names its project by the repository of the change it links, such as github.com/owner/sign-off/pull/9.
@@ -917,8 +917,8 @@
   /** done-done's word on a proof: the board's check of its linked run when it has one, else the judge's line at the start of what the update says
    *  (a board served with no evidence root keeps only that line): 'held' when it holds up, 'not' when it failed or could not be confirmed, '' when nothing checked it. */
   const HELD = /^done-done checked the proof and it holds up\b[:.]?\s*/i, UNCONFIRMED = /^done-done could not confirm the proof\b[:.]?\s*/i;
-  const judged = (d) => { const r = d.evidenceCard?.result; return r === 'RUN PASS' || (!r && HELD.test(d.about ?? '')) ? 'held' : r === 'RUN FAIL' || r === 'INCONCLUSIVE' || (!r && UNCONFIRMED.test(d.about ?? '')) ? 'not' : ''; };
-  const judgedWord = (d) => ({ 'RUN PASS': 'Holds up', 'RUN FAIL': 'Failed', INCONCLUSIVE: 'Did not finish', UNVERIFIED: 'Could not check' })[d.evidenceCard?.result] ?? { held: 'Holds up', not: 'Could not confirm' }[judged(d)] ?? 'Not checked';
+  const judged = (d) => { const r = d.evidenceCard?.result; return r === 'RUN PASS' || (!d.evidence && !r && HELD.test(d.about ?? '')) ? 'held' : r === 'RUN FAIL' || r === 'INCONCLUSIVE' || (!d.evidence && !r && UNCONFIRMED.test(d.about ?? '')) ? 'not' : ''; };
+  const judgedWord = (d) => ({ 'RUN PASS': 'Holds up', 'RUN FAIL': 'Failed', INCONCLUSIVE: 'Did not finish', UNVERIFIED: 'Unverified' })[d.evidenceCard?.result] ?? (d.evidence ? 'Unverified' : { held: 'Holds up', not: 'Could not confirm' }[judged(d)] ?? 'Not checked');
   /** The line drawings of Evidence's rows and sheet, as the approved prototype draws them on a 20px box; fixed strings from this page. */
   const EV_ICONS = { shield: '<path d="M10 2.6l6 2.4v4.4c0 3.9-2.6 6.6-6 8-3.4-1.4-6-4.1-6-8V5z"/><path d="M7.3 10l1.9 1.9 3.6-3.7"/>', flag: '<path d="M5 17.5v-14M5 4h9.5l-2 3.5 2 3.5H5"/>',
     layers: '<path d="M10 3.2 17 7l-7 3.8L3 7z"/><path d="M3 10.6l7 3.8 7-3.8"/>', pr: '<circle cx="6" cy="4.8" r="1.8"/><circle cx="6" cy="15.2" r="1.8"/><circle cx="14" cy="15.2" r="1.8"/><path d="M6 6.6v6.8M14 13.4V8.8a2.5 2.5 0 0 0-2.5-2.5H9.5"/>',
@@ -955,7 +955,7 @@
     const project = projectName(d), meta = [d.status, project, evWhen(d)].filter(Boolean).join(' · '), title = plain(headline(d)), first = evStills(d)[0], desk = !phone(), open = !desk && evOpen === d.key;
     const th = first ? el('span', { class: 'ev-th', 'aria-hidden': 'true' }, lazyImg(src(first[4])))
       : evRich ? el('span', { class: 'ev-th none', 'aria-hidden': 'true' }, projectTile(project)) : '';
-    const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: d.status && !judged(d) && !d.evidenceCard ? meta : frag(evVerdict(d), meta ? ` · ${meta}` : '') });
+    const parts = uiRow({ tile: evTile(project, judgedMark(d)), title, priority: prio(d), meta: d.status && !judged(d) && !d.evidenceCard && !d.evidence ? meta : frag(evVerdict(d), meta ? ` · ${meta}` : '') });
     const label = [title, prio(d), judgedWord(d), meta].filter(Boolean).join(', ');
     const row = desk ? el('a', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, href: `#evidence/${d.key}`, id: `item-${d.key}`, 'data-row': '', 'aria-label': label }, ...parts, th)
       : el('button', { class: `ui-row ev-card${evRich ? ' rich' : ''}`, id: `item-${d.key}`, 'data-row': '', 'aria-expanded': String(open), 'aria-label': label }, ...parts, th);
@@ -985,13 +985,15 @@
   let evSort = 'new', evProject = '', evMore = false;
   function verdicts(d) {
     const saved = state.answers[d.key], err = el('div', { class: 'err', role: 'alert', id: `err-${d.key}` }), order = { fail: 0, 'needs-work': 1, pass: 2 };
-    const opts = [...d.options].sort((x, y) => (order[x.value] ?? 1) - (order[y.value] ?? 1)), lead = saved?.answer ?? 'pass';
+    const opts = [...d.options].sort((x, y) => (order[x.value] ?? 1) - (order[y.value] ?? 1)), lead = saved?.answer;
     const buttons = opts.map((o) => el('button', { class: `v-${o.value}${o.value === lead ? ' ink' : ''}`, 'aria-pressed': o.value === saved?.answer, 'aria-label': `${o.label}, ${headline(d)}` }, o.label));
     buttons.forEach((b, i) => (b.onclick = () => save(d, opts[i], buttons, err)));
     return el('div', { class: 'ev-verdict' }, el('div', { class: 'choices', role: 'group', 'aria-label': `Your verdict, ${headline(d)}` }, ...buttons), err, other(d, saved, err), xBtn(d, 'Discard'));
   }
   /** A proof's panel (ui.css): done-done's word, its priority, the ask it serves with its progress, and its pull request. */
-  const evProps = (d) => { const p = uiProps(d.status && uiProp({ mark: 'dot', name: 'Status', value: el('span', { class: 'ev-status' }, d.status) }), !d.status || judged(d) || d.evidenceCard ? uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }) : '', priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
+  const proofHead = (d) => d.proofHead ?? 'Unknown';
+  const releaseWord = (d) => { const r = d.evidence?.release_state; return r?.state === 'released' && typeof r.version === 'string' && r.version.trim() && typeof r.destination === 'string' && r.destination.trim() ? `Released ${r.version} · ${r.destination}` : r?.state === 'unreleased' ? 'Not released' : 'Unknown'; };
+  const evProps = (d) => { const p = uiProps(d.evidence && uiProp({ mark: 'dot', name: 'Proof head', value: proofHead(d) }), d.evidence && uiProp({ mark: 'dot', name: 'Release', value: releaseWord(d) }), d.evidenceCard?.runState && uiProp({ mark: 'dot', name: 'Run', value: d.evidenceCard.runState }), d.status && uiProp({ mark: 'dot', name: 'Status', value: el('span', { class: 'ev-status' }, d.status) }), !d.status || judged(d) || d.evidenceCard || d.evidence ? uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }) : '', priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
   /** One update as a sheet over the list on a phone: its project and time, its whole title, the capture, then its panel, what it says, its Activity and the verdict. */
   function proofPane(d) {
     const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
@@ -1919,7 +1921,7 @@
     Object.assign(reader.dataset, { answer, plan, evidence, ticket });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
     if (!d) return reader.replaceChildren();
-    if ((from === 'reports' || from.startsWith('inbox/')) && unread(d) && !state.readonly && !FROZEN) setTimeout(() => markRead([d.key], true));
+    if (d?.type !== 'evidence' && (from === 'reports' || from.startsWith('inbox/')) && unread(d) && !state.readonly && !FROZEN) setTimeout(() => markRead([d.key], true));
     const back = el('a', { class: 'close', href: `#${from}` }, `‹ ${from.startsWith('reports') ? 'Reports' : from.startsWith('inbox/') ? `Thread${trailOf(d.key).some(unseen) ? ` · ${trailOf(d.key).filter(unseen).length} new` : ''}` : AREAS[from]}`), h1 = el('h1', { id: 'reader-title', tabindex: '-1', dir: 'auto' }, sheet ? plain(d.title) : d.title);
     back.onclick = (e) => { if (`#${from}` === location.hash) e.preventDefault(), shutFull(); };
     // A report's page reads under its own head: what it is and when, its title, what it says and decided; a plan or a design keeps its title in the bar;
@@ -2704,10 +2706,8 @@
     const openKeys = new Set(open.map((d) => d.key));
     const merged = new Set(open.flatMap((d) => d.merges ?? []).filter((k) => openKeys.has(k)));
     for (const d of [...state.decisions].reverse()) if (!gone.has(d.key) && !merged.has(d.key)) by[area(d)].push(d);
-    // Evidence keeps every proof that is not dismissed, answered or not, newest first, however old: a passed check, a capture with no run to check (it says Not run) or one that could not be checked.
-    // A failed run or one that did not finish is no proof, so it is left off; its own screen still opens, and a verdict moves it to Answered.
-    // Today's Proof tile counts the same list, and says how many runs failed.
-    const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result) && !gone.has(d.key));
+    // Evidence keeps every proof that is not dismissed, including failed and unfinished runs; a person's verdict does not remove it.
+    const shownProof = state.decisions.filter((d) => d.type === 'evidence' && !gone.has(d.key));
     by.evidence = [...by.evidence.filter((d) => d.type !== 'evidence'), ...shownProof].sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
     by.failedProof = state.decisions.filter((d) => d.type === 'evidence' && d.evidenceCard?.result === 'RUN FAIL' && !gone.has(d.key));
     by.designs = [...state.decisions].reverse().filter((d) => !gone.has(d.key) && (d.kind === 'design' || (isPick(d) && !merged.has(d.key))));
