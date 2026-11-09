@@ -1681,6 +1681,18 @@ test('a report names the part in view as its reader scrolls it, and the page kee
     await evaluate(`document.fonts.ready.then(() => document.querySelector('[data-part="this"]').scrollIntoView({ block: 'center' }))`);
     await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) !== 'Two steps');
     assert.deepEqual(await evaluate('globalThis.__errors'), []);
+    // A changed report is reread by the board's poll while the person is reading it.
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = ''; document.querySelector('.gd-scroll').scrollTo({ top: 700, behavior: 'instant' });
+      globalThis.__positions = []; const s = document.querySelector('.gd-scroll'), box = s.getBoundingClientRect(), part = [...s.querySelectorAll('[data-part]')].find((p) => { const r = p.getBoundingClientRect(); return r.bottom > box.top && r.top < box.bottom; }); globalThis.__anchor = { part: part.dataset.part, offset: part.getBoundingClientRect().top - box.top }; new MutationObserver(() => { const s = document.querySelector('.gd-scroll'), p = [...s.querySelectorAll('[data-part]')].find((p) => p.dataset.part === __anchor.part); globalThis.__positions.push(p.getBoundingClientRect().top - s.getBoundingClientRect().top); }).observe(document.querySelector('#reader'), { childList: true });`);
+    const before = await evaluate(`document.querySelector('.gd-scroll').scrollTop`);
+    const saved = JSON.parse(readFileSync(file));
+    saved.items.find((item) => item.key === report.key).about = 'An updated report for the reader.';
+    writeFileSync(file, JSON.stringify(saved));
+    await until(() => evaluate(`document.querySelector('#reader').textContent.includes('An updated report for the reader.')`));
+    assert.ok(before > 0);
+    const positions = await evaluate('globalThis.__positions');
+    assert.equal(positions.length, 1);
+    assert.ok(Math.abs(positions[0] - (await evaluate('globalThis.__anchor.offset'))) < 1, 'redraw keeps the same report part at the same viewport position');
   } finally { close(); proc.kill(); }
 });
 

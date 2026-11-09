@@ -161,7 +161,7 @@ Each new answer piece increments `answerRevision`. `POST /api/engagement/seen` t
 
 ### report, schema 3
 
-The older guided report: the board draws it, so the agent writes no page. One scroll, in the order *What this is* (one picture), *What I understood*, *What I found*, *Next step*; the numbers and the longer answers open in place. `sign-off-axi report init <folder>` writes `report.json` to fill; `post --kind report --from <folder>/report.json` posts it. Shows in Reports and explainers, and opens over the whole board. It takes no answer but its typed open questions (`decisions` below); if the person says the understanding is off, that reaches the agent as a comment.
+The older guided report: the board draws it, so the agent writes no page. One scroll, in the order *What this is* (one picture), *What I understood*, *What I found*, *Next step*; the numbers and the longer answers open in place. `sign-off-axi report init <folder>` writes `report.json` to fill; `post --kind report --from <folder>/report.json` posts it. Shows in Reports and explainers, and opens over the whole board. Poll redraws keep the reader's visible report part at the same viewport position, including when the report changes. It takes no answer but its typed open questions (`decisions` below); if the person says the understanding is off, that reaches the agent as a comment.
 
 - Required: the common fields, `about`, `filed` (as schema 2), `understood`, `visual`, `sections` (1 to 6) and `next`. Optional: `group` (text, 1-40), `decided` (text, 1-200) and `asked_by` (text, 1-40).
 - `understood`: 1 to 6 objects of exactly `label` (text, 1-40) and `text` (text, 1-240): the request in the agent's words, so the person can see it was understood.

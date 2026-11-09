@@ -1,6 +1,8 @@
 # done-done project config. `done-done init` never overwrites this file.
 # The app name finds this repo's evidence and receipts from every checkout.
 app: "sign-off"
+judge:
+  max_captures: 17
 # This repo's coding agent, over agent in ~/.done-done/config.yaml (model, effort and the other agent settings stay there).
 # agent: opencode
 # Every check the CI gate enforces, as a re-runnable journey. Each command
@@ -27,6 +29,10 @@ journeys:
   # Report content gate (CLI only): the real "bots share one computer" plan report is refused with each rule named, a corrected copy passes.
   report-content:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/report-content-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
+  # A long guided report remains at the reading position across an update during two minutes of phone reading.
+  reader-scroll:
+    timeout: 10m
+    command: 'user_home=$(getent passwd "$(id -u)" | cut -d: -f6); export MISE_OFFLINE=1 MISE_TRUSTED_CONFIG_PATHS="$user_home/.config/mise/config.toml" PATH="$user_home/.local/share/mise/installs/node/26.1.0/bin:$PATH"; npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/reader-scroll.sh "$DONE_DONE_EVIDENCE_ROOT"'
   document-scroll:
     command: 'npm run build > /dev/null && node --test --test-name-pattern="report and plan documents use one page scroll" test/design.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/document-scroll.log" 2>&1 && node .agents/skills/done-done-verify-sign-off/document-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # The question shape: an ask, a guarded ask, a plan's and a report's open question as one radio list with the recommendation selected and Something else last,
@@ -380,4 +386,4 @@ approved_requirements:
   - kind: spec
     name: design-pick-listing
     requirement: A design pick is listed under Designs.
-    capture: designs.1440.dark.png
+    capture: designs.after.dark.1440w.png

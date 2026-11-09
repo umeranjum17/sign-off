@@ -194,13 +194,29 @@
     // A part of the board arriving redraws the report the person is reading too: the place they had scrolled to is kept, as the row they are on keeps
     // the focus, so a poll never sends a reader back to the top of what they were reading.
     const open = document.getElementById('reader');
-    const places = open && !open.hidden ? [...open.querySelectorAll('.gd-scroll')].map((s) => s.scrollTop) : null;
+    const places = open && !open.hidden ? [...open.querySelectorAll('.gd-scroll')].map((s) => {
+      const box = s.getBoundingClientRect();
+      const anchor = [...s.querySelectorAll('[data-part]')].find((part) => {
+        const rect = part.getBoundingClientRect();
+        return rect.bottom > box.top && rect.top < box.bottom;
+      });
+      s.style.overflowAnchor = 'none';
+      return { top: s.scrollTop, part: anchor?.dataset.part, offset: anchor && anchor.getBoundingClientRect().top - box.top };
+    }) : null;
     const held = holdRows?.(open);
     render();
     held?.();
     if (places?.length) {
       const now = document.getElementById('reader');
-      if (now && !now.hidden) [...now.querySelectorAll('.gd-scroll')].forEach((s, i) => { if (places[i]) s.scrollTop = places[i]; });
+      if (now && !now.hidden) [...now.querySelectorAll('.gd-scroll')].forEach((s, i) => {
+        const place = places[i];
+        if (place?.top) {
+          const anchor = place.part && [...s.querySelectorAll('[data-part]')].find((part) => part.dataset.part === place.part);
+          const top = anchor ? s.scrollTop + anchor.getBoundingClientRect().top - s.getBoundingClientRect().top - place.offset : place.top;
+          if (s.scrollTop !== top) s.scrollTo({ top, behavior: 'instant' });
+        }
+        requestAnimationFrame(() => { s.style.overflowAnchor = ''; });
+      });
     }
     const box = typing && document.getElementById(typing.id);
     if (box) box.focus(), box.setSelectionRange(start, end, direction);
