@@ -1,0 +1,9 @@
+{
+  "key": "delivery-review",
+  "companion": "delivery-rescan",
+  "drafts": [
+    {"version": 1, "title": "The delivery review", "rows": 12},
+    {"version": 3, "title": "The delivery review with checks", "rows": 29},
+    {"version": 5, "title": "The delivery review in build order", "rows": 57}
+  ]
+}

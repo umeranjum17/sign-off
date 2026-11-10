@@ -68,7 +68,7 @@ export type Decision = {
   layout?: 'document'; engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** A guided report 5: the Actions block it declares (who owns the build, when the first pull request comes, which action it recommends),
    *  its version, what changed since the version before, and every version the board has posted under this key. */
-  actions?: ReportActions; version?: number; changes?: VersionChange[]; versions?: { version: number; at: string; changes: VersionChange[] }[];
+  actions?: ReportActions; version?: number; changes?: VersionChange[]; versions?: { version: number; at: string; changes: VersionChange[]; filed?: string; item?: Record<string, unknown> }[];
   /** Designs: project, date, review status, preview and screen views. An evidence update's `status` is one of EVIDENCE_STATUSES and its `captions` name each capture, in order. */
   status?: 'draft' | 'in_review' | 'approved' | 'Fixed' | 'In progress' | 'Waiting on you'; captions?: string[]; journeys?: DesignJourney[]; recommend?: string;
   /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
@@ -275,8 +275,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
         && (c.kind === 'rewritten' ? typeof c.was === 'string' && c.was.trim() && [...c.was].length <= 120 : c.was === undefined)))) {
       throw bad('changes', 'must list 1 to 8 lines of what changed, each added, rewritten (with the wording it replaces) or removed');
     }
-    if (d.versions !== undefined && (!Array.isArray(d.versions) || !d.versions.every((v: any) => v && Number.isInteger(v.version) && v.version >= 2 && typeof v.at === 'string' && Array.isArray(v.changes)))) {
-      throw bad('versions', 'must list the versions the board posted, each a number from 2 and the lines that changed');
+    if (d.versions !== undefined && (!Array.isArray(d.versions) || !d.versions.every((v: any) => v && Number.isInteger(v.version) && v.version >= 1 && typeof v.at === 'string' && Array.isArray(v.changes)))) {
+      throw bad('versions', 'must list the versions the board posted, each a number from 1 and the lines that changed');
     }
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     const signin = d.type === 'signin';
@@ -610,17 +610,17 @@ export type DiscardReason = keyof typeof DISCARD_REASONS;
 /** Undo takes a discard back this long after it: until then its agent is not told, so an undone discard never reaches it. */
 export const UNDO_MS = 10_000;
 export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean, reason?: DiscardReason): void {
-  const at = now();
-  for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at, ...(dismissed && reason && { reason }) });
+  const at = now(), reports = dismissed && reason ? readItems(decisionsPath).items.filter((d) => d.kind === 'report') : [];
+  for (const key of keys) { const report = reports.find((d) => d.key === key); appendLine(dismissedPath(decisionsPath), { key, dismissed, at, ...(dismissed && reason && { reason }), ...(report && { version: report.version ?? 1 }) }); }
 }
 /** Each discard the person made, oldest first, and whether it is still the last word on its card (no restore or dismiss since).
  *  A discard that a restore took back inside the Undo window never left the board and is left out. */
-export function readDiscards(decisionsPath: string): { key: string; reason: DiscardReason; at: string; last: boolean }[] {
+export function readDiscards(decisionsPath: string): { key: string; reason: DiscardReason; at: string; last: boolean; version?: number }[] {
   const lines = readRaw(dismissedPath(decisionsPath)).split('\n').flatMap((line) => { try { const x = line && JSON.parse(line); return x && typeof x.key === 'string' && typeof x.at === 'string' ? [x] : []; } catch { return []; } });
   return lines.flatMap((x, i) => {
     const after = lines.slice(i + 1).filter((y) => y.key === x.key);
     return x.dismissed === true && Object.hasOwn(DISCARD_REASONS, x.reason) && !after.some((y) => y.dismissed === false && Date.parse(y.at) - Date.parse(x.at) < UNDO_MS)
-      ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length }] : [];
+      ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length, ...(Number.isInteger(x.version) && { version: x.version }) }] : [];
   });
 }
 /** The kind and project an agent read an older report's words and set for it, one line per key and change: who set it and when. The report's own file is never rewritten. */
@@ -953,7 +953,7 @@ export function readDismissed(decisionsPath: string, answers: Record<string, Ans
       warn(`skipped unreadable line ${n + 1} in ${dismissedPath(decisionsPath)}`);
     }
   });
-  const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
+  const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.versions?.at(-1)?.at ?? d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
   return [...[...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key), ...archived];
 }
 
@@ -1157,7 +1157,7 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
  * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply, or an answer the leash took, marks it seen. */
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; /** Follow-up buttons under a reply that asks for a next step: one tap answers. */ options?: Option[]; at: string };
 export type Reply = { at: string; text?: string; link?: string; options?: Option[]; acted?: true };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words (the board keeps them nowhere else), or the words of an answer written instead of picked. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; version?: number; /** A ticket comment's words (the board keeps them nowhere else), or the words of an answer written instead of picked. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
@@ -1170,7 +1170,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   const sends: Trail[] = [
     ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a), ...(a.taken && { taken: a.taken }), ...(a.answer === 'text' && { said: a.note }) })),
     ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
-    ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at })),
+    ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at, ...(x.version && { version: x.version }) })),
     ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
     // On a guided plan or report: each Go deeper (or other) ask on a part, read when a wait handed it over or its author's session acknowledged it, replied once answered;
     // and each Agree, Disagree or Comment on a part, read when a wait handed it over, replied with the agent's words.

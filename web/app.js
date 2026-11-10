@@ -856,7 +856,7 @@
       ...trailOf(d.key).flatMap((t) => [t.delivered && { at: t.delivered, text: `Delivered to ${by}` }, t.read && { at: t.read, text: `${by} read it` },
         all && t.reply && (!t.reply.acted || d.type === 'signin') && { at: t.reply.at, text: `${by} ${t.reply.text ? 'replied' : t.reply.acted ? 'posted a new link' : 'acted on it'}`, note: t.reply.text, link: t.reply.link && [linkName(t.reply.link), t.reply.link] }]),
       ...(state.rounds ?? []).filter((r) => r.key === d.key).map((r) => ({ at: r.at, text: 'You asked for a new round', note: r.note })),
-      ...trailOf(d.key, 'discard').map((t) => ({ at: t.at, text: `Discarded: ${reasonOf(t.reason)}` })),
+      ...trailOf(d.key, 'discard').map((t) => { const version = t.version ?? (d.versions ?? []).filter((v) => Date.parse(v.at) <= Date.parse(t.at)).at(-1)?.version; return { at: t.at, text: `${version && version < (d.version ?? 1) ? `Version ${version} discarded` : 'Discarded'}: ${reasonOf(t.reason)}` }; }),
       ...(state.comments ?? []).filter((c) => c.key === d.key && c.text).map((c) => ({ at: c.at, text: 'Your comment', note: c.text })),
       ...(all ? (state.messages ?? []).filter((m) => m.kind === 'comment' && m.key === d.key) : []).map((m) => ({ at: m.at, text: 'Your comment', note: m.text }))]
       .filter((e, i, all) => e && !Number.isNaN(Date.parse(e.at)) && all.findIndex((x) => x && x.text === e.text && x.note === e.note && bySecond(x, e) === 0) === i).sort(bySecond);
@@ -1906,6 +1906,8 @@
     return out;
   }
   function readPage(d, from = 'reports') {
+    const version = d && rpVersions.get(d.key), earlier = d?.versions?.find((v) => v.version === version && v.item);
+    if (earlier && version !== d.version) d = { ...earlier.item, type: d.type, guided: earlier.item.schema >= 3, by: d.by, version, versions: d.versions, historical: true };
     // A card opens whole or not at all: a row from a page of the board carries what a list shows, and a card that is still coming is no card to read.
     if (d?.row && !d.whole) { if (reader.dataset.key !== d.key) readPage(undefined, from); return; }
     // A card's body comes from app-more.js: a card opened before it lands opens, whole, when it does.
@@ -1951,6 +1953,7 @@
     if (swapped) swapIn([...reader.children].filter((n) => !n.matches('.rp-scrim')));
   }
   /** A guided report opened in full from its sheet (its key), else ''; and the report last tapped in the list, whose sheet stays until another opens. */
+  const rpVersions = new Map();
   let rpGuide = '', rpListed = '';
   addEventListener('click', (e) => { const row = e.target.closest?.('.rp-list a[data-row]'); if (row) rpListed = row.getAttribute('href').slice('#reports/'.length); }, true);
   /** A report as the prototype's sheet draws it: a handle; its project, what it is and the day, with Close; its title in full and what it says; what it found (or decided);

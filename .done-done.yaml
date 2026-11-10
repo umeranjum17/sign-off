@@ -27,6 +27,8 @@ journeys:
   serve-stop:
     command: 'npm run build > /dev/null && node --test test/serve-stop.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/serve-stop.log" 2>&1'
   # Report content gate (CLI only): the real "bots share one computer" plan report is refused with each rule named, a corrected copy passes.
+  report-history:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440 && node .agents/skills/done-done-verify-sign-off/report-history-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   report-content:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/report-content-proof.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # A long guided report remains at the reading position across an update during two minutes of phone reading.

@@ -565,7 +565,7 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   // A key takes only the same message again: another filer, another filed time, or a plain item under it is a conflict.
   for (const [input, args, error, help] of [
     ['', ['--kind', 'ask', '--from', file, '--filer', 'agent-99'], /already holds a different message/, /Post it under a new key/],
-    [JSON.stringify({ ...report, filed: '2026-10-14T07:19:00Z' }), ['--kind', 'report', '--from', '-'], /key slice-5-live already holds a different message/, /Post it under a new key/],
+    [JSON.stringify({ ...report, filed: '2026-10-14T07:19:00Z' }), ['--kind', 'report', '--from', '-'], /key slice-5-live: version 1 is already posted/, /Keep this key/],
     [JSON.stringify({ ...ask, key: 'plain' }), ['--kind', 'ask', '--from', '-'], /key plain already holds a different message/, /Post it under a new key/],
     [JSON.stringify({ ...ask, recommend_value: undefined }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2: recommend_value is required/, /Add \\"recommend_value\\"/],
     ['', ['--kind', 'report', '--from', file], new RegExp(`${file}: key ship-signin-2: kind is ask, not --kind report`), /Pass --kind ask/],

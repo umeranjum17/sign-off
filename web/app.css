@@ -1066,6 +1066,9 @@
   .rda-said { color: var(--tk-text-secondary); }
   .rda-a:focus-visible, .rda-chip:focus-visible, .rda-go:focus-visible, .rda-text:focus-visible, .rda-mic:focus-visible, .rda-sb:focus-visible, .rda-note:focus-visible, .rda-line:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
   .rda-ver { margin: 1.25rem 0 0; }
+  .rda-ver label { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .rda-ver select { min-height: 2.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--tk-line); border-radius: 0.75rem; background: var(--tk-inset); color: var(--tk-text); font: inherit; }
+  .rda-ver summary { min-height: 2.75rem; padding: 0.75rem 0; cursor: pointer; }
   .rda-vmeta { margin: 0 0 0.25rem; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
   .rda-ver h2 { margin: 0.25rem 0 0.5rem; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
   .rda-diff { list-style: none; margin: 0; padding: 0; }

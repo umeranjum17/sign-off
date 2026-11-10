@@ -1186,7 +1186,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
      whose answer (sign-off-axi deeper) is polled and shown under the part that was tapped. */
   function guideView(d) {
     const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = d.decisions ?? [], asks = plan || decisions.length > 0, by = (stage) => sections.filter((s) => s.stage === stage);
-    const live = !FROZEN && !state.readonly;
+    const live = !FROZEN && !state.readonly && !d.historical;
     // View, this browser's choice: a report's pictures Drawn or As lists, and its numbers shown under the parts or not.
     const view = { lists: lsGet('sign-off-view-lists') === '1', nums: lsGet('sign-off-view-nums') !== '0' }, viewHooks = new Set();
     const stages = [d.visual && 'this', d.understood?.length && 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', d.next && 'next'].filter(Boolean);
@@ -1745,7 +1745,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     // ---- The Actions block: what a report ends on. The report declares it (role, owner, the day of the first pull request and which
     // action it recommends); the person approves, refines with a note typed or spoken, or rejects with a reason. Each records one line the
     // fleet side reads, so the same report can be approved once and its result is never guessed by the page.
-    const declared = d.actions ?? null, acted = () => (state.report_actions ?? {})[key] ?? null;
+    const declared = d.historical ? null : d.actions ?? null, acted = () => (state.report_actions ?? {})[key] ?? null;
     const whoActs = declared ? plain(declared.owner?.trim() || declared.role || '') : '';
     const dayWords = (iso) => { const t = Date.parse(`${iso}T00:00:00Z`); return Number.isNaN(t) ? iso : new Date(t).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); };
     const resultOf = (a) => a === 'approve' ? (declared?.approve_result?.trim() || `Starts the build. ${whoActs} opens the first PR${declared?.first_pull_request ? ` by ${dayWords(declared.first_pull_request)}` : ''}.`)
@@ -1862,7 +1862,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       const notes = plan && S.understood ? [{ section: 'understood', verdict: S.understood === 'yes' ? 'approve' : 'change', ...(S.note.trim() && { note: S.note.trim() }) }] : [];
       if (!await sendWithFeedback(`plan:${key}`, b, async () => { await postJson('/api/answers', { key, note: '', notes, decisions: S.picks }); S.note = noteBox.value = ''; sync(); })) b.disabled = false;
     }
-    const goBtn = () => { const b = el('button', { class: 'gd-btn block', type: 'button' }, gic('send'), changes() ? `Send ${plural(changes(), 'change')}` : plan ? 'Go ahead' : `Send ${plural(decisions.length, 'answer')}`); b.onclick = () => go(b); return b; };
+    const goBtn = () => { const b = el('button', { class: 'gd-btn block', type: 'button' }, gic('send'), changes() ? `Send ${plural(changes(), 'change')}` : plan ? 'Go ahead' : `Send ${plural(decisions.length, 'answer')}`); b.disabled = !live; b.onclick = () => go(b); return b; };
 
     // ---- rail, progress and the phone bar
     const sumHost = E('div', 'gd-sum'), bar = E('div', 'gd-bar'), barTxt = E('div', 'txt'), nav = el('nav', { 'aria-label': 'Parts' }), segs = E('div', 'gd-segs');
@@ -2059,16 +2059,16 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
 
     const who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
     const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), el('div', { class: 'gd-activity' }, thread(d)),
-      E('div', 'howto', gic('info'), E('span', '', plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
+      E('div', 'howto', gic('info'), E('span', '', d.historical ? 'Earlier version. Return to the current version to comment or approve.' : plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
     const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
     const nowPart = E('div', 'now-part'); nowPart.hidden = plan;
     const progress = E('div', 'gd-progress', now, segs, nowPart);
     // A report the owner redid says so before its first part: the version, whose it is and when, then what changed, marked.
-    const versionAt = (d.versions ?? []).at(-1);
+    const history = [...(d.versions ?? [])].sort((a, b) => b.version - a.version), versionAt = history.find((v) => v.version === (d.version ?? 1));
     const diffLines = d.changes ?? versionAt?.changes ?? [];
-    const versionFig = !plan && (d.version ?? 1) > 1 ? el('section', { class: 'rda-ver' },
-      el('p', { class: 'rda-vmeta' }, `Version ${d.version} · ${declared?.owner?.trim() || declared?.role || d.by || 'its owner'} · ${versionAt ? hhmm(versionAt.at) : when(d.filed)}`),
-      el('h2', {}, 'What changed'),
+    const versionFig = !plan && ((d.version ?? 1) > 1 || d.historical) ? el('section', { class: 'rda-ver' },
+      el('p', { class: 'rda-vmeta' }, `Version ${d.version} · ${d.actions?.owner?.trim() || d.actions?.role || d.by || 'its owner'} · ${versionAt ? hhmm(versionAt.at) : when(d.filed)}`),
+      el('h2', {}, (d.version ?? 1) === 1 ? 'Original version' : 'What changed'),
       el('ul', { class: 'rda-diff' }, ...diffLines.map((c) => {
         const mark = c.kind === 'added' ? '+' : c.kind === 'rewritten' ? '~' : '\u2013';
         return el('li', { class: `rda-d ${c.kind}` },
@@ -2077,6 +2077,12 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
             ...(c.was ? [el('span', { class: 'was' }, `was ${c.was}`)] : [])));
       })),
       el('p', { class: 'rda-vmark' }, 'Marked: added, rewritten, removed.')) : '';
+    if (versionFig && history.length) {
+      const picker = el('select', { 'aria-label': 'Report version' }, ...history.map((v, i) => el('option', { value: v.version, ...(!v.item && i > 0 && { disabled: '' }) }, `Version ${v.version}${i === 0 ? ' (current)' : !v.item ? ' (notes only)' : ''}`)));
+      picker.value = String(d.version ?? 1);
+      picker.onchange = () => { rpVersions.set(key, Number(picker.value)); readPage(state.decisions.find((x) => x.key === key)); };
+      versionFig.append(el('label', {}, 'Read a version ', picker), ...history.filter((v) => v.version < (d.version ?? 1)).map((v) => el('details', {}, el('summary', {}, `Version ${v.version} · ${when(v.at)}`), el('ul', {}, ...v.changes.map((c) => el('li', {}, `${c.kind}: ${c.text}${c.was ? ` (was ${c.was})` : ''}`))))));
+    }
     const main = el('div', { class: 'gd-main' }, top, ...(versionFig ? [versionFig] : []), ...stageBlocks, ...(declared ? [decBox] : []));
     cols.append(rail, main, ...(plan ? [] : [actBox]));
     const scroll = E('div', 'gd-scroll', E('div', 'gd', progress, cols));

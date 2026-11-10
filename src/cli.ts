@@ -233,7 +233,7 @@ It is optional, and only a reference: the ticket need not exist yet, and one not
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--ask-ref, --why, --outcome, --recommend-reason, --silent-by, --merge).
 A new Decide question requires --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed); follow-ups belong in the backlog, not the board. Existing cards, plans, reports, evidence and engagement records are unchanged.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
-else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
+else it is refused with one fix line and nothing is written. A report keeps its key: post a higher "version" with "changes" to advance it, or retry the same message. Other changed messages under a used key exit 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
 a "run" is the update's proof: its outcome line heads the card, so write it as the result the user can see. With no key it posts the next update-<number>.
 --kind gate holds a done-done run for the user: it waits like an ask; run done-done respond --action <the picked value>.
@@ -545,8 +545,8 @@ const MANY = ['option', 'outcome', 'merge'];
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none, and the notice record (`announced`) is the board's too. */
 const asSent = ({ filed: _filed, announced: _announced, ...rest }: any) => rest;
-/** A report names its own `filed` time, so only the notice record goes. */
-const asReport = ({ announced: _announced, ...rest }: any) => rest;
+/** A report names its own `filed` time; history and the notice record belong to the board. */
+const asReport = ({ announced: _announced, versions: _versions, ...rest }: any) => rest;
 /** The projects the board knows, for a refusal that names them. */
 const knownProjects = (file: string) => { const all = existsSync(file) ? readProjects(file).map((p) => p.name) : []; return all.length ? `known projects: ${all.join(', ')}` : 'no project is registered on this board yet (sign-off-axi project --name <project> --icon <picture>), so name the one the report is about'; };
 /** A new report names its kind and its project, whatever its schema; one already on the board stays a re-post of its own key (an older one is named with report kind). */
@@ -1691,7 +1691,10 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
     const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i])), now = new Date().toISOString();
     for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
-    const feed: any[] = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
+    const feed: any[] = fed.items.map((i) => {
+      const next = { filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) };
+      return i?.kind === 'report' || first.get(i?.key)?.kind === 'report' ? reportPost(first.get(i.key), next, now) : next;
+    });
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
@@ -1706,7 +1709,7 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
-      if (had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
+      if (had.kind !== 'report' && had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
         throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
       }
     }
@@ -1731,9 +1734,9 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     checkMerges(incoming, resulting, current);
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
-    if (changed) {
+    if (changed || incoming.some((d) => d.kind === 'report' && current.find((c) => c.key === d.key)?.dismissed)) {
       const before = waitingKeys(file);
-      writeItems(file, items, extra);
+      writePostedItems(file, items, incoming, extra);
       notifyEntered(file, named, before);
     }
     return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
@@ -1947,6 +1950,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
     if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
     // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
     process.once('exit', () => { process.exitCode = 2; });
+    if (m.kind === 'report') throw e;
     throw fail(`${name}: ${e.message}`, 'CONFLICT', 'Post it under a new key');
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -2050,6 +2054,31 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
 
 /** JSON with object fields in key order, so the same message compares equal in any field order. */
 const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** Report transitions, shared by raise, contract post and replacement feeds. History is owned by the board, never by a producer. */
+function reportPost(had: any, next: any, now: string) {
+  if (next.kind !== 'report') throw fail(`key ${next.key} holds a report`, 'CONFLICT', 'Keep this key for its report; post another kind under its own key');
+  if (!had) return { ...asReport(next), filed: next.filed ?? now };
+  if (had.kind !== 'report') throw fail(`key ${next.key} already holds another kind of card`, 'CONFLICT', 'Use the key of the report you are updating');
+  const authored = had.versions?.find((v: any) => v.version === had.version)?.filed ?? had.filed;
+  if ([asReport(had), { ...asReport(had), filed: authored }].some((m) => canon(m) === canon(asReport(next)))) return had;
+  if (!(next.version > (had.version ?? 1) && next.changes?.length)) {
+    throw fail(`key ${next.key}: version ${had.version ?? 1} is already posted; a changed report needs a newer version and change notes`, 'CONFLICT',
+      `Keep this key, increase "version" above ${had.version ?? 1} and include "changes"; retry the unchanged message to post it again`);
+  }
+  const history = had.versions ?? [], version = had.version ?? 1;
+  return { ...asReport(next), ...(had.announced && { announced: had.announced }), filed: had.filed ?? now, versions: [
+    ...history.filter((v: any) => v.version !== version),
+    { version, at: history.find((v: any) => v.version === version)?.at ?? had.filed ?? now, changes: had.changes ?? [], item: asReport(had) },
+    { version: next.version, at: now, changes: next.changes, filed: next.filed },
+  ] };
+}
+/** Publish only after every transition passed validation, then restore each posted report's one live card. Callers hold the board lock. */
+function writePostedItems(file: string, items: any[], incoming: Decision[], extra?: Record<string, unknown>) {
+  writeItems(file, items, extra);
+  const hidden = new Set(readDismissed(file, readAnswers(file), readRounds(file), warn, loadDecisions(file)));
+  const reports = incoming.filter((d) => d.kind === 'report' && hidden.has(d.key)).map((d) => d.key);
+  if (reports.length) appendDismissed(file, reports, false);
+}
 /** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and merges nothing itself.
  * A card is named by one ask until that ask is answered, dismissed or not. A merge new to the board also names a card still open. */
 function checkMerges(incoming: Decision[], resulting: Decision[], current: ReturnType<typeof board>) {
@@ -2114,6 +2143,12 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
     }
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
+      if (d.kind === 'report' || had?.kind === 'report') {
+        if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw fail(`key ${d.key} already has a saved answer`, 'CONFLICT', 'Use another key; the earlier answer belongs to its original card');
+        const index = items.findIndex((x) => x?.key === d.key), stored = items[index], next = reportPost(stored, raw[i], now);
+        if (next !== stored) { fits(d.title, d.key); if (stored) items[index] = next; else items.push(next); }
+        return { key: d.key, status: !had ? 'raised' : next !== stored ? `version ${d.version} posted` : had.dismissed ? 'raised again' : 'already posted', title: d.title };
+      }
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
       const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
       const refuse = (why: string) => {
@@ -2127,10 +2162,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       // A card the lead reopened (sign-off-axi reopen) may be asked again on its key: the new question or round replaces the old one, filed now, and its earlier answer stays in the thread.
-      // A report the owner redid is the same card one version on: it replaces the report in place, never a second card and never a new key, and it
-      // keeps the day it was first filed and every version it has had.
-      const bumped = !!had && had.kind === 'report' && d.kind === 'report' && Number.isInteger(d.version) && d.version! > (had.version ?? 1) && !!d.changes?.length;
-      const again = !!had && (bumped || (reopened.has(d.key) && differs()));
+      const again = !!had && reopened.has(d.key) && differs();
       if (had && !again && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
@@ -2138,15 +2170,14 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
         items.push({ filed: now, ...raw[i] });
       } else if (again) {
         fits(d.title, d.key);
-        items[items.findIndex((x) => x?.key === d.key)] = { filed: bumped ? (had.filed ?? now) : now, ...raw[i],
-          ...(bumped && { versions: [...(had.versions ?? []), { version: d.version!, at: now, changes: d.changes }] }) };
+        items[items.findIndex((x) => x?.key === d.key)] = { filed: now, ...raw[i] };
       }
-      return { key: d.key, status: !had ? 'raised' : bumped ? `version ${d.version} posted` : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     let picked: Answer[] = [];
     if (raised.some((r) => r.status === 'raised' || r.status === 'raised again' || /^version \d+ posted$/.test(r.status))) {
       const before = waitingKeys(file);
-      writeItems(file, items);
+      writePostedItems(file, items, incoming);
       // On the leash Act, then tell me, a new ask takes its agent's recommended pick at once: the person sees it and can still change it.
       if (leashOf(named) === 'act') picked = leashTake(file, 'act', raised.flatMap((r) => (r.status === 'raised' ? [r.key] : []))).took.map(({ a }) => a);
       for (const a of picked) raised.find((r) => r.key === a.key)!.status = `picked ${a.answer}`;
@@ -3143,7 +3174,7 @@ function stateRead() {
 }
 /** What a row leaves out: a proof's media and the writing of a report are what a card links, and they load with the card itself. Everything else a
  * card shows at a glance (its option mocks, a guided page's own steps) stays in the row, so a list drawn from rows is the same list the board draws. */
-const HEAVY = ['evidenceCard'];
+const HEAVY = ['evidenceCard', 'versions'];
 /** A row draws what a report is made of (its parts and where each stands, its sources' links) and never its words: those come with the card. */
 const slimSections = (sections: any[]) => sections.map((s) => ({ ...Object.fromEntries(['id', 'stage', 'heading', 'part'].filter((k) => s[k] !== undefined).map((k) => [k, s[k]])),
   ...(s.items?.length && { items: s.items.filter((it: any) => it.link).map((it: any) => ({ link: it.link, ...(it.source && { source: it.source }) })) }) }));
