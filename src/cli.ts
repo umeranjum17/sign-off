@@ -219,7 +219,7 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and i
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--video <value>=<file>]... [--score <value>=<number>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--video <value>=<file>]... [--score <value>=<number>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>] [--replaces <key>]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--attach <file>]... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
@@ -227,6 +227,7 @@ examples:
        sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
+--replaces <key> works on a decision, design, diagram, interactive, report or --kind post: the card with that key moves to Archived (reason Replaced by newer) in the same write, and is refused if it is not on the board.
 --ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row, its title and progress, that opens the ticket.
 It is optional, and only a reference: the ticket need not exist yet, and one not on the board shows no row. With --kind or --from it fills "ticket" on each message or item that has none.
 --priority P0-P3 works on every form above too: how urgent the card is, P0 the most, shown as a chip. Optional; with --kind or --from it fills "priority" on each message or item that has none.
@@ -1079,7 +1080,7 @@ function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true }, video: { type: 'string', multiple: true }, score: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
-  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
+  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, replaces: { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'purpose', 'project', 'tradeoff', 'mock', 'video', 'score', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
@@ -1095,6 +1096,11 @@ function post(args: string[], cmd = 'post') {
   }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   for (const f of ['ticket', 'priority']) if (values.replace && values[f] !== undefined) throw fail(`--${f} does not apply to --replace`, 'VALIDATION_ERROR', `Put "${f}" on each item of the feed that has one`);
+  if (values.replaces !== undefined) {
+    if (!isKey(values.replaces)) throw fail(`--replaces ${values.replaces} must be a card key of 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass the key of the card this one replaces');
+    const unfit = values.replace ? '--replace' : ['evidence', 'explainer', 'signin'].includes(values.type) ? `--type ${values.type}` : undefined;
+    if (unfit) throw fail(`--replaces does not apply to ${unfit}`, 'VALIDATION_ERROR', 'Use it on a decision, design, diagram, interactive, report or --kind post');
+  }
   if (values.replace) return replace(file, named, on, values.from, filerOf(values), values['ask-ref']);
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
@@ -1114,7 +1120,7 @@ function post(args: string[], cmd = 'post') {
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined || values.video !== undefined || values.score !== undefined)) throw fail('--tradeoff, --mock, --video and --score need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer);
+  if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer, false, values.replaces);
   const root = resolve(dirname(file));
   if (view) {
     // The same real-path check the board serves with, so a post that passes always renders.
@@ -1127,7 +1133,7 @@ function post(args: string[], cmd = 'post') {
     let size: Stats;
     try { size = statSync(actual); } catch (e: any) { throw fail(`--view ${values.view} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram'); }
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram');
-    return storeIncoming(file, named, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
+    return storeIncoming(file, named, on, buildIncoming(values, { type, view: values.view }, filer, file), filer, false, values.replaces);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
@@ -1152,7 +1158,7 @@ function post(args: string[], cmd = 'post') {
   if (mocks) for (const m of mocks) { const demo = demos.get(m.value); if (demo) (m as MockRef).video = demo(); }
   const lost = optionLinks.find((l) => !mocks?.some((m: { value: string }) => l.startsWith(`${m.value}=`)));
   if (type === 'design' && lost !== undefined) throw fail(`--link ${lost} must be <value>=<url> with a --mock for that value`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --link a=https://example.com/a --recommend a');
-  return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
+  return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer, false, values.replaces);
 }
 
 /** --video <value>=<file> and --score <value>=<number>: each option's demo recording and its round score. Checked before anything is copied; the returned
@@ -1949,7 +1955,7 @@ async function postKind(file: string, named: string, on: string, values: Record<
   try {
     if (m.kind === 'evidence') return await postMedia(file, named, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
-    return await storeIncoming(file, named, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
+    return await storeIncoming(file, named, on, buildIncoming({ from: source }, {}, filer, file), filer, true, values.replaces);
   } catch (e) {
     if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
     // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
@@ -2130,13 +2136,17 @@ function checkDesignOptions(incoming: Decision[], raw: any[], current: Decision[
 }
 
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
-function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
+function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false, replaces?: string) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), reopened = reopenedNow(file), now = new Date().toISOString();
     checkAskRefs(incoming, raw, current);
     checkDesignOptions(incoming, raw, current);
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
+    if (replaces !== undefined) {
+      if (incoming.some((d) => d.key === replaces)) throw fail(`--replaces ${replaces} names the card being posted`, 'VALIDATION_ERROR', 'Name the key of the older card this one replaces');
+      if (!current.some((c) => c.key === replaces)) throw fail(`no card with key ${replaces} on ${tilde(file)} to replace`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+    }
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
     const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
     if (proof) throw fail(`key ${proof.key} offers Pass and Fail: a proof is not an ask and would wait on you`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>');
@@ -2187,6 +2197,8 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       for (const a of picked) raised.find((r) => r.key === a.key)!.status = `picked ${a.answer}`;
       notifyEntered(file, named, before);
     }
+    // The card it replaces is archived in this write, under the same board lock, so no reader sees both or neither.
+    if (replaces !== undefined) appendDismissed(file, [replaces], true, 'replaced');
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     const goAhead = picked.map((a) => `The leash is Act, then tell me: go ahead with ${a.label} on ${a.key}; the person can still change it`);
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.

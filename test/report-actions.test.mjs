@@ -216,3 +216,19 @@ test('Approve starts the build through the ticket the fleet reads, and only once
   assert.equal(again.status, 409, 'one approval, one build');
   assert.equal(lines(`${board.replace(/\.json$/, '')}.tickets.jsonl`).length, 1);
 });
+
+test('a report that names the key it replaces archives the old card in the same write, and a missing key writes nothing', () => {
+  const board = join(scratch, 'replace-board.json');
+  assert.equal(run('post', board, '--kind', 'report', '--from', write('old.json', report({ key: 'old-plan' }))).code, 0);
+  const refused = run('post', board, '--kind', 'report', '--from', write('new.json', report({ key: 'new-plan' })), '--replaces', 'no-such-card');
+  assert.equal(refused.code, 1, refused.out);
+  assert.match(refused.out, /no card with key no-such-card/);
+  assert.equal(JSON.parse(readFileSync(board, 'utf8')).items.some((i) => i.key === 'new-plan'), false, 'a refused replace writes no card');
+  assert.equal(run('post', board, '--kind', 'report', '--from', write('new.json', report({ key: 'new-plan' })), '--replaces', 'old-plan').code, 0);
+  const keys = JSON.parse(readFileSync(board, 'utf8')).items.map((i) => i.key);
+  assert.deepEqual(keys.sort(), ['new-plan', 'old-plan']);
+  const archived = lines(`${board.replace(/\.json$/, '')}.dismissed.jsonl`).findLast((l) => l.key === 'old-plan');
+  assert.equal(archived?.dismissed, true);
+  assert.equal(archived?.reason, 'replaced');
+  assert.equal(lines(`${board.replace(/\.json$/, '')}.dismissed.jsonl`).findLast((l) => l.key === 'new-plan')?.dismissed, false, 'the new card stays live');
+});
