@@ -384,6 +384,9 @@ journeys:
   # A new ticket needs a summary and old ones get one (CLI only, screen: none): refused without --description, ticket --backfill; then the Designs capture at 1440, dark.
   ticket-summary:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/ticket-summary-proof.sh'
+  # A board lock whose holder is gone is cleared by the next write (CLI only, screen: none): a dead pid's lock no longer answers BUSY, a live one's still does; then the Designs capture at 1440, dark.
+  board-lock:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-lock-proof.sh'
 approved_requirements:
   - kind: spec
     name: design-pick-listing

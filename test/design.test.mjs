@@ -4211,22 +4211,53 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   proc.kill();
 });
 
-test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
-  const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');
+test('a lock left by a sign-off-axi that stopped mid-write: the next raise clears it, a live owner keeps it, doctor still names one nobody cleared', async () => {
+  const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock'), file = join(sod, 'decisions.json');
   run('init', dir);
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(run('doctor', dir).out, /locks,none left behind/);
-  // What a crash leaves: the lock with the pid of a process that is gone.
-  writeFileSync(lock, `${spawnSync(process.execPath, ['-e', '']).pid}\n`);
-  const busy = run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?');
-  assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
-  assert.match(busy.out, /a sign-off-axi that stopped mid-write left decisions\.json\.lock behind\n[^]*Run `rm /);
+  const gone = () => spawnSync(process.execPath, ['-e', '']).pid;
+  // What a crash leaves: the lock with the pid of a process that is gone. Doctor names it and prints the fix, which clears it.
+  writeFileSync(lock, `${gone()}\n`);
   const broken = run('doctor', dir);
   assert.equal(broken.code, 1);
   const fix = /locks: decisions\.json\.lock left by a sign-off-axi that stopped mid-write, so every raise, post and open waits on it\. Run `([^`]+)`/.exec(broken.out)[1];
   execFileSync('/bin/sh', ['-c', fix]);
   assert.equal(run('doctor', dir).code, 0);
-  assert.match(run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?').out, /ship-it,raised,/);
+  // Dead owner: the raise clears the lock itself, at once, and leaves neither the lock nor its guard behind.
+  writeFileSync(lock, `${gone()}\n`);
+  const began = Date.now(), raised = run('raise', file, '--title', 'Ship it?');
+  assert.equal(raised.code, 0, raised.out);
+  assert.match(raised.out, /ship-it,raised,/);
+  assert.ok(Date.now() - began < 2_500, `a dead owner's lock is not waited out: ${Date.now() - began} ms`);
+  assert.deepEqual([existsSync(lock), existsSync(`${lock}.reclaim`)], [false, false]);
+  // Live owner: the same lock naming a running process is kept, the raise fails BUSY after its wait, and the owner's pid is still in it.
+  const owner = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' });
+  try {
+    writeFileSync(lock, `${owner.pid}\n`);
+    const busy = run('raise', file, '--title', 'Ship it too?');
+    assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
+    assert.match(busy.out, /another raise is still writing the board/);
+    assert.equal(readFileSync(lock, 'utf8'), `${owner.pid}\n`);
+    assert.equal(run('list', file).out.includes('ship-it-too'), false);
+  } finally { owner.kill(); }
+  // No pid in it yet (a writer between creating the file and writing its pid): not provably dead, so it is waited on and then named, never removed.
+  writeFileSync(lock, '');
+  const unwritten = run('raise', file, '--title', 'Ship it three?');
+  assert.deepEqual([unwritten.code, /code: BUSY/.test(unwritten.out)], [1, true]);
+  assert.match(unwritten.out, /a sign-off-axi that stopped mid-write left decisions\.json\.lock behind\n[^]*Run `rm /);
+  assert.equal(existsSync(lock), true);
+  rmSync(lock);
+  // Concurrent writers on a dead owner's lock: every raise lands exactly once, one at a time, and the lock is gone at the end.
+  writeFileSync(lock, `${gone()}\n`);
+  const titles = Array.from({ length: 8 }, (_, i) => `Race ${String.fromCharCode(97 + i)}?`);
+  const done = await Promise.all(titles.map((title) => new Promise((ok) => {
+    execFile(process.execPath, [cli, ...asked(['raise', file, '--title', title])], { encoding: 'utf8', env }, (e, out) => ok({ code: e ? e.code : 0, out }));
+  })));
+  assert.deepEqual(done.map((d) => d.code), titles.map(() => 0), done.map((d) => d.out).join('\n'));
+  const listed = run('list', file).out;
+  for (const title of ['Ship it?', ...titles]) assert.equal(listed.split(`,${title}\n`).length - 1, 1, `${title} is on the board once`);
+  assert.deepEqual([existsSync(lock), existsSync(`${lock}.reclaim`)], [false, false]);
 });
 
 test('two serves of one board started at once: one runs, the other is refused', async () => {

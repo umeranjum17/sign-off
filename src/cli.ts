@@ -1050,12 +1050,14 @@ async function waitInto(file: string, values: Record<string, any>, onBoard: stri
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
-/** Runs fn while holding an exclusive lock file that names its pid, so two agents raising at once never drop a decision,
- * and a lock a crash left behind can be told apart from one in use. */
+/** Runs fn while holding an exclusive lock file that names its pid, so two agents raising at once never drop a decision.
+ * A lock is in one of four states, and only the third has a way out: absent (take it), held by a live pid (wait), held by a pid that is gone
+ * (reclaim it, below, then take it), or empty (wait: the writer may not have put its pid in yet; past `tries` it fails and names the file). */
 async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another raise is still writing the board', tries = 150): Promise<T> {
   for (;;) {
     try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
+      if (deadOwner(lock)) reclaimDead(lock);
       if (!tries--) {
         throw staleLock(lock) ? fail(`a sign-off-axi that stopped mid-write left ${basename(lock)} behind`, 'BUSY', `Run \`rm ${shellPath(lock)}\`, then try again`)
           : fail(busy, 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
@@ -2253,10 +2255,19 @@ const serving = (port: number, host: string, file: string) => fetch(`http://${ur
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
+/** The pid a lock names: 0 when it names none (empty, from before locks held one, or not yet written); undefined when there is no lock. */
+const lockPid = (lock: string) => { try { const pid = Number(readFileSync(lock, 'utf8')); return pid > 0 ? pid : 0; } catch { return undefined; } };
 /** A lock whose pid is gone (or empty, from before locks held one): a crash left it, and every later write waits on it. */
-const staleLock = (lock: string) => {
-  try { const pid = Number(readFileSync(lock, 'utf8')); return !(pid > 0 && alive(pid)); } catch { return false; }
-};
+const staleLock = (lock: string) => { const pid = lockPid(lock); return pid !== undefined && !(pid && alive(pid)); };
+/** A lock that names a pid no process has: only this is safe to take over. An empty lock is not, for a live writer is empty for a moment. */
+const deadOwner = (lock: string) => { const pid = lockPid(lock); return !!pid && !alive(pid); };
+/** Removes a lock whose owner is gone. One process at a time may do it, under `<lock>.reclaim`, and it looks again under that guard: a
+ * lock another process took in the meantime names a live pid and is left alone. A busy guard means another process is already on it. */
+function reclaimDead(lock: string) {
+  const guard = `${lock}.reclaim`;
+  try { writeFileSync(guard, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); } catch (e: any) { if (e.code === 'EEXIST') return; throw e; }
+  try { if (deadOwner(lock)) rmSync(lock, { force: true }); } finally { rmSync(guard, { force: true }); }
+}
 /** The board open started for this file, only while that pid really serves this file on that port. */
 async function running(file: string) {
   const [pid, port, host = '127.0.0.1'] = (existsSync(record(file)) ? readFileSync(record(file), 'utf8') : '').trim().split(' ');
