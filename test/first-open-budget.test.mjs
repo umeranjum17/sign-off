@@ -42,7 +42,9 @@ after(() => rmSync(scratch, { recursive: true, force: true }));
 // Re-recorded on 7 November 2026 in the change that opens a ticket from any name a link gives it and opens Tickets on a read of the Story alone, on main's 99,920 B / 332,786 B
 // (two runs): -64 B before the first paint (the ticket loader and the link lookup moved into app-more.js) and +1,644 B whole (the Story drawn from the server's figures, the loader and the lookup, after the first paint).
 // Re-recorded on 7 November 2026 in the change that makes a ticket, groups by epic and names who moved a ticket, on main's 334,550 B whole: +4,119 B of the New ticket sheet, epic groups and Activity people in app-more.js and app.css, all after the first paint.
-const baseline = { bytesBeforePaint: 99_876, requestsBeforePaint: 5, bytesWhole: 338_669, paintMs: 900 };
+// Re-recorded on 11 November 2026 in the change that gives a document report its outline, folding sections and search, on this host's main at 100,353 B / 335,568 B (it reads 477 B above the recorded
+// first-paint number here, so only the delta is applied): -3 B before the first paint and +2,129 B whole (the outline, fold, search and Sections sheet in app-more.js and app.css, after the first paint).
+const baseline = { bytesBeforePaint: 99_873, requestsBeforePaint: 5, bytesWhole: 340_798, paintMs: 900 };
 const byteHeadroom = 1_024;
 const firstPaintCeiling = 100_000;
 // The paint is the one number a busy host moves: it may take half as long again, and is never allowed more.

@@ -1295,7 +1295,14 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const live = !FROZEN && !state.readonly && !d.historical;
     // View, this browser's choice: a report's pictures Drawn or As lists, and its numbers shown under the parts or not.
     const view = { lists: lsGet('sign-off-view-lists') === '1', nums: lsGet('sign-off-view-nums') !== '0' }, viewHooks = new Set();
-    const stages = [d.visual && 'this', d.understood?.length && 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', d.next && 'next'].filter(Boolean);
+    // A document keeps its own headings: each section is one stop in the rail, folds on its own and is found by search. Any other report or plan keeps its stages.
+    const doc = d.layout === 'document', unmd = (t) => String(t ?? '').replace(/[*`]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+    const headingOf = (s) => s.heading || (s.blocks ?? []).find((b) => b.type === 'text' && b.level)?.text || d.title;
+    const outline = doc ? [...by('found'), ...by('recommend')].map((s) => ({ id: s.id, name: unmd(headingOf(s)) })) : [];
+    /** The section a reader wants first: the one headed as the answer, else the first. */
+    const answerId = outline.find((o) => /\b(answer|summary|bottom line|tl;?dr|recommendation)\b/i.test(o.name))?.id ?? outline[0]?.id;
+    const stages = doc ? outline.map((o) => o.id) : [d.visual && 'this', d.understood?.length && 'understood', by('found').length && 'found', by('recommend').length && 'recommend', decisions.length && 'decide', d.next && 'next'].filter(Boolean);
+    const stageName = (st) => (doc ? outline.find((o) => o.id === st)?.name : GSTAGES[st]) ?? '';
     const saved0 = answerOf(key);
     const sentNote = (saved0?.notes ?? []).find((n) => n.section === 'understood');
     // On a report, That is right and Not quite are said to the author as the understood part's Agree and Disagree, so a reload shows what was said.
@@ -1726,7 +1733,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       if (b.type === 'table') {
         const wide = b.columns.length > 5 || [...b.columns, ...b.rows.flat()].some((c) => typeof c === 'object') || b.rows.some((r) => r.length !== b.columns.length);
         const cell = (c, tag, i) => el(tag, { ...(tag === 'th' ? { scope: 'col' } : !wide && i ? { 'data-h': b.columns[i] } : {}), ...(typeof c === 'object' ? { colspan: c.colspan ?? 1, rowspan: c.rowspan ?? 1 } : {}) }, mdSpan('span', '', typeof c === 'object' ? c.text : c, { local }));
-        const table = el('table', { class: `kt-table${wide ? ' kt-wide' : ''}` }, el('thead', {}, el('tr', {}, ...b.columns.map((c, i) => cell(c, 'th', i)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => cell(c, 'td', i))))));
+        // A phone sets each row's cells two to a line; a cell of whole sentences gets the full width instead.
+        const long = !wide && b.rows.some((r) => r.slice(1).some((c) => String(c).length > 40));
+        const table = el('table', { class: `kt-table${wide ? ' kt-wide' : ''}${long ? ' kt-long' : ''}` }, el('thead', {}, el('tr', {}, ...b.columns.map((c, i) => cell(c, 'th', i)))), el('tbody', {}, ...b.rows.map((r) => el('tr', {}, ...r.map((c, i) => cell(c, 'td', i))))));
         return el('div', { class: `kt${wide ? ' kt-scroll' : ''}`, ...(wide ? { tabindex: '0', role: 'region', 'aria-label': 'Table' } : {}) }, table);
       }
       if (b.type === 'compare') return E('div', 'kt kt-compare', ...[['Before', b.before], ['After', b.after]].map(([w, x]) => E('figure', '', mediaBtn(kitUrl(s, x.image, true), kitUrl(s, x.image), `${w}: ${x.caption}`), E('figcaption', '', E('b', '', w), x.caption))));
@@ -1810,8 +1819,29 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         b.onclick = () => { const open = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(open)); body.hidden = !open; };
         return E('li', '', b, ...srcLink(it), body);
       });
-      return card(s.id, s.stage, ...(s.heading || s.body ? [head(s.heading, s.body, undefined, s.id, 'heading', 'body')] : []), ...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id));
+      const top = s.heading || s.body ? [head(s.heading, s.body, doc && s.id === answerId ? 'The answer' : undefined, s.id, 'heading', 'body')] : [];
+      const rest = [...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id)];
+      return doc ? foldCard(s, top, rest) : card(s.id, s.stage, ...top, ...rest);
     };
+    /** A document's section: its heading is the switch that folds it, everything after the heading is the fold. Only the answer starts open; a section with no heading of its own stays open. */
+    const foldCard = (s, top, rest) => {
+      const body = E('div', 'gd-fold', ...rest), h2 = top[0]?.querySelector('h2'), open = s.id === answerId || !h2;
+      const c = card(s.id, s.id, ...top, body);
+      if (h2) {
+        const b = el('button', { type: 'button', class: 'gd-foldbtn', 'aria-expanded': String(open) }, ...h2.childNodes, gic('chev', 'gchev'));
+        b.onclick = () => setFold(s.id, body.hidden);
+        h2.replaceChildren(b);
+      }
+      body.hidden = !open; c.classList.toggle('folded', !open);
+      return c;
+    };
+    /** Open or close one section of a document. Opening re-arms its read timer: it may already be in view. */
+    function setFold(id, open) {
+      const c = parts.get(id), body = c?.querySelector(':scope > .gd-fold'), b = c?.querySelector(':scope .gd-foldbtn');
+      if (!body || !b || body.hidden === !open) return;
+      body.hidden = !open; c.classList.toggle('folded', !open); b.setAttribute('aria-expanded', String(open));
+      if (open) { io.unobserve(c); io.observe(c); }
+    }
 
     const optBtns = new Map(), owns = new Map();
     // A decision is one radio list: the recommended answer starts selected (shown only; nothing is saved until the send), and Something else, last, opens a field for the person's own words.
@@ -1972,15 +2002,23 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
 
     // ---- rail, progress and the phone bar
     const sumHost = E('div', 'gd-sum'), bar = E('div', 'gd-bar'), barTxt = E('div', 'txt'), nav = el('nav', { 'aria-label': 'Parts' }), segs = E('div', 'gd-segs');
-    const now = E('div', 'now', E('span', '', E('b', '')), E('span', ''));
+    const now = E(doc ? 'button' : 'div', 'now', E('span', '', E('b', '')), E('span', ''));
+    if (doc) { now.type = 'button'; now.setAttribute('aria-haspopup', 'dialog'); now.append(gic('chev', 'gchev')); now.onclick = openOutline; }
+    const stageEl = new Map();
+    /** Go to a stage's start; a folded section opens first. */
+    const goTo = (st) => { if (doc) setFold(st, true); stageEl.get(st)?.scrollIntoView({ block: 'start' }); };
+    /** One stop in the outline: the rail's link, or a row of the phone's Sections sheet. */
+    const stop = (st, i) => {
+      const a = el('a', { href: `#gd-st-${st}`, 'data-nav': st }, E('span', 'gn', String(i + 1)), E('span', 'gt', stageName(st)));
+      a.onclick = (e) => { e.preventDefault(); goTo(st); };
+      return a;
+    };
     stages.forEach((st, i) => {
-      const a = el('a', { href: `#gd-st-${st}`, 'data-nav': st }, E('span', 'gn', String(i + 1)), E('span', 'gt', GSTAGES[st]));
-      a.onclick = (e) => { e.preventDefault(); stageEl.get(st)?.scrollIntoView({ block: 'start' }); };
-      nav.append(a);
-      const s = el('button', { type: 'button', 'aria-label': GSTAGES[st] }); s.onclick = () => stageEl.get(st)?.scrollIntoView({ block: 'start' });
+      nav.append(stop(st, i));
+      if (doc) return;
+      const s = el('button', { type: 'button', 'aria-label': stageName(st) }); s.onclick = () => goTo(st);
       segs.append(s);
     });
-    const stageEl = new Map();
     const summaryRows = () => [['Understood', S.understood === 'yes' ? 'Right' : S.understood === 'no' ? E('span', 'chg', 'Not quite') : 'My reading stands'],
       ...decisions.map((q, i) => [q.question, S.picks[q.key] === q.recommend ? 'My pick' : E('span', 'chg', q.options.find((o) => o.value === S.picks[q.key])?.label ?? S.picks[q.key])])];
     function paintSummary() {
@@ -2012,7 +2050,42 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       cur = st; const i = stages.indexOf(st);
       nav.querySelectorAll('a').forEach((a) => a.classList.toggle('cur', a.dataset.nav === st));
       [...segs.children].forEach((b, k) => b.classList.toggle('cur', k === i));
-      now.firstChild.firstChild.textContent = GSTAGES[st]; now.lastChild.textContent = `${i + 1} of ${stages.length}`;
+      now.firstChild.firstChild.textContent = stageName(st); now.children[1].textContent = `${i + 1} of ${stages.length}`;
+    }
+
+    // ---- a document's search, Expand all and Collapse all: one query, drawn in the rail and in the phone's Sections sheet
+    const find = { q: '', counts: new Set() };
+    /** Hide the sections without the words, open the ones with them, mark the words (the page's own highlight, no markup added) and say how many match. */
+    function searchSections() {
+      const q = find.q.trim().toLowerCase(), marks = [];
+      let hits = 0;
+      for (const { id } of outline) {
+        const c = parts.get(id), hit = !q || c.textContent.toLowerCase().includes(q);
+        c.hidden = !hit; document.querySelectorAll(`a[data-nav="${id}"]`).forEach((a) => { a.hidden = !hit; });
+        if (!q || !hit) continue;
+        hits++; setFold(id, true);
+        const text = document.createTreeWalker(c, NodeFilter.SHOW_TEXT);
+        for (let n = text.nextNode(); n && marks.length < 400; n = text.nextNode()) {
+          const at = n.data.toLowerCase();
+          for (let i = at.indexOf(q); i >= 0 && marks.length < 400; i = at.indexOf(q, i + q.length)) { const r = new Range(); r.setStart(n, i); r.setEnd(n, i + q.length); marks.push(r); }
+        }
+      }
+      if (CSS.highlights) CSS.highlights.set('gd-hit', new Highlight(...marks));
+      find.counts.forEach((p) => { p.textContent = q ? (hits ? `${plural(hits, 'section')} of ${outline.length} match` : 'No section has those words') : ''; });
+    }
+    function outlineTools() {
+      const input = el('input', { type: 'search', class: 'gd-find', placeholder: 'Search this report', 'aria-label': 'Search this report', autocomplete: 'off' }), said = E('p', 'gd-found');
+      input.value = find.q; said.setAttribute('role', 'status'); find.counts.add(said);
+      input.oninput = () => { find.q = input.value; searchSections(); };
+      const all = (name, open) => { const b = el('button', { type: 'button', class: 'gd-lnk' }, name); b.onclick = () => outline.forEach((o) => setFold(o.id, open)); return b; };
+      queueMicrotask(searchSections);
+      return E('div', 'gd-tools', input, said, E('div', 'gd-foldall', all('Expand all', true), all('Collapse all', false)));
+    }
+    /** On a phone the rail is out of sight: the progress line opens the outline in a sheet. */
+    function openOutline() {
+      find.counts.forEach((p) => { if (!p.isConnected) find.counts.delete(p); });
+      const list = E('nav', 'gd-outline', ...stages.map((st, i) => { const a = stop(st, i); a.hidden = parts.get(st).hidden; return a; }));
+      openSheet('Sections', outlineTools(), list);
     }
 
     // ---- the page
@@ -2021,12 +2094,12 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     let last = '';
     for (const c of cards) {
       const st = stageOf.get(c.dataset.part);
-      if (st !== last) { last = st; const s = el('div', { class: 'gd-stage', id: `gd-st-${st}`, 'data-stage': st }, E('i', '', String(stages.indexOf(st) + 1)), GSTAGES[st]); stageEl.set(st, s); stageBlocks.push(s); }
+      if (doc) stageEl.set(st, c);
+      else if (st !== last) { last = st; const s = el('div', { class: 'gd-stage', id: `gd-st-${st}`, 'data-stage': st }, E('i', '', String(stages.indexOf(st) + 1)), stageName(st)); stageEl.set(st, s); stageBlocks.push(s); }
       stageBlocks.push(c);
     }
     const cols = E('div', 'gd-cols');
     // ---- A report's one bar, one View and one Activity (a plan keeps its parts' own rows until its slice). Each acts on the part in view.
-    const unmd = (t) => String(t ?? '').replace(/[*`]/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
     const names = new Map([['this', unmd(d.visual?.heading)], ['understood', 'What I understood'], ...sections.map((x) => [x.id, unmd(x.heading || d.title)]), ...decisions.map((q) => [`d:${q.key}`, unmd(q.question)]), ['next', unmd(d.next?.heading)]]);
     const partName = (part) => names.get(part) ?? names.get(String(part).replace(/:\d+$/, '')) ?? part;
     let curPart = d.visual ? 'this' : sections[0].id;
@@ -2164,10 +2237,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     deskMq.addEventListener('change', () => { if (root.isConnected) { actOn = deskMq.matches; paintActOpen(); } });
 
     const who = plan ? 'Planning agent' : d.asked_by ?? 'Reporting agent';
-    const top = E('div', 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), el('div', { class: 'gd-activity' }, thread(d)),
-      E('div', 'howto', gic('info'), E('span', '', d.historical ? 'Earlier version. Return to the current version to comment or approve.' : plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`)));
-    const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), nav, ...(plan ? [sumHost] : []));
-    const nowPart = E('div', 'now-part'); nowPart.hidden = plan;
+    const top = E('div', doc ? 'gd-top gd-doc' : 'gd-top', E('p', 'geye', kindChip(d, true), E('span', '', [plan ? d.project : d.group, [who, d.filed && when(d.filed)].filter(Boolean).join(', ')].filter(Boolean).join(' · '))), fld('this', 'title', E('h1', '', d.title)), purposeLine(d), fld('this', 'about', mdSpan('p', 'sub', d.about)), ticketRow(d), el('div', { class: 'gd-activity' }, thread(d)),
+      ...(doc ? [] : [E('div', 'howto', gic('info'), E('span', '', d.historical ? 'Earlier version. Return to the current version to comment or approve.' : plan ? 'A few short parts, in order. Tap Details for the numbers and Go deeper to ask me more. Nothing is required: Go ahead accepts my picks.' : `A few short parts, in order. The bar at the foot acts on the part you are reading${live ? '' : '.'}${live ? ': Agree, Disagree, Comment or Ask.' : ''}`))]));
+    const rail = el('aside', { class: 'gd-rail' }, E('h4', '', plan ? 'This plan' : 'This report'), ...(doc ? [outlineTools()] : []), nav, ...(plan ? [sumHost] : []));
+    const nowPart = E('div', 'now-part'); nowPart.hidden = plan || doc; segs.hidden = doc;
     const progress = E('div', 'gd-progress', now, segs, nowPart);
     // A report the owner redid says so before its first part: the version, whose it is and when, then what changed, marked.
     const history = [...(d.versions ?? [])].sort((a, b) => b.version - a.version), versionAt = history.find((v) => v.version === (d.version ?? 1));
@@ -2219,7 +2292,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     }), { threshold: 0.35 });
 
     // ---- reading: a part on screen for a moment is read
-    const mark = (part) => { if (!live || readAt(part) !== undefined) return; (state.reads ??= {})[`${key}/${part}`] = new Date().toISOString(); paintRc(); paintRail(); postJson('/api/reads', { key, part }).then(sync).catch(() => {}); };
+    const mark = (part) => { if (!live || readAt(part) !== undefined || parts.get(part)?.classList.contains('folded')) return; (state.reads ??= {})[`${key}/${part}`] = new Date().toISOString(); paintRc(); paintRail(); postJson('/api/reads', { key, part }).then(sync).catch(() => {}); };
     const timers = new Map();
     const quick = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const io = new IntersectionObserver((es) => es.forEach((en) => { const p = en.target.dataset.part; if (en.isIntersecting) timers.set(p, setTimeout(() => mark(p), 1400)); else clearTimeout(timers.get(p)); }), { root: scroll, threshold: 0.35 });

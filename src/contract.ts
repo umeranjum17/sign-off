@@ -228,9 +228,11 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     text(field, v, 256, `${kinds} path from the board file's folder, such as "${example}"`);
     if (/^([\\/]|[A-Za-z]:)/.test(v) || v.split(/[\\/]/).includes('..') || /[?#\\]/.test(v) || !re.test(v)) throw bad(field, `${show(v)} must be a relative ${kinds} path with no .., ?, # or \\`, `Set "${field.replace(/^.*\./, '')}" to the file next to the message, such as "${example}"`);
   };
-  /** The report kit: 1 to 12 blocks a section draws in the board's own style, in the order given. A block is data (words, files, rows); it never carries markup or colour. */
+  /** The report kit: 1 to 12 blocks a section draws in the board's own style, in the order given (a document keeps its original flow: up to 40 blocks and 100 table rows). A block is data (words, files, rows); it never carries markup or colour. */
+  const document = m.kind === 'report' && m.layout === 'document';
+  const maxBlocks = document ? 40 : 12, maxRows = document ? 100 : 30;
   const blocks = (field: string, v: any) => {
-    if (!Array.isArray(v) || v.length < 1 || v.length > 12) throw bad(field, 'must list 1 to 12 blocks', `Set "${field}" to blocks such as {"type":"callout","title":"Read this first","text":"..."}; the types are ${KIT_BLOCKS.join(', ')}`);
+    if (!Array.isArray(v) || v.length < 1 || v.length > maxBlocks) throw bad(field, `must list 1 to ${maxBlocks} blocks`, `Set "${field}" to blocks such as {"type":"callout","title":"Read this first","text":"..."}; the types are ${KIT_BLOCKS.join(', ')}`);
     v.forEach((o: any, n: number) => {
       const at = `${field}[${n}]`;
       if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each block as {"type":"callout",...}; the types are ${KIT_BLOCKS.join(', ')}`);
@@ -269,7 +271,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       } else if (o.type === 'table') {
         only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo"],"rows":[["AI calls","3"]]}');
         if (!Array.isArray(o.columns) || o.columns.length < 1 || o.columns.length > 20) throw bad(`${at}.columns`, 'must list 1 to 20 column names', 'Set "columns" to the original headings');
-        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of cells, preserving ragged rows');
+        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > maxRows) throw bad(`${at}.rows`, `must list 1 to ${maxRows} rows`, 'Set "rows" to arrays of cells, preserving ragged rows');
         for (const src of localLinks(JSON.stringify([o.columns, o.rows]))) kitFile(`${at}.rows`, src, /./, 'file', 'report.md');
         const occupied: boolean[][] = o.rows.map(() => []);
         const cell = (c: any, field: string, remaining: number) => {
@@ -348,7 +350,6 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
   };
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
-    const document = m.kind === 'report' && m.layout === 'document';
     if (m.layout !== undefined && !document) throw bad('layout', 'must be document on a report', 'Leave layout out for the guided workflow');
     if (!document) {
     list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
