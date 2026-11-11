@@ -14,7 +14,7 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { reportContent } from './report-content.js';
@@ -700,11 +700,13 @@ const archivable = (file: string, decisions: Decision[]) => ((x) => (x.readonly 
 function board(file: string, say = warn) {
   if (!existsSync(file)) return [];
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
-  const hidden = new Set(readDismissed(file, answers, readRounds(file), say, archivable(file, decisions)));
+  const kinds = readHidden(file, answers, readRounds(file), say, archivable(file, decisions));
+  const why = new Map<string, 'dismissed' | 'deferred' | 'archived'>([...kinds.archived.map((k) => [k, 'archived'] as const), ...kinds.deferred.map((k) => [k, 'deferred'] as const), ...kinds.dismissed.map((k) => [k, 'dismissed'] as const)]);
+  const hidden = new Set(why.keys());
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
   // A discard holds while its card is hidden and nothing came after it: no restore, no plain dismiss, no answer or round.
   const promoted = new Set(readPromoted(file, say)), discards = new Map(readDiscards(file).filter((x) => x.last && hidden.has(x.key)).map(({ key, reason, at }) => [key, { reason, at }]));
-  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), ...(discards.has(d.key) && { discarded: discards.get(d.key) }), ...(promoted.has(d.key) && { promoted: true }) }));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), state: cardState({ hidden: why.get(d.key), answered: Object.hasOwn(answers, d.key) && !awaitsVerdict(d.type, answers[d.key]) }), ...(discards.has(d.key) && { discarded: discards.get(d.key) }), ...(promoted.has(d.key) && { promoted: true }) }));
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
@@ -719,7 +721,7 @@ function ready(file: string, on: string, root?: string) {
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
   const rows = board(file), waiting = rows.filter(asksUser), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
-  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
+  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }), ...(waiting.some((w) => w.key === d.key) && d.filed && { waiting_since: d.filed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
@@ -2160,7 +2162,7 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // An answer outlives its item: a new question under that key would inherit it.
       if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, state: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       // A card the lead reopened (sign-off-axi reopen) may be asked again on its key: the new question or round replaces the old one, filed now, and its earlier answer stays in the thread.
@@ -2315,7 +2317,7 @@ const linkHelp = (file: string, url: string) => (loopback(new URL(url).hostname.
 async function status(args: string[]) {
   const { file, values, on } = parse('status', args, { json: { type: 'boolean' } });
   const live = await running(file);
-  if (values.json) return JSON.stringify({ board: file, status: live ? 'running' : 'not running', ...live });
+  if (values.json) return JSON.stringify({ board: file, status: live ? 'running' : 'not running', ...live, cards: Object.fromEntries(CARD_STATES.map((st) => [st, board(file).filter((d) => d.state === st).length])) });
   if (!live) return toon({ board: tilde(file), status: 'not running' }, [`Run \`sign-off-axi open${on}\` to start it`]);
   return toon({ board: tilde(file), status: 'running', ...live }, [linkHelp(file, live.url), `Run \`sign-off-axi stop${on}\` to close the board`]);
 }

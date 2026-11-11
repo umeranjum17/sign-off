@@ -942,11 +942,16 @@ export const ARCHIVE_MS = 24 * 3_600_000;
 /** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.
  * `items`, when given, adds the archive: reports filed over a day ago that no log line ever named. Restore writes a line, so a restored item stays. */
 export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): string[] {
-  const hidden = new Map<string, string>(), named = new Set<string>();
+  const { dismissed, deferred, archived } = readHidden(decisionsPath, answers, rounds, warn, items);
+  return [...dismissed, ...deferred, ...archived];
+}
+/** The hidden keys split by why: dismissed by a person, deferred (a dismiss line marked `deferred: true`) or archived on their own. Same rules as readDismissed. */
+export function readHidden(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): { dismissed: string[]; deferred: string[]; archived: string[] } {
+  const hidden = new Map<string, { at: string; deferred: boolean }>(), named = new Set<string>();
   readRaw(dismissedPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const x = line && JSON.parse(line);
-      if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, x.at);
+      if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, { at: x.at, deferred: x.deferred === true });
       else if (x) hidden.delete(x.key);
       if (x) named.add(x.key);
     } catch {
@@ -954,8 +959,13 @@ export function readDismissed(decisionsPath: string, answers: Record<string, Ans
     }
   });
   const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.versions?.at(-1)?.at ?? d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
-  return [...[...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key), ...archived];
+  const live = [...hidden].filter(([key, { at }]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at));
+  return { dismissed: live.filter(([, h]) => !h.deferred).map(([key]) => key), deferred: live.filter(([, h]) => h.deferred).map(([key]) => key), archived };
 }
+export const CARD_STATES = ['open', 'deferred', 'answered', 'archived', 'dismissed'] as const;
+export type CardState = (typeof CARD_STATES)[number];
+/** The one lifecycle value of a card. Hidden wins (dismissed, deferred, archived), then an answer settles it, else it is open. Read is a separate mark and never changes it. */
+export const cardState = (c: { hidden?: 'dismissed' | 'deferred' | 'archived'; answered: boolean }): CardState => c.hidden ?? (c.answered ? 'answered' : 'open');
 
 /** A comment on one item or a prompt queued for the agent; delivered is when poll handed it over. */
 export type Message = { id: string; kind: 'comment' | 'prompt'; key?: string; text: string; at: string; delivered?: string };
