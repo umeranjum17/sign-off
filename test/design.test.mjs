@@ -2470,7 +2470,7 @@ test('report kinds and their workflows: post names what a report is for and hold
   // report init --purpose writes the kind's parts to fill, each a section naming its part; posted as it is, it is refused for its FILL lines.
   assert.equal(run('report', 'init', join(dir, 'tmpl'), '--purpose', 'plan').code, 0);
   const tmpl = JSON.parse(readFileSync(join(dir, 'tmpl', 'report.json'), 'utf8'));
-  assert.deepEqual([tmpl.schema, tmpl.purpose, tmpl.sections.map((x) => x.part).join(',')], [5, 'plan', 'goal,current,design,slices,tests,risks,rollout,estimate,owner-calls']);
+  assert.deepEqual([tmpl.schema, tmpl.purpose, tmpl.sections.map((x) => x.part).join(',')], [6, 'plan', 'goal,current,design,slices,tests,risks,rollout,estimate,owner-calls']);
   assert.match(run('post', file, '--kind', 'report', '--from', join(dir, 'tmpl', 'report.json')).out, /still has FILL: lines/);
   // A full plan: every part, the design with its diagram, each slice sized, each tested.
   const sec = (part, heading, more = {}) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line.`, ...more });

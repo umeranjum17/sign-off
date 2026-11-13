@@ -299,8 +299,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4, 5].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
-    const engagement = (report && [4, 5].includes(d.schema)) || (plan && d.schema === 3);
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4, 5, 6].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
+    const engagement = (report && [4, 5, 6].includes(d.schema)) || (plan && d.schema === 3);
     if (engagement && !isKey(d.filer)) throw bad('filer', 'is required for engagement');
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
     const views = guided ? undefined : report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;

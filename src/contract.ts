@@ -4,19 +4,20 @@ import { accessSync, constants, readFileSync, realpathSync, statSync } from 'nod
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_ACTIONS, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 import { nestedCard, ownColours } from './pagestyle.js';
+import { checkBoard } from './board.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 2 };
-/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), plan 1 and 2, and design 1 (screens of one view each). */
-const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2], design: [1] };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 6, evidence: 1, gate: 1, finding: 1, plan: 3, design: 2 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3, 4 and 5 (4 with no purpose, 5 without a board), plan 1 and 2, and design 1 (screens of one view each). */
+const OLDER: Record<string, number[]> = { report: [2, 3, 4, 5], plan: [1, 2], design: [1] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
-export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
-/** The schemas with versioned engagement, whose owning filer is required: report 4 and 5, plan 3. */
-export const engaged = (m: any) => (m?.kind === 'report' && [4, 5].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
+export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5, 6].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+/** The schemas with versioned engagement, whose owning filer is required: report 4, 5 and 6, plan 3. */
+export const engaged = (m: any) => (m?.kind === 'report' && [4, 5, 6].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -343,7 +344,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     }
     if (m.purpose === 'plan') {
       const d = m.sections[of('design')];
-      need('design', !!(d.diagram || (d.items ?? []).some((it: any) => it.diagram) || m.visual?.diagram), 'needs a diagram (on the section, an item or the visual)', 'Draw the design as inline SVG in an .html page and add "diagram": [{"label": "Flow", "src": "diagrams/flow.html"}] (see the skill)');
+      need('design', !!(d.diagram || d.board || (d.items ?? []).some((it: any) => it.diagram) || m.visual?.diagram), 'needs a diagram or a board (on the section, an item or the visual)', 'Draw the design as inline SVG in an .html page and add "diagram": [{"label": "Flow", "src": "diagrams/flow.html"}], or put a board on the section (see the skill)');
       need('slices', items('slices').length >= 1 && items('slices').every((it: any) => it.size), 'must list each slice with its "size"', 'Give each slice an item with "size", such as "S, half a day"');
       need('tests', items('tests').length >= 1, 'must list how each slice is tested and proven', 'Add an item per slice: the test and the proof that it works');
     }
@@ -382,8 +383,8 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
     // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
     }
-    const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
-    const ids = list('sections', minSections, document ? 80 : v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    const v5 = m.kind === 'report' && m.schema >= 5, v6 = m.kind === 'report' && m.schema >= 6, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
+    const ids = list('sections', minSections, document ? 80 : v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : []), ...(v6 ? ['board'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
@@ -408,6 +409,11 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       if (Object.hasOwn(o, 'gallery')) gallery(`${at}.gallery`, o.gallery);
       if (Object.hasOwn(o, 'blocks')) blocks(`${at}.blocks`, o.blocks);
       if (Object.hasOwn(o, 'pins')) pinList(`${at}.pins`, o.pins);
+      // A board is data on the section: checked by the same geometry the reader lists, one fault at a time with its fix.
+      if (Object.hasOwn(o, 'board')) {
+        const fault = checkBoard(o.board);
+        if (!fault.ok) throw bad(`${at}.board.${fault.field}`, fault.problem, fault.fix);
+      }
       return o.id;
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);

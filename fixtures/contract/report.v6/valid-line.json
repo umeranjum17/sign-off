@@ -1,0 +1,454 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 6,
+  "filer": "agent-41",
+  "filed": "2026-11-13T09:00:00Z",
+  "key": "line",
+  "title": "Whiteboard: The line after the plan: a ticket from intake to main",
+  "project": "sign-off",
+  "purpose": "other",
+  "about": "One board draws the whole line, so the person reads every state and move in one place.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Draw the state machine on a whiteboard I can read."
+    }
+  ],
+  "visual": {
+    "type": "tiles",
+    "heading": "One board, every state",
+    "rows": [
+      {
+        "label": "States",
+        "text": "17 on the board"
+      },
+      {
+        "label": "Moves",
+        "text": "22 between them"
+      }
+    ]
+  },
+  "actions": {
+    "role": "addons lead",
+    "first_pull_request": "2026-11-20",
+    "recommended": "approve"
+  },
+  "sections": [
+    {
+      "id": "design",
+      "stage": "recommend",
+      "heading": "The line, drawn",
+      "body": "Each shape is one state; each line is a move between two of them.",
+      "board": {
+        "title": "The line after the plan: a ticket from intake to main",
+        "shapes": [
+          {
+            "id": "intake",
+            "label": "0 intake",
+            "at": [
+              1,
+              0
+            ],
+            "tone": "start",
+            "note": "Beads: status open; type; priority; parent; born-from. Owner: The lead of the home."
+          },
+          {
+            "id": "held",
+            "label": "1 held for owner",
+            "at": [
+              0,
+              0
+            ],
+            "tone": "warn",
+            "note": "Beads: status on_hold or deferred, with the reason. Owner: The owner."
+          },
+          {
+            "id": "approved",
+            "label": "2 approved",
+            "at": [
+              0,
+              1
+            ],
+            "note": "Beads: open, no open dependency; the approval record; brief and route. Owner: The lead, or the dispatch check."
+          },
+          {
+            "id": "coding",
+            "label": "3 coding",
+            "at": [
+              1,
+              2
+            ],
+            "note": "Beads: in_progress; assignee; a live lease; lane=working. Owner: The worker."
+          },
+          {
+            "id": "waiting",
+            "label": "3a waiting",
+            "at": [
+              2,
+              1
+            ],
+            "note": "Beads: lane=blocked, needs-decision, paused or capacity-wait; a dependency when it waits for a ticket; a child decision ticket when it asks. Owner: The worker;…"
+          },
+          {
+            "id": "parked",
+            "label": "3b parked",
+            "at": [
+              2,
+              2
+            ],
+            "note": "Beads: on_hold; station=parked. Owner: The lead who parked it."
+          },
+          {
+            "id": "ready",
+            "label": "4 ready",
+            "at": [
+              1,
+              3
+            ],
+            "note": "Beads: lane=done; station=ready. Owner: The worker until the proof is whole; then the landing check."
+          },
+          {
+            "id": "landing",
+            "label": "5 landing",
+            "at": [
+              1,
+              4
+            ],
+            "note": "Beads: station=landing. Owner: The landing check."
+          },
+          {
+            "id": "refused",
+            "label": "5a refused",
+            "at": [
+              2,
+              3
+            ],
+            "tone": "bad",
+            "note": "Beads: station=refused with the reason. Owner: The worker for a red or a conflict; the tick for a wait."
+          },
+          {
+            "id": "landed",
+            "label": "6 landed",
+            "at": [
+              1,
+              5
+            ],
+            "note": "Beads: station=landed. Owner: No one: the belt splits here."
+          },
+          {
+            "id": "cleaned",
+            "label": "7 cleaned",
+            "at": [
+              2,
+              5
+            ],
+            "tone": "end",
+            "note": "Beads: status closed; station=cleaned. Owner: The sweep."
+          },
+          {
+            "id": "live",
+            "label": "8 live",
+            "at": [
+              2,
+              6
+            ],
+            "note": "Beads: station=live. Owner: The go-live tick."
+          },
+          {
+            "id": "release-open",
+            "label": "9 release open",
+            "at": [
+              1,
+              6
+            ],
+            "note": "Beads: station=release-open; the pull request address. Owner: The release tick, or the lead until D1."
+          },
+          {
+            "id": "release-green",
+            "label": "10 release green",
+            "at": [
+              1,
+              7
+            ],
+            "tone": "ok",
+            "note": "Beads: station=release-ci-running, then release-green or release-red. Owner: The forge; the feeder."
+          },
+          {
+            "id": "release-red",
+            "label": "10 release red",
+            "at": [
+              2,
+              7
+            ],
+            "tone": "bad",
+            "note": "Beads: station=release-ci-running, then release-green or release-red. Owner: The forge; the feeder."
+          },
+          {
+            "id": "merged",
+            "label": "11 merged into main",
+            "at": [
+              1,
+              8
+            ],
+            "note": "Beads: station=merged. Owner: The merge check, on his standing word."
+          },
+          {
+            "id": "rolled",
+            "label": "12 next trunk",
+            "at": [
+              2,
+              8
+            ],
+            "tone": "end",
+            "note": "Beads: station=rolled. Owner: The merge pass, with the landing check as backstop."
+          }
+        ],
+        "arrows": [
+          {
+            "id": "m1",
+            "from": "intake",
+            "to": "held",
+            "label": "needs owner",
+            "note": "Today: Yes. Starts: A question only the owner can answer"
+          },
+          {
+            "id": "m2",
+            "from": "held",
+            "to": "approved",
+            "label": "his answer",
+            "note": "Today: Yes; the main chat by slice 38. Starts: His answer: a card, a phone note, or an order typed in the main chat"
+          },
+          {
+            "id": "m3",
+            "from": "intake",
+            "to": "approved",
+            "label": "lead approves",
+            "style": "dashed",
+            "note": "Today: Slices 15, 40. Starts: The lead approves; or a plan's follow-up stated ahead files it"
+          },
+          {
+            "id": "m4",
+            "from": "approved",
+            "to": "coding",
+            "label": "free lane",
+            "style": "dashed",
+            "note": "Today: By the lead; the check by slice 16. Starts: A free lane"
+          },
+          {
+            "id": "m5",
+            "from": "coding",
+            "to": "waiting",
+            "label": "waits",
+            "note": "Today: The line; Beads by slices 44, 47, 48. Starts: The worker writes a blocked, paused or needs-decision line; or the provider is at capacity"
+          },
+          {
+            "id": "m6",
+            "from": "waiting",
+            "to": "coding",
+            "label": "wait clears",
+            "style": "dashed",
+            "note": "Today: By the lead's hand today; slices 12, 44. Starts: The other ticket lands; the decision is answered; the route is moved"
+          },
+          {
+            "id": "m7",
+            "from": "coding",
+            "to": "approved",
+            "label": "reclaim",
+            "style": "dashed",
+            "note": "Today: Slice 46. Starts: The worker dies: the lease expires"
+          },
+          {
+            "id": "m8",
+            "from": "coding",
+            "to": "parked",
+            "label": "lead parks",
+            "style": "dashed",
+            "note": "Today: Slice 27. Starts: The lead parks the lane"
+          },
+          {
+            "id": "m9",
+            "from": "coding",
+            "to": "ready",
+            "label": "done line",
+            "note": "Today: Yes. Starts: The worker's done line passes the proof guard"
+          },
+          {
+            "id": "m10",
+            "from": "ready",
+            "to": "landing",
+            "label": "proof whole",
+            "note": "Today: Yes. Starts: The proof is whole and a landing slot is free"
+          },
+          {
+            "id": "m11",
+            "from": "landing",
+            "to": "landed",
+            "label": "gate green",
+            "note": "Today: Yes. Starts: The gate is green"
+          },
+          {
+            "id": "m12",
+            "from": "landing",
+            "to": "refused",
+            "label": "red or conflict",
+            "note": "Today: Yes. Starts: A red the lane caused, a conflict, or a wait"
+          },
+          {
+            "id": "m13",
+            "from": "refused",
+            "to": "coding",
+            "label": "fix",
+            "note": "Today: Yes. Starts: The worker fixes and says done again; a wait retries by itself"
+          },
+          {
+            "id": "m14",
+            "from": "landed",
+            "to": "cleaned",
+            "label": "sweep",
+            "note": "Today: Yes, often refused. Starts: The sweep's cleanup passes"
+          },
+          {
+            "id": "m15",
+            "from": "landed",
+            "to": "live",
+            "label": "go live",
+            "note": "Today: Yes. Starts: The quiet time or the cap"
+          },
+          {
+            "id": "m16",
+            "from": "landed",
+            "to": "release-open",
+            "label": "release due",
+            "style": "dashed",
+            "note": "Today: By hand; slices 28, 23. Starts: The trunk holds enough: 10 commits or 2 hours"
+          },
+          {
+            "id": "m17",
+            "from": "live",
+            "to": "release-open",
+            "label": "release due",
+            "style": "dashed",
+            "note": "Today: By hand; slices 28, 23. Starts: The trunk holds enough: 10 commits or 2 hours"
+          },
+          {
+            "id": "m18",
+            "from": "release-open",
+            "to": "release-green",
+            "label": "CI green",
+            "note": "Today: The forge yes; the feeder by slice 31. Starts: CI ends"
+          },
+          {
+            "id": "m19",
+            "from": "release-open",
+            "to": "release-red",
+            "label": "CI red",
+            "note": "Today: The forge yes; the feeder by slice 31. Starts: CI ends"
+          },
+          {
+            "id": "m20",
+            "from": "release-red",
+            "to": "release-open",
+            "label": "fix lands",
+            "style": "dashed",
+            "note": "Today: By hand; slices 35, 23. Starts: A fix lands on the trunk and is pushed"
+          },
+          {
+            "id": "m21",
+            "from": "release-green",
+            "to": "merged",
+            "label": "his word",
+            "style": "dashed",
+            "note": "Today: By hand; slice 2. Starts: His standing word of 10 Nov"
+          },
+          {
+            "id": "m22",
+            "from": "merged",
+            "to": "rolled",
+            "label": "merge proved",
+            "note": "Today: Yes. Starts: The merge is proved"
+          }
+        ],
+        "zones": [
+          {
+            "id": "release-ci",
+            "label": "Post 10: CI",
+            "around": [
+              "release-green",
+              "release-red"
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "title": "The line after the plan",
+            "text": "This is the line as the jg-7v6uw plan leaves it, not as it runs today. A solid arrow runs by itself today. A dashed arrow is done by hand today or is not built yet. The ticket id rides the belt from intake to landed.",
+            "focus": [
+              "intake",
+              "approved",
+              "coding",
+              "ready",
+              "landing",
+              "landed"
+            ]
+          },
+          {
+            "title": "The owner stands at one post",
+            "text": "A ticket is held only for a question he alone can answer. His answer moves it to approved. A lead can approve without him.",
+            "focus": [
+              "intake",
+              "held",
+              "approved"
+            ]
+          },
+          {
+            "title": "Coding, waiting and parked",
+            "text": "A free lane starts the work. A wait clears by itself or by a decision. A lead can park a lane. If the worker dies, its lease expires and the ticket goes back to approved.",
+            "focus": [
+              "coding",
+              "waiting",
+              "parked"
+            ]
+          },
+          {
+            "title": "A landing lands or is refused",
+            "text": "The done line makes the ticket ready. A whole proof starts the landing. A red or a conflict sends it back to coding.",
+            "focus": [
+              "ready",
+              "landing",
+              "refused",
+              "landed",
+              "coding"
+            ]
+          },
+          {
+            "title": "After landed the belt splits",
+            "text": "One branch cleans up and closes the ticket. The other takes the change to the homes. Side exits close a ticket from any post: dropped, archived, superseded, reverted.",
+            "focus": [
+              "landed",
+              "cleaned",
+              "live"
+            ]
+          },
+          {
+            "title": "The release: to main, then the next trunk",
+            "text": "When the trunk holds enough, a release opens. Red returns after a fix. Green merges on his standing word, and the next trunk version starts.",
+            "focus": [
+              "live",
+              "release-open",
+              "release-ci",
+              "merged",
+              "rolled"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "next": {
+    "heading": "Say go and the person reads it in Reports",
+    "lines": [
+      "The board reads as a list of shapes, moves and steps until the canvas lands."
+    ]
+  }
+}

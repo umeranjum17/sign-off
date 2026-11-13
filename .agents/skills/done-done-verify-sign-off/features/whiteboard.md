@@ -1,0 +1,18 @@
+# A board on a report
+
+## Sub-features
+
+- A board is data on a section of a guided report: `board` is optional, at most one per section, and holds either `shapes`, `arrows`, `zones` and `steps` or `mermaid` (a later slice), never both. A shape sits on a grid cell (`at`: column, row), an arrow names the two shapes it moves between by id, a zone names the shapes it surrounds, and a step names what the camera frames while its words show. Ids are shared by shapes, arrows and zones and are unique among them. The rules are in `src/board.ts`, whose geometry the page and the check share: a shape is one cell wide and its label fits on one line or breaks at a space or hyphen onto two.
+- Report schema 6 (`src/contract.ts`): every field and rule of report 5 plus that board field on a section. The new `report init` default, and schemas 2 to 5 still load. A plan report's `design` part may carry a board where it needed a diagram. `docs/contract.md` (report schema 6) and `fixtures/contract/README.md` carry the form; the fixtures are `fixtures/contract/report.v6/`.
+- The check, at post time and in `validate`, in plain Node with no page: the field rules; no line passes through a third shape; no line's label covers a shape or another label; no line crosses a zone's label; no label is longer than its line. It refuses the first rule broken with one fix line, and a refused board is never written.
+- A removed id never comes back: `post` keeps what each earlier version of the report's boards dropped, refuses one that returns, and the fix names a new id, so an old mark can never land on a new shape (`src/cli.ts`, `retiredIds`).
+- `report init <folder> --purpose <kind> --board` writes `<folder>/board.json` to fill, beside `report.json`; it is refused with `--plan` and with `--page`, which carry no board.
+- The reader lists the board with no canvas (`web/app-more.js`, `boardList`): the board's title, then its steps with their words, its shapes with their notes, the moves as `from → to` with the move's name and note, and each zone with the shapes it surrounds. The canvas takes its place in a later slice.
+- An older sign-off-axi knows no schema 6, so it refuses one with "Upgrade sign-off-axi"; a board that already holds a schema 6 report keeps the data and shows that report under Notes until the upgrade, as it did at 0.10.2.
+
+## Drive
+
+- `done-done run board` runs `board-shots.mjs`: `BOARD_CHECK=1` refuses each broken copy and accepts the three machine boards through the real `validate`, and runs `test/board.test.mjs` (post, a removed id coming back, `report init --board`, and a future schema refused with "Upgrade sign-off-axi"); then the reader at 390 and 1280 in light and dark posts the first real board and checks the list it draws. Captures: `board-check.log`, `board-cli.log`, `board-list.<theme>.<width>w.png` with its `.dom.json`.
+- The three machine boards are `valid-task.json` (the task lifecycle, 14 shapes), `valid-lane.json` (lane delivery, 17 shapes) and `valid-line.json` (the first real board, the line after the plan, 17 shapes). Each broken copy is `invalid-<field>-<rule>.json` and breaks exactly one rule, and its name gives the field the refusal must name.
+- The two faults found on the first real board, which the prototype check did not look for, are `invalid-arrows-line-across-zone-label.json` and `invalid-arrows-label-longer-than-line.json`. The corrected copies are the fixtures themselves: the lane board's zone label is shorter and two task-board move names are shorter than the record's.
+- `node --test --test-global-setup=./test/temp-folder.mjs test/board.test.mjs` is the CLI regression. `validate --kind report <fixture>` names the board rule in its one fix line.

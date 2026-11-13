@@ -1,0 +1,477 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 6,
+  "filer": "agent-41",
+  "filed": "2026-11-13T09:00:00Z",
+  "key": "lane",
+  "title": "Whiteboard: The last mile: 17 states from done to main",
+  "project": "sign-off",
+  "purpose": "other",
+  "about": "One board draws the whole line, so the person reads every state and move in one place.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Draw the state machine on a whiteboard I can read."
+    }
+  ],
+  "visual": {
+    "type": "tiles",
+    "heading": "One board, every state",
+    "rows": [
+      {
+        "label": "States",
+        "text": "17 on the board"
+      },
+      {
+        "label": "Moves",
+        "text": "29 between them"
+      }
+    ]
+  },
+  "actions": {
+    "role": "addons lead",
+    "first_pull_request": "2026-11-20",
+    "recommended": "approve"
+  },
+  "sections": [
+    {
+      "id": "design",
+      "stage": "recommend",
+      "heading": "The line, drawn",
+      "body": "Each shape is one state; each line is a move between two of them.",
+      "board": {
+        "title": "The last mile: 17 states from done to main",
+        "shapes": [
+          {
+            "id": "coding",
+            "label": "coding",
+            "at": [
+              2,
+              0
+            ],
+            "tone": "start",
+            "note": "The worker is still on it: its last status line is not done."
+          },
+          {
+            "id": "ready",
+            "label": "ready",
+            "at": [
+              3,
+              0
+            ],
+            "note": "The worker said done, and the proof for that commit is not complete yet, so the landing check does not start it."
+          },
+          {
+            "id": "admitted",
+            "label": "admitted",
+            "at": [
+              3,
+              1
+            ],
+            "note": "The proof is complete and the change waits for the landing check to start it."
+          },
+          {
+            "id": "landing",
+            "label": "landing",
+            "at": [
+              3,
+              2
+            ],
+            "note": "The landing is under way right now."
+          },
+          {
+            "id": "refused",
+            "label": "refused",
+            "at": [
+              4,
+              1
+            ],
+            "note": "The landing was refused: it waits, is tried again, or needs a new commit, as the reason says."
+          },
+          {
+            "id": "landed",
+            "label": "landed",
+            "at": [
+              1,
+              3
+            ],
+            "note": "The change is on the trunk. No home was moved to it yet."
+          },
+          {
+            "id": "home-behind",
+            "label": "home-behind",
+            "at": [
+              1,
+              0
+            ],
+            "note": "A go-live for the change was tried, and no home runs it yet: the move failed or was rolled back."
+          },
+          {
+            "id": "live-partial",
+            "label": "live-partial",
+            "at": [
+              0,
+              2
+            ],
+            "note": "Some homes run the change and others do not."
+          },
+          {
+            "id": "live",
+            "label": "live",
+            "at": [
+              0,
+              1
+            ],
+            "note": "Every home runs the change."
+          },
+          {
+            "id": "cleanup-refused",
+            "label": "cleanup-refused",
+            "at": [
+              0,
+              4
+            ],
+            "note": "The change landed, and the lane's cleanup was refused, so its record and work copy still stand."
+          },
+          {
+            "id": "release-open",
+            "label": "release-open",
+            "at": [
+              2,
+              3
+            ],
+            "note": "The change is in the open release pull request, and no CI run has reported on its head."
+          },
+          {
+            "id": "release-ci-running",
+            "label": "release-ci-running",
+            "at": [
+              3,
+              4
+            ],
+            "note": "The change is in the release pull request, and CI is running on its head."
+          },
+          {
+            "id": "release-red",
+            "label": "release-red",
+            "at": [
+              2,
+              4
+            ],
+            "note": "The change is in the release pull request, and CI failed on its head."
+          },
+          {
+            "id": "release-green",
+            "label": "release-green",
+            "at": [
+              3,
+              3
+            ],
+            "note": "The change is in the release pull request, every check passed, and it is not merged yet."
+          },
+          {
+            "id": "merged",
+            "label": "merged",
+            "at": [
+              4,
+              2
+            ],
+            "note": "The release pull request that holds the change merged, and the next trunk is not cut yet."
+          },
+          {
+            "id": "rolled",
+            "label": "rolled",
+            "at": [
+              4,
+              3
+            ],
+            "tone": "end",
+            "note": "The change is on the main branch and a new trunk was cut after it."
+          },
+          {
+            "id": "reverted",
+            "label": "reverted",
+            "at": [
+              1,
+              4
+            ],
+            "tone": "end",
+            "note": "The change was reverted on the trunk and does not run."
+          }
+        ],
+        "arrows": [
+          {
+            "id": "m1",
+            "from": "coding",
+            "to": "ready",
+            "label": "done",
+            "note": "the worker appends a done line for its head"
+          },
+          {
+            "id": "m2",
+            "from": "ready",
+            "to": "admitted",
+            "label": "proof",
+            "note": "bin/jg-trunk.sh proof finds the receipt, the merge-card evidence and the sealed run at the head"
+          },
+          {
+            "id": "m3",
+            "from": "admitted",
+            "to": "landing",
+            "label": "start",
+            "note": "no landing runs and the flush rule lets the lane go"
+          },
+          {
+            "id": "m4",
+            "from": "landing",
+            "to": "landed",
+            "label": "land",
+            "note": "bin/jg-trunk.sh land or land-batch writes the lane's data/trunk-landings.tsv row"
+          },
+          {
+            "id": "m5",
+            "from": "landing",
+            "to": "refused",
+            "label": "refuse",
+            "note": "the lander refuses; the state file holds wait, retry or final with the reason"
+          },
+          {
+            "id": "m6",
+            "from": "refused",
+            "to": "landing",
+            "label": "retry",
+            "note": "a wait on each sweep and on the start a finished landing chains after its 2 minute backoff, a retry after that backoff, a final conflict once the trunk tip it…"
+          },
+          {
+            "id": "m7",
+            "from": "landed",
+            "to": "live",
+            "label": "live",
+            "note": "every home moved to a commit that holds the change, and the project's live row is written"
+          },
+          {
+            "id": "m8",
+            "from": "landed",
+            "to": "live-partial",
+            "label": "partial",
+            "note": "some homes moved to a commit that holds the change"
+          },
+          {
+            "id": "m9",
+            "from": "landed",
+            "to": "home-behind",
+            "label": "behind",
+            "note": "the move to a commit that holds the change failed or was rolled back in every home"
+          },
+          {
+            "id": "m10",
+            "from": "home-behind",
+            "to": "live-partial",
+            "label": "partial",
+            "note": "a later move reached some homes"
+          },
+          {
+            "id": "m11",
+            "from": "home-behind",
+            "to": "live",
+            "label": "live",
+            "note": "a later move reached every home"
+          },
+          {
+            "id": "m12",
+            "from": "live-partial",
+            "to": "live",
+            "label": "live",
+            "note": "the homes left behind moved"
+          },
+          {
+            "id": "m13",
+            "from": "landed",
+            "to": "release-open",
+            "label": "release",
+            "note": "a release pushes a trunk commit that holds the change"
+          },
+          {
+            "id": "m14",
+            "from": "home-behind",
+            "to": "release-open",
+            "label": "release",
+            "note": "a release pushes a trunk commit that holds the change"
+          },
+          {
+            "id": "m15",
+            "from": "live-partial",
+            "to": "release-open",
+            "label": "release",
+            "note": "a release pushes a trunk commit that holds the change"
+          },
+          {
+            "id": "m16",
+            "from": "live",
+            "to": "release-open",
+            "label": "release",
+            "note": "a release pushes a trunk commit that holds the change"
+          },
+          {
+            "id": "m17",
+            "from": "release-open",
+            "to": "release-ci-running",
+            "label": "run",
+            "note": "a CI run starts on the pull request's head; no script records it yet (row 42)"
+          },
+          {
+            "id": "m18",
+            "from": "release-open",
+            "to": "release-red",
+            "label": "red",
+            "note": "a check failed on the head before the run was read as running"
+          },
+          {
+            "id": "m19",
+            "from": "release-open",
+            "to": "release-green",
+            "label": "green",
+            "note": "every check passed on the head before the run was read as running"
+          },
+          {
+            "id": "m20",
+            "from": "release-ci-running",
+            "to": "release-red",
+            "label": "red",
+            "note": "a check failed on the head"
+          },
+          {
+            "id": "m21",
+            "from": "release-ci-running",
+            "to": "release-green",
+            "label": "green",
+            "note": "every check passed on the head"
+          },
+          {
+            "id": "m22",
+            "from": "release-red",
+            "to": "release-open",
+            "label": "push",
+            "note": "a fixed trunk head is pushed into the same pull request; no script does it by itself yet (row 46)"
+          },
+          {
+            "id": "m23",
+            "from": "release-red",
+            "to": "reverted",
+            "label": "revert",
+            "note": "the change is charged with the red and reverted on the trunk"
+          },
+          {
+            "id": "m24",
+            "from": "release-green",
+            "to": "merged",
+            "label": "merge",
+            "note": "the guarded merge, when the owner's rule allows it"
+          },
+          {
+            "id": "m25",
+            "from": "merged",
+            "to": "rolled",
+            "label": "rollover",
+            "note": "the landing check cuts the next trunk from the main branch"
+          },
+          {
+            "id": "m26",
+            "from": "landed",
+            "to": "cleanup-refused",
+            "label": "refused",
+            "note": "bin/jg-teardown.sh refuses the lane's cleanup after the landing"
+          },
+          {
+            "id": "m27",
+            "from": "cleanup-refused",
+            "to": "landed",
+            "label": "cleaned",
+            "note": "the sweep's unforced cleanup removes the lane record"
+          },
+          {
+            "id": "m28",
+            "from": "live",
+            "to": "home-behind",
+            "label": "x1-ci-red",
+            "note": "CI is red at a live commit, so the green pin and every home move back to the last green commit"
+          },
+          {
+            "id": "m29",
+            "from": "landed",
+            "to": "reverted",
+            "label": "s18-revert",
+            "note": "a hand-run whole suite charges the change with a red and reverts it"
+          }
+        ],
+        "zones": [
+          {
+            "id": "release",
+            "label": "The release lane",
+            "around": [
+              "landing",
+              "release-open",
+              "release-ci-running",
+              "release-red",
+              "release-green"
+            ]
+          },
+          {
+            "id": "homes",
+            "label": "In the homes",
+            "around": [
+              "home-behind",
+              "live-partial",
+              "live"
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "title": "From the done line to the landing",
+            "text": "The worker says done. The proof must be complete before the landing check starts the lane.",
+            "focus": [
+              "coding",
+              "ready",
+              "admitted",
+              "landing"
+            ]
+          },
+          {
+            "title": "A landing lands or is refused",
+            "text": "A refused landing waits, is tried again, or needs a new commit, as its reason says.",
+            "focus": [
+              "landing",
+              "refused",
+              "landed"
+            ]
+          },
+          {
+            "title": "Reaching the homes",
+            "text": "A landed change is live only when every home runs it.",
+            "focus": [
+              "landed",
+              "homes"
+            ]
+          },
+          {
+            "title": "The release pull request",
+            "text": "The change rides the release pull request through CI to main.",
+            "focus": [
+              "release",
+              "merged",
+              "rolled"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "next": {
+    "heading": "Say go and the person reads it in Reports",
+    "lines": [
+      "The board reads as a list of shapes, moves and steps until the canvas lands."
+    ]
+  }
+}

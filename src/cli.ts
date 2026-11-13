@@ -17,6 +17,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, appendTicketComment, readTicketComments, ticketCommentFault, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { boardIds, checkBoard } from './board.js';
 import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
@@ -129,7 +130,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid] [--new]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 6 (schemas 2 to 5 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
 A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). Every report names what it is for in "purpose", required on a report 5 and on any new report, and so is its "project".
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
@@ -403,10 +404,13 @@ examples:
   sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
   sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
-  report: `usage: sign-off-axi report init <folder> --purpose research|plan|decision|audit|incident|status|other [--page] [--gallery]
+  report: `usage: sign-off-axi report init <folder> --purpose research|plan|decision|audit|incident|status|other [--page] [--gallery] [--board]
        sign-off-axi report init <folder> --plan
        sign-off-axi report kind <key> <kind> --project <name> --by <who> [--board board.json]   (or --from <file> of key<TAB>kind<TAB>project lines)
 Writes the guided template to fill: <folder>/report.json (--purpose is required), or <folder>/plan.json with --plan. A file already there is kept.
+--board writes <folder>/board.json, a whiteboard to fill and put in a section's "board" field: shapes on grid cells, arrows by id, steps to explain.
+The check refuses the first rule it breaks, with one fix line: a shape per cell, no line through a shape, no label over a shape or another label,
+no line across a zone's label, and no label longer than its line. Only report schema 6 carries a board, so an older sign-off refuses one.
 Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
 audit, incident (incident and retro), status, or other. --purpose fills it in and writes that kind's parts to fill, one section each, which post then requires
 (research: question, scope, method, sources with links and a user report, options, findings with their confidence, not-checked, recommendation, open-questions;
@@ -428,6 +432,7 @@ A report is for an explanation the user asked for, or a concept, design or trade
 report kind sets the kind and the project of a report posted before every report had them, and records --by, who set it; the board itself is not changed, only <board>.kinds.jsonl. All the lines of --from are checked before the first is written.
 examples:
   sign-off-axi report init .sign-off/reports/sign-in-flow --purpose research
+  sign-off-axi report init .sign-off/reports/ticket-line --purpose plan --board
   sign-off-axi report kind sign-in-flow research --project Beacon --by agent-41
 `,
   init: `usage: sign-off-axi init [dir] [--agent auto|<name>[,<name>]...]
@@ -1999,11 +2004,24 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
 
 /** JSON with object fields in key order, so the same message compares equal in any field order. */
 const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** Every board a report carries, with the section it sits on. */
+const reportBoards = (m: any): any[] => (m?.sections ?? []).flatMap((s: any, n: number) => (s?.board ? [{ section: n, board: s.board }] : []));
+/** The ids every earlier version of this report's boards used and the version just before it dropped: post refuses one that comes back, so an old mark never lands on a new thing. */
+const retiredIds = (had: any): string[] => {
+  const before = reportBoards(had), earlier = [had, ...(had.versions ?? []).map((v: any) => v.item)].flatMap(reportBoards);
+  const kept = new Set(before.flatMap((b) => boardIds(b.board)));
+  return [...new Set(earlier.flatMap((b) => boardIds(b.board)))].filter((id) => !kept.has(id));
+};
 /** Report transitions, shared by raise, contract post and replacement feeds. History is owned by the board, never by a producer. */
 function reportPost(had: any, next: any, now: string) {
   if (next.kind !== 'report') throw fail(`key ${next.key} holds a report`, 'CONFLICT', 'Keep this key for its report; post another kind under its own key');
   if (!had) return { ...asReport(next), filed: next.filed ?? now };
   if (had.kind !== 'report') throw fail(`key ${next.key} already holds another kind of card`, 'CONFLICT', 'Use the key of the report you are updating');
+  // A board's ids are the names its marks use: one an earlier version removed may not come back under a new shape, arrow or zone.
+  for (const { section, board } of reportBoards(next)) {
+    const fault = checkBoard(board, retiredIds(had));
+    if (!fault.ok) throw fail(`key ${next.key}: sections[${section}].board.${fault.field} ${fault.problem}`, 'VALIDATION_ERROR', fault.fix);
+  }
   const authored = had.versions?.find((v: any) => v.version === had.version)?.filed ?? had.filed;
   if ([asReport(had), { ...asReport(had), filed: authored }].some((m) => canon(m) === canon(asReport(next)))) return had;
   if (!(next.version > (had.version ?? 1) && next.changes?.length)) {
@@ -2509,14 +2527,33 @@ const kindSections = (purpose: string) => REPORT_PARTS[purpose].map(([part, name
     ...(purpose === 'plan' && part === 'design' && { diagram: [{ label: 'Flow', src: 'FILL: diagrams/flow.html, inline SVG in light and dark' }] }) };
 });
 
+/** The whiteboard `report init --board` writes: three shapes on their cells, the two moves between them, and one step to explain them. */
+const BOARD_TEMPLATE = {
+  title: 'FILL: what the board shows, in 80 characters or fewer',
+  shapes: [
+    { id: 'start', label: 'FILL: first state', at: [0, 0], tone: 'start', note: 'FILL: what happens here, in 160 characters or fewer' },
+    { id: 'middle', label: 'FILL: middle state', at: [1, 1], note: 'FILL: what happens here, in 160 characters or fewer' },
+    { id: 'end', label: 'FILL: last state', at: [2, 2], tone: 'end' },
+  ],
+  arrows: [
+    { id: 'm1', from: 'start', to: 'middle', label: 'FILL: move' },
+    { id: 'm2', from: 'middle', to: 'end', label: 'FILL: move' },
+  ],
+  steps: [{ title: 'FILL: the step, in 80 characters or fewer', text: 'FILL: what the person sees in this step, in 240 characters or fewer', focus: ['start', 'middle'] }],
+};
+
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
+  // --board names a file for report kind and needs no value for report init: one subcommand, one meaning of the flag.
+  const isInit = args[0] === 'init';
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' }, project: { type: 'string' }, board: { type: 'string' }, by: { type: 'string' }, from: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
-  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery } = parsed.values;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' }, project: { type: 'string' }, board: isInit ? { type: 'boolean' } : { type: 'string' }, by: { type: 'string' }, from: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery, board: withBoard } = parsed.values;
   if (parsed.values.project !== undefined && sub !== 'kind') throw fail('--project belongs to report kind; a new report carries its project in report.json', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --project <name> --by <who>');
   if (sub === 'kind') return reportKind(parsed.positionals.slice(1), parsed.values);
-  if (parsed.values.board !== undefined || parsed.values.by !== undefined || parsed.values.from !== undefined) throw fail('--board, --by and --from belong to report kind', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --by <who>');
+  if (parsed.values.by !== undefined || parsed.values.from !== undefined) throw fail('--by and --from belong to report kind', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --by <who>');
+  if (withBoard && plan) throw fail('--board does not go with --plan: a plan message carries no board in this sign-off-axi', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose plan --board, which writes a report whose design section holds the board');
+  if (withBoard && page) throw fail('--board does not go with --page: a board is data on a guided report, not a page', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose <kind> --board');
   if (purpose !== undefined && plan) throw fail('--purpose does not go with --plan: a plan is always an implementation plan', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --plan');
   if (gallery && (plan || page)) throw fail(`--gallery does not go with --${plan ? 'plan' : 'page'}: a gallery is a section of a guided report`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research --gallery');
   if (purpose !== undefined && !REPORT_PURPOSES.includes(purpose)) throw fail(`--purpose ${purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
@@ -2548,9 +2585,16 @@ function report(args: string[]) {
       writeFileSync(path, doc ? `${JSON.stringify(doc, null, 2)}\n` : template, { flag: 'wx' });
       created.push(shellPath(path));
     }
+    // --board writes a whiteboard to fill: shapes on grid cells, the moves between them by id, and the steps that explain them.
+    const boardPath = join(out, 'board.json');
+    if (withBoard) {
+      if (existsSync(boardPath)) kept.push(shellPath(boardPath));
+      else { writeFileSync(boardPath, `${JSON.stringify(BOARD_TEMPLATE, null, 2)}\n`, { flag: 'wx' }); created.push(shellPath(boardPath)); }
+    }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
       `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
+      ...(withBoard ? [`Replace every FILL: line in board.json, then put the whole object in a section's "board" field: a shape sits on a grid cell, an arrow names two shapes, a step says what to frame`] : []),
       ...(gallery ? ['Save each option\'s screenshots (or pages) under the board file\'s folder, a phone frame 390 wide and a desktop frame 1280 wide, and fill the gallery: its label, model, run time (UTC), and per frame its path from that folder and a caption'] : []),
       'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
       `Run \`sign-off-axi post --kind ${kind} --from ${shellPath(path)}\` to put it on the board`,
