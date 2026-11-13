@@ -14,14 +14,15 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, readOwnerCreated, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, appendTicketComment, readTicketComments, ticketCommentFault, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
 import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
-import { assigneeFrom, fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
+import { homeOf } from './fleet.js';
+import { ADAPTER_VAR, type Ticket, TicketError, comment as commentOn, create as createTicket, describe as describeTickets, get as getTicket, history as historyOf, list as listTickets, statusOf, update as updateTicket } from './tickets.js';
 import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -68,7 +69,7 @@ examples:
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
   sign-off-axi signin done --key npm-login
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
-  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40
+  sign-off-axi ticket --create --set title="Ship the new settings page"
   sign-off-axi project --name Beacon --icon icons/beacon.png
   sign-off-axi init
   sign-off-axi doctor
@@ -114,7 +115,7 @@ One decision is one card: look at the open cards first. --merge <key> (up to 10)
 they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key. A merged card merges nothing itself, a card is named by one ask until that ask is answered, and an answered or dismissed card cannot be merged.
 A new ask that repeats an open ask on the same decision (the same answers, titles that share at least 80% of their words), from anyone, is not posted: the refusal names the card to wait on. When one is answered, every open ask on the same decision takes the answer and leaves Decide.
 --proof <key> names an evidence update already on the board that this ask rests on: Decide shows its capture and result at the top.
---ticket <id> names the ticket this ask belongs to (see \`sign-off-axi ticket --help\`): the ask shows a Ticket row that opens it. Optional; a ticket not on the board shows no row.
+--ticket <id> names the ticket this ask belongs to (see \`sign-off-axi ticket --help\`): the ask shows a Ticket row that opens it. Optional, and only a reference: the board never checks the ticket exists.
 --priority P0-P3 says how urgent the ask is, P0 the most: the card shows it as a chip, and the board can sort by it. Optional; leave it out when you do not know.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
@@ -228,8 +229,8 @@ examples:
        sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
 --replaces <key> works on a decision, design, diagram, interactive, report or --kind post: the card with that key moves to Archived (reason Replaced by newer) in the same write, and is refused if it is not on the board.
---ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row, its title and progress, that opens the ticket.
-It is optional, and only a reference: the ticket need not exist yet, and one not on the board shows no row. With --kind or --from it fills "ticket" on each message or item that has none.
+--ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row that opens the ticket.
+It is optional, and only a reference: the ticket need not exist yet,. With --kind or --from it fills "ticket" on each message or item that has none.
 --priority P0-P3 works on every form above too: how urgent the card is, P0 the most, shown as a chip. Optional; with --kind or --from it fills "priority" on each message or item that has none.
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--ask-ref, --why, --outcome, --recommend-reason, --silent-by, --merge).
 A new Decide question requires --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed); follow-ups belong in the backlog, not the board. Existing cards, plans, reports, evidence and engagement records are unchanged.
@@ -333,43 +334,29 @@ examples:
 Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
-       sign-off-axi ticket [board.json] --id <id> [--json]
-       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--type epic|ticket|bug|decision|evidence|merge] [--key <PREFIX-N>] [--description <text>] [--hold yes|no] [--hold-reason <text>] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>] [--filer <id>]
-       sign-off-axi ticket [board.json] --backfill [--json]
+       sign-off-axi ticket [board.json] --id <id> [--history] [--json]
+       sign-off-axi ticket [board.json] --id <id> --rev <rev> [--set <name>=<value>]... [--unset <key>]... [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --create --set <name>=<value>... [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --id <id> --text <words> [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --fields [--json]
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
-       sign-off-axi ticket [board.json] --created [--json]
-A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
-whether it is on hold and whether you asked for it (the board's Tickets screen then marks it From you in its filter). It stands alone: nothing else needs it.
-An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
-With no --id, lists every ticket with how many cards name it. With --id alone, shows that ticket and its cards, newest first.
-With any other flag, writes it: a new ticket needs --title (progress starts at 0); a later write changes only the fields given, and an empty value ("") takes one off.
-A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item:
-its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
-A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
---stage is the sync-published stage, independent of progress. --last-event-at takes whole epoch seconds or an ISO UTC time ending in Z; stored as epoch seconds. Empty values clear either field.
---filer (or SIGN_OFF_FILER) names who writes the line, as on post; the board's Activity then says who moved the ticket. A line written without one shows no who, and a bare session id names nobody, so it is not kept.
---release labels the release (up to 40 characters). --state is queued, "in progress", "on hold" or done; it takes precedence over progress/hold for grouping.
---type says what the row is, and gives it that type's own glyph and colour on the Tickets screen: epic, ticket, bug, decision, evidence or merge. Without one a ticket is a ticket, or an epic once tickets sit under it.
---key is the ticket's readable name, a prefix and a number as JG-101: rows, the sheet and search show it in place of the long id, which drops to a small line under it. Without one the id is the name.
-A new ticket needs --description (refused without one); \`ticket --backfill\` gives every old ticket without one its title as the summary.
---description is the ticket's own words, as the sheet draws them: a summary paragraph first, then lines starting "# " for a heading, "- " for a list item, "> " for a quote, and [words](https://link) for a link. A description with none of those reads as plain text.
---hold yes (or --state "on hold") needs --hold-reason, the words that say why: a hold with no reason is refused, and the reason shows in its row and on the ticket. Empty --hold-reason clears the reason, and releasing a hold clears it too.
---pr takes full HTTP(S) URLs, repeatable or comma separated; it replaces the linked PR list. Empty --release, --state or --pr clears that field.
-Without --state, grouping stays Done at 100%, else On hold with --hold yes, else In progress above 0%, else To do.
-It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
+The board holds no tickets: they live in the system behind the ticket adapter, the one executable named by SIGN_OFF_TICKETS_ADAPTER (${ADAPTER_VAR}). Every command here is one call to it and shows what it answered, or its error as it came: its code and message, never an empty list.
+With no --id, lists every ticket with how many cards name it; a list the adapter cannot give whole is an error. With --id alone, shows that ticket, every field it carries beyond the named ones (extra) and its cards, newest first. --history shows its events, as the backend recorded them.
+--fields shows which fields the backend knows, the words each allows and which operations it has.
+--create makes a ticket from --set fields (title is the one the interface requires; the backend says what else it needs). --id with --rev edits one: only the --set and --unset given are sent, never the rest of the ticket,
+and --rev is the rev you read; a ticket that changed since is refused as a conflict, with its current rev. --text adds a comment, where the backend has comments.
+--set name=value sets a field whole: title, body, kind, status, assignee, labels, parent, links. extra.<key>=<value> sets one key of extra and leaves the others. A value is plain words, unless it is null or starts with [ or { and is JSON: --set labels='["a","b"]'.
+--unset <key> removes a key of extra. --op-id is a key of up to 128 characters that makes a write safe to repeat: the same command with the same key never writes twice (one is made for you when you give none).
+A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item: its screen then shows a Ticket row that opens the ticket, which lists its asks, designs, proof and reports.
 --comment hands over a comment the person made on the ticket elsewhere (the fleet dashboard), in that dashboard's thread record: {"id","at","text","error","picked","replies":[{"at","text","by"}]},
 times in whole seconds since 1970. Send it again as it moves: the board shows it Sent, Delivered (no error), Read (picked) and Replied (the last reply) on the ticket, and a reply in Today.
 It writes one line to <board>.ticket-comments.jsonl; the latest line for a comment id wins.
---created lists the tickets the board's owner made on its Tickets screen (New ticket), oldest first: each ticket, title, type, epic, priority, project, assignee and description.
-The board writes those as ticket lines of its own (by: owner); the fleet reads them here and files each in its backlog.
 examples:
-  sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
-  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9 --priority P0
-  sign-off-axi ticket --id T-29 --progress 80
-  sign-off-axi ticket --id T-29 --key JG-101 --type epic
-  sign-off-axi ticket --id T-29 --description "Ship the settings page. # What ships - the page - the store listings > The captain: keep it small"
-  sign-off-axi ticket --id T-29 --hold yes --hold-reason "Waiting on the store review"
+  sign-off-axi ticket --create --set title="Ship the new settings page" --set extra.estimate=3
+  sign-off-axi ticket --id T-29 --rev r-9001 --set title="Ship the settings page" --unset estimate
+  sign-off-axi ticket --id T-29 --text "Needs a screenshot."
   sign-off-axi ticket --id T-29
+  sign-off-axi ticket --fields
   sign-off-axi ticket --json
 `,
   project: `usage: sign-off-axi project [board.json] [--json]
@@ -1333,7 +1320,7 @@ function reopen(args: string[]) {
 /** The person's three actions on a report, and Reopen: Approve starts the build by minting a queued ticket the fleet reads, Refine sends it
  *  back to its owner with a note, Reject closes it and records the reason as a learning, and Reopen puts a closed one back on its block.
  *  Every one of them is a line in <board>.report-actions.jsonl, which is what the fleet side reads (docs/file-formats.md). */
-function reportAction(file: string, input: any): { action: string; key: string; at: string; who: string; ticket?: string } {
+async function reportAction(file: string, input: any): Promise<{ action: string; key: string; at: string; who: string; ticket?: string }> {
   const { key, action, note, reason } = input ?? {};
   if (!isKey(key)) throw new InputError('Name the report by its key, 1-128 of A-Z a-z 0-9 . _ -');
   if (!['approve', 'refine', 'reject', 'reopen'].includes(action)) throw new InputError('The action is approve, refine, reject or reopen');
@@ -1372,11 +1359,8 @@ function reportAction(file: string, input: any): { action: string; key: string; 
     appendReportLearning(file, { key, at, role: actions.role, ...(actions.owner && { owner: actions.owner }), who, reason: picked, ...(text && { note: text }), rule });
     return { action, key, at, who };
   }
-  // Approve: the build starts through the ticket the board already keeps for the fleet, never a second mechanism.
-  const ticket = `build-${key}`, project = d.project, title = d.title.slice(0, 160);
-  appendTicket(file, { id: ticket, title, progress: 0, state: 'queued', stage: 'queued', asked: true, type: 'ticket', by: 'sign-off',
-    ...(project && { project }), ...(d.priority && { priority: d.priority }), last_event_at: Math.floor(Date.now() / 1000),
-    description: `Approved from report ${key}. ${who} starts the build; the first pull request lands by ${actions.first_pull_request ?? 'a day the owner names'}.` });
+  // Approve: the build starts through a ticket made in the ticket system; the same op_id makes a retry after a lost answer find that ticket, not make a second.
+  const made = await createTicket({ title: d.title.slice(0, 160), body: `Approved from report ${key}. ${who} starts the build; the first pull request lands by ${actions.first_pull_request ?? 'a day the owner names'}.` }, `build-${key}`.slice(0, 128)), ticket = made.id;
   appendReportAction(file, { ...base, action: 'approve', result: 'build', ticket });
   return { action, key, at, who, ticket };
 }
@@ -1439,221 +1423,141 @@ function fleetHomeOf(board: string) {
   try { line = /^[ \t]*fleet_home[ \t]*:[ \t]*(.*?)[ \t]*(?:\s#.*)?$/m.exec(readFileSync(join(dirname(board), 'config.yaml'), 'utf8'))?.[1]; } catch {}
   return homeOf(process.env.SIGN_OFF_FLEET_HOME || line?.replace(/^(['"])(.*)\1$/, '$2'));
 }
-/** The tickets with what each one's task record names (see fleet.ts): its `assignee`, its `type` while the record names one the board knows, and the `hold_reason`
- * of a hold the record explains. The ticket's own line always wins, and with no home configured, or no record, a ticket is unchanged and reads as unassigned. */
-const withRecords = <T extends { id: string; type?: string; key?: string; hold?: boolean; state?: Ticket['state']; hold_reason?: string; assignee?: Ticket['assignee'] }>(tickets: T[], board: string): (Omit<T, 'assignee'> & { assignee?: Assignee })[] => {
-  const home = fleetHomeOf(board);
-  // The line's own assignee (the fleet's, or the owner's pick) is the ticket's: its record fills in only a line that says nothing, and null is the owner's Unassigned.
-  const own = ({ assignee, ...t }: T) => ({ ...t, ...(assignee && { assignee: assigneeFrom(assignee) }) });
-  return tickets.map((t) => {
-    const rec = home ? readTask(home, t.id) : undefined;
-    if (!rec) return own(t);
-    const type = t.type ?? ((TICKET_TYPES as readonly string[]).includes(rec.type ?? '') ? rec.type : undefined);
-    // A reason belongs to a hold: the record explains a hold the ticket already says it is on, and never invents one.
-    const reason = t.hold_reason ?? (ticketHeld(t) ? rec.hold_reason : undefined);
-    return { ...own(t), ...(t.assignee === undefined && rec.assignee && { assignee: rec.assignee }), ...(type && { type }), ...(t.key ?? rec.key ? { key: t.key ?? rec.key } : {}), ...(reason && { hold_reason: reason }) };
-  });
-};
-/** A ticket no key was given reads PROJECT-n: the project's short name and its place among that project's tickets, counted in the order they were first written, so a key never moves. */
-const withKeys = <T extends { id: string; key?: string; project?: string }>(tickets: T[]): (T & { key_derived?: boolean })[] => {
-  const prefix = new Map<string, string>(), count = new Map<string, number>(), used = new Set<string>(), taken = new Set(tickets.flatMap((t) => (t.key ? [t.key] : [])));
-  const short = (p: string) => {
-    const w = p.split(/[^A-Za-z0-9]+/).filter(Boolean), base = (w.length > 1 ? w.map((x) => x[0]).join('') : w[0] ?? 'TKT').toUpperCase();
-    for (let n = Math.min(3, base.length); n <= base.length; n++) if (!used.has(base.slice(0, n))) return base.slice(0, n);
-    let n = 2; while (used.has(`${base}${n}`)) n++; return `${base}${n}`;
-  };
-  return tickets.map((t) => {
-    if (t.key) return t;
-    const p = t.project ?? '';
-    if (!prefix.has(p)) { const k = short(p); used.add(k); prefix.set(p, k); }
-    let n = (count.get(p) ?? 0) + 1;
-    while (taken.has(`${prefix.get(p)}-${n}`)) n++;
-    count.set(p, n);
-    return { ...t, key: `${prefix.get(p)}-${n}`, key_derived: true };
-  });
-};
-/** Where a ticket stands, in the four words the Tickets screen sorts by (web/app.js tkStateOf): its state when it names one, else its progress and hold. */
-const STANDING: Record<string, 'todo' | 'moving' | 'hold' | 'done'> = { queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' };
-const standing = (t: Pick<Ticket, 'state' | 'progress' | 'hold'>) => STANDING[t.state ?? ''] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo');
-/** What the Story, the first view of Tickets, shows, worked out over every ticket so the page needs none of them: the totals, up to four recorded releases with open work
- *  (three or more tickets each), the six in flight that moved last and the four held with a reason, by id, and how many of each there are. */
-function storyOf(tickets: (Ticket & { assignee?: Assignee })[]) {
-  const byId = new Map(tickets.map((t) => [t.id, t])), parents = new Set(tickets.flatMap((t) => (t.parent && byId.has(t.parent) ? [t.parent] : [])));
-  // A ticket under another takes the project of the ticket at the top of its line unless it names its own; a loop of parents ends where it comes back round.
-  const projectOf = (t: Ticket) => { let x: Ticket | undefined = t; const seen = new Set<string>(); while (x && !x.project && x.parent && !seen.has(x.id)) seen.add(x.id), x = byId.get(x.parent); return t.project ?? x?.project; };
-  const leaves = tickets.filter((t) => !parents.has(t.id)), open = tickets.filter((t) => standing(t) !== 'done');
-  const split = (list: Ticket[]) => ({ total: list.length, done: list.filter((t) => standing(t) === 'done').length, moving: list.filter((t) => standing(t) === 'moving').length, hold: list.filter((t) => standing(t) === 'hold').length });
-  const groups = new Map<string, Ticket[]>();
-  for (const t of leaves) if (/^v?\d+(\.\d+){1,3}$/.test(t.release ?? '')) { const k = `${projectOf(t) ?? ''}\n${t.release}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
-  const releases = [...groups].map(([k, list]) => ({ project: k.split('\n')[0]!, release: list[0]!.release!, ...split(list), at: Math.max(...list.map((t) => Date.parse(t.at) || 0)) }))
-    .filter((g) => g.total >= 3 && g.done < g.total).sort((x, y) => y.at - x.at).slice(0, 4).map(({ at, ...g }) => g);
-  const moving = leaves.filter((t) => standing(t) === 'moving').sort((x, y) => (y.last_event_at ?? 0) - (x.last_event_at ?? 0));
-  const held = leaves.filter((t) => standing(t) === 'hold').sort((x, y) => +!!y.hold_reason - +!!x.hold_reason || (y.last_event_at ?? 0) - (x.last_event_at ?? 0)), why = held.filter((t) => t.hold_reason);
-  return { total: tickets.length, open: open.length, owned: open.filter((t) => t.assignee).length, releases, moving: moving.slice(0, 6).map((t) => t.id), moving_total: moving.length,
-    blocked: why.slice(0, 4).map((t) => t.id), held_total: held.length, held_with_reason: why.length };
-}
 /** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
  * `ticket --json` and the board's /api/tickets say it the same way. */
 const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
   status: d.answer && !awaitsVerdict(d.type, d.answer) ? d.answer.answer : waits(d) ? (d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : 'shown', title: d.title, filed: d.filed ?? '' });
-/** The open ticket API, GET /api/tickets and /api/tickets/<id>: the same tickets and cards `ticket --json` prints, with the board file's path left out. Undefined for any other path. */
-function ticketsApi(path: string): [number, unknown] | undefined {
-  const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
-  if (path !== '/api/tickets' && !one) return undefined;
-  const folded = new Map<string, string>(), all = withRecords(rollUp(readTickets(file, warn, folded)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
-  // Newest card first, as the CLI and the ticket's page list them.
-  const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
-  let handle: string;
-  try { handle = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
-  // A key is read as the Tickets view shows it, so the keys are made over the whole board, in its order; the ticket itself is sent as the list has it.
-  const id = ticketNamed(withKeys(all), handle, folded)?.id, t = all.find((x) => x.id === id);
-  return t ? [200, { ticket: { ...t, cards: cardsOf(t.id).map(ticketCard) } }] : [404, { error: `No ticket named ${handle} on this board` }];
-}
-/** The ticket a link names, whichever name the link was given: its id, its key in any case (SO-453), a unique start of at least 8 of a fleet id's hex (with or
- * without its jg- or fm- prefix, so an id from before the fleet re-keyed its tickets still opens the ticket), or the slug of the backlog item it was filed from.
- * An id the board folded into the open ticket that already tracks its work (`folded`, from readTickets) opens that ticket. */
-function ticketNamed<T extends { id: string; key?: string }>(all: T[], handle: string, folded: Map<string, string>): T | undefined {
-  const shown = (id: string) => all.find((t) => t.id === (folded.get(id) ?? id)), hex = /^(?:(?:jg|fm)-)?([0-9a-f]{8,32})$/i.exec(handle)?.[1]?.toLowerCase();
-  const hits = hex ? [...all.map((t) => t.id), ...folded.keys()].filter((id) => /^(?:jg|fm)-[0-9a-f]{32}$/.test(id) && id.slice(3).startsWith(hex)) : [];
-  // One piece of work can sit under both prefixes: jg- is the id the fleet writes now, so it wins. Two different hashes that start alike name no one ticket.
-  const one = new Set(hits.map((id) => id.slice(3))).size === 1 ? hits.find((id) => id.startsWith('jg-')) ?? hits[0] : undefined;
-  return shown(handle) ?? all.find((t) => t.key?.toUpperCase() === handle.toUpperCase()) ?? (one ? shown(one) : undefined) ?? fleetIdsOf(handle).map(shown).find(Boolean);
-}
-/** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
- * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
- * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
-function ticket(args: string[]) {
-  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, created: { type: 'boolean' }, filer: { type: 'string' }, backfill: { type: 'boolean' }, json: { type: 'boolean' } });
-  if (values.comment !== undefined) return ticketComment(file, values, on);
-  if (values.backfill) return ticketBackfill(file, values, on);
-  if (values.created) {
-    // What the board's owner made on the page, oldest first: the fleet files each in its backlog (the board never writes the backlog itself).
-    const created = readOwnerCreated(file).map((t) => ({ ticket: t.id, title: t.title, type: t.type ?? 'ticket', parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', assignee: t.assignee?.lead ?? 'nobody', description: t.description ?? '', at: t.at }));
-    if (values.json) return JSON.stringify({ board: file, created });
-    return toon({ board: tilde(file), created: created.length ? created : '0 tickets made on the board' }, ['File each in the backlog; its assignee is the lead that owns the item']);
-  }
-  const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.type, values.key, values.description, values.hold, values['hold-reason'], values.asked, values.release, values.state, values.pr, values.stage, values['last-event-at']].some((v) => v !== undefined);
-  if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --type, --key, --description, --hold, --hold-reason, --asked, --release, --state, --pr, --stage and --last-event-at need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
-  // The board is read once per command, and its warnings print once, however many tickets name cards.
-  let byTicket: Map<string, ReturnType<typeof board>> | undefined;
-  const cardsOf = (t: Ticket) => {
-    if (!byTicket) {
-      byTicket = new Map();
-      for (const d of board(file)) if (d.ticket !== undefined && !d.dismissed) byTicket.set(d.ticket, [...(byTicket.get(d.ticket) ?? []), d]);
+/** The cards of the board that name a ticket, newest first, as a ticket's page and `ticket --id` list them. */
+const cardsNaming = (path: string, id: string) => board(path).filter((d) => d.ticket === id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0)).map(ticketCard);
+/** A refused request of the board's own, in the adapter's error shape. */
+const invalidRequest = (message: string): [number, unknown] => [400, { error: new TicketError('invalid', message, false, { fields: [{ field: 'request', message }] }).toJSON() }];
+/** How many of the latest-changed tickets Activity reads the history of: a call each, so the feed says how many it covers. */
+const ACTIVITY_TICKETS = 20;
+/** The ticket API of the running board: every call goes to the adapter and answers with what it said, or its error as it was (`{"error": {code, message, retryable, detail?}}`).
+ * GET /api/ticket-fields (describe), GET /api/tickets (list), GET /api/tickets/<id> (the ticket and its cards), GET /api/tickets/<id>/history, GET /api/ticket-activity,
+ * POST /api/tickets (create), POST /api/tickets/<id> (a patch: rev, set, unset) and POST /api/tickets/<id>/comment. Undefined for any other path. */
+async function ticketsApi(req: IncomingMessage, path: string): Promise<[number, unknown] | undefined> {
+  const m = /^\/api\/tickets(?:\/([^/]+?)(?:\/(history|comment))?)?$/.exec(path);
+  if (!m && path !== '/api/ticket-fields' && path !== '/api/ticket-activity') return undefined;
+  try {
+    let handle = '';
+    try { handle = decodeURIComponent(m?.[1] ?? ''); } catch { return invalidRequest('The ticket id is not valid text'); }
+    const verb = m?.[2];
+    if (req.method === 'GET') {
+      if (path === '/api/ticket-fields') return [200, await describeTickets()];
+      if (path === '/api/ticket-activity') return [200, await activityOf()];
+      if (!handle) return [200, { tickets: await listTickets() }];
+      if (verb === 'history') return [200, { events: await historyOf(handle) }];
+      if (verb) return undefined;
+      return [200, { ticket: await getTicket(handle), cards: cardsNaming(file, handle) }];
     }
-    return [...(byTicket.get(t.id) ?? [])].reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  };
-  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', type: t.type ?? '', key: t.key ?? '', description: t.description ?? '', hold: t.hold ? 'yes' : 'no', hold_reason: t.hold_reason ?? '', asked: t.asked ? 'yes' : 'no', release: t.release ?? '', state: t.state ?? '', prs: t.prs ?? [], stage: t.stage ?? '', last_event_at: t.last_event_at ?? '' });
-  if (id === undefined) {
-    const all = withRecords(rollUp(readTickets(file, warn)), file);
-    if (values.json) return JSON.stringify({ board: file, tickets: all.map((t) => ({ ...t, cards: cardsOf(t).map((d) => d.key) })) });
-    return toon({ board: tilde(file), tickets: all.length ? all.map((t) => ({ ...row(t), cards: cardsOf(t).length })) : '0 tickets' }, [`Run \`sign-off-axi ticket${on} --id <id> --title "<what the work is>" --progress <0-100>\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
+    if (req.method !== 'POST' || path.startsWith('/api/ticket-') || (verb && verb !== 'comment')) return undefined;
+    if (readOnly()) return [403, { error: new TicketError('denied', 'This board is read-only', false).toJSON() }];
+    if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: new TicketError('invalid', 'Send JSON', false).toJSON() }];
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    let input: any;
+    try { input = JSON.parse(raw); } catch { return invalidRequest('Send one JSON object'); }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return invalidRequest('Send one JSON object');
+    const { op_id } = input;
+    if (typeof op_id !== 'string' || !op_id || op_id.length > 128) return invalidRequest('op_id must be a key of 1-128 characters, chosen once for this write');
+    if (!handle) return [200, { ticket: await createTicket(input.ticket, op_id) }];
+    if (verb === 'comment') return [200, { event: await commentOn(handle, input.text, op_id) }];
+    return [200, { ticket: await updateTicket({ id: handle, rev: input.rev, set: input.set, unset: input.unset }, op_id) }];
+  } catch (e) { return ticketFailure(e); }
+}
+const ticketFailure = (e: unknown): [number, unknown] => { if (e instanceof TicketError) return [statusOf(e), { error: e.toJSON() }]; throw e; };
+/** Activity: the events of the tickets that changed last, each from the adapter's `history`, newest first. It invents none, and says how many tickets it reads of how many there are. */
+async function activityOf() {
+  const all = await listTickets(), newest = [...all].sort((x, y) => (Date.parse(y.updated_at) || 0) - (Date.parse(x.updated_at) || 0)).slice(0, ACTIVITY_TICKETS);
+  const events = (await Promise.all(newest.map(async (t) => (await historyOf(t.id)).map((event) => ({ ticket: t.id, title: t.title, event }))))).flat();
+  events.sort((x, y) => (Date.parse(y.event.at) || 0) - (Date.parse(x.event.at) || 0));
+  return { events, covered: newest.length, total: all.length };
+}
+/** A ticket as one line of the CLI's output: the fields the interface names, the backend's own words as they are. */
+const ticketRow = (t: Ticket) => ({ id: t.id, rev: t.rev, title: t.title, kind: t.kind, status: t.status, assignee: t.assignee ?? '', parent: t.parent ?? '', labels: t.labels.join(','), updated: t.updated_at });
+/** A failure of the adapter as a CLI error: its code and message as it said them, and the step that follows from the code. */
+function ticketFault(e: unknown, on: string, id?: string) {
+  if (!(e instanceof TicketError)) return e;
+  const current = (e.detail as { current?: Ticket } | undefined)?.current;
+  const fields = ((e.detail as { fields?: { field: string; message: string }[] } | undefined)?.fields ?? []).map((f) => `${f.field}: ${f.message}`);
+  const help = e.code === 'conflict' && current ? [`${id} is now at rev ${current.rev}; read it with \`sign-off-axi ticket${on} --id ${id}\`, then send the change again with --rev ${current.rev}`]
+    : e.code === 'not_configured' ? [`Set ${'SIGN_OFF_TICKETS_ADAPTER'} to the adapter executable (docs/ticket-adapter.md)`]
+    : e.retryable ? ['Run the same command again'] : [];
+  return fail(`${e.code}: ${e.message}${fields.length ? ` (${fields.join('; ')})` : ''}`, e.code.toUpperCase(), ...help);
+}
+/** `--set name=value`: a top-level field, or `extra.<key>` for one of the backend's own. A value is a string, unless it is `null` or starts with `[` or `{`, when it is read as JSON. */
+function patchOf(sets: string[] = [], unsets: string[] = []) {
+  const set: Record<string, any> = {};
+  for (const s of sets) {
+    const at = s.indexOf('=');
+    if (at < 1) throw fail(`--set ${s} must be name=value`, 'VALIDATION_ERROR', 'Pass --set title="New words", --set labels=\'["a","b"]\' or --set extra.<key>=<value>');
+    const name = s.slice(0, at), text = s.slice(at + 1);
+    let value: unknown = text;
+    if (text === 'null' || /^[[{]/.test(text)) { try { value = JSON.parse(text); } catch { throw fail(`--set ${name}: ${text} is not valid JSON`, 'VALIDATION_ERROR', 'Quote a JSON value, or leave out the brackets to send plain words'); } }
+    const sub = /^extra\.(.+)$/.exec(name)?.[1];
+    if (sub) set.extra = { ...set.extra, [sub]: value }; else set[name] = value;
   }
-  if (!isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass a short id such as --id T-29');
-  if (!write) {
-    const t = withRecords(rollUp(readTickets(file, warn)), file).find((x) => x.id === id);
-    if (!t) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
-    const cards = cardsOf(t).map(ticketCard);
-    if (values.json) return JSON.stringify({ board: file, ticket: { ...t, cards } });
-    return toon({ board: tilde(file), ticket: row(t), cards: cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
-  }
-  const progress = values.progress === undefined ? undefined : /^\d{1,3}$/.test(values.progress) ? Number(values.progress) : NaN;
-  const event = values['last-event-at'];
-  let lastEvent: number | '' | undefined = event === '' ? '' : event === undefined ? undefined : NaN;
-  if (event && /^\d+$/.test(event)) lastEvent = Number(event);
-  else if (event && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.000)?Z$/.test(event)) {
-    const ms = Date.parse(event);
-    if (Number.isFinite(ms) && new Date(ms).toISOString() === event.replace(/(?:\.000)?Z$/, '.000Z')) lastEvent = ms / 1000;
-  }
-  // yes or no; anything else is kept as given, so the rule below refuses it by name.
-  const yesNo = (v: string | undefined) => (v === undefined ? undefined : ({ yes: true, no: false } as Record<string, boolean>)[v] ?? (v as unknown as boolean));
-  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  return locked(`${file}.lock`, () => {
-    const had = readTickets(file, warn).find((t) => t.id === id);
-    if (!had && title === undefined) throw fail(`no ticket ${id} on ${tilde(file)} yet: a new ticket needs --title`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "<what the work is>" --progress 0`);
-    // A later write changes only what it gives; an empty --parent, --priority, --project, --hold or --asked takes that field off.
-    const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
-    // Who wrote this line is this write's own: a later write without a filer does not inherit the earlier writer.
-    const filer = values.filer ?? (process.env.SIGN_OFF_FILER || undefined);
-    delete next.by;
-    if (filer && !SESSION_ID.test(filer)) next.by = filer;
-    for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, type: values.type, key: values.key, description: values.description, hold: yesNo(values.hold), hold_reason: values['hold-reason'], asked: yesNo(values.asked), release: values.release, state: values.state, stage: values.stage, last_event_at: lastEvent, prs: values.pr === undefined ? undefined : values.pr.every((v: string) => v === '') ? '' : [...new Set(values.pr.flatMap((v: string) => v.split(',').map((u: string) => u.trim())))] })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
-    // A hold says why. Recording one (with --hold yes or --state "on hold") without a reason is refused here, where holds are written;
-    // a write that leaves an existing hold alone is never refused, so an old board keeps working, and releasing a hold drops its reason.
-    const held = ticketHeld(next), hadHeld = !!had && ticketHeld(had), touchesHold = values.hold !== undefined || values.state !== undefined || values['hold-reason'] !== undefined;
-    if (held && !hadHeld && !next.hold_reason) throw fail(`ticket ${id}: a hold needs --hold-reason "<why it is on hold>"`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --hold yes --hold-reason "Waiting on the store review"`);
-    if (held && touchesHold && !next.hold_reason) throw fail(`ticket ${id}: a hold needs --hold-reason "<why it is on hold>"`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --hold-reason "Waiting on the store review"`);
-    if (!held && values['hold-reason'] === undefined) delete next.hold_reason;
-    const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|type|key|description|hold_reason|hold|asked|release|state|stage|last_event_at|prs|by)/, '--$1').replace(/^--prs\b/, '--pr').replace(/^--by\b/, '--filer').replace(/^--last_event_at\b/, '--last-event-at').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
-    // A new ticket says what it is in words a person can read: its description opens with a one-line summary.
-    if (!had && !values.description?.trim()) throw fail(`ticket ${id}: a new ticket needs --description, a one-line summary first, then short "# Ask", "# Why" and "# Done when" sections`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "${title}" --description "Ship the page. # Ask - the captain wants it # Why - users look for it # Done when - it opens from the profile"`);
-    // A release names what ships, not when: a word like "later" would sit beside the priority and read as a contradiction.
-    if (values.release && releaseIsWhen(values.release)) throw fail(`ticket ${id}: --release names a release such as v1.4 or 2026-11, not when; set --priority P0-P3 for how soon it matters`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --priority P1`);
-    // The same open work under another id is one ticket, not two: write to the one that has it.
-    const twin = ticketTwin(readTickets(file, warn), next);
-    if (twin) throw fail(`ticket ${id}: ticket ${twin.id} already tracks "${twin.title}"${twin.project ? ` in ${twin.project}` : ''}`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${twin.id} --progress <0-100>`);
-    const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
-    if (!same) appendTicket(file, next);
-    return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
-  });
+  return { ...(Object.keys(set).length && { set }), ...(unsets.length && { unset: unsets }) };
+}
+/** ticket [board.json] [--json]: lists the tickets, as the adapter has them now.
+ *  ticket --id <id> [--json]: one ticket with the cards that name it; --history its events; --text <words> comments on it; --rev <rev> with --set and --unset edits it; --create --set ... makes one;
+ *  --fields says which fields the backend knows. Nothing is kept here: every call goes to the adapter named in SIGN_OFF_TICKETS_ADAPTER. */
+async function ticket(args: string[]) {
+  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, rev: { type: 'string' }, set: { type: 'string', multiple: true }, unset: { type: 'string', multiple: true }, create: { type: 'boolean' }, fields: { type: 'boolean' },
+    history: { type: 'boolean' }, text: { type: 'string' }, 'op-id': { type: 'string' }, comment: { type: 'string' }, json: { type: 'boolean' } });
+  const { id } = values, opId = values['op-id'] ?? randomBytes(16).toString('hex'), out = (data: object, help: string[] = []) => (values.json ? JSON.stringify({ board: file, ...data }) : toon({ board: tilde(file), ...data }, help));
+  if (id !== undefined && !isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass the id the ticket list shows');
+  if (values.comment !== undefined) return ticketComment(file, values, on);
+  const writes = [values.create, !values.create && (values.rev !== undefined || values.set || values.unset), values.text !== undefined].filter(Boolean).length;
+  if (writes > 1 || (writes && (values.fields || values.history))) throw fail('Give one thing to do: --create, an edit (--rev with --set or --unset), --text, --history or --fields', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --help`);
+  if ((values.history || values.text !== undefined || values.rev !== undefined || values.unset || (values.set && !values.create)) && id === undefined) throw fail('--history, --text, --rev, --set and --unset need --id <ticket id>', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id <id>`);
+  try {
+    if (values.fields) return out({ ...(await describeTickets()) });
+    if (values.create) {
+      if (id !== undefined || values.rev !== undefined || values.unset) throw fail('--create takes --set only', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --create --set title="What the work is"`);
+      const t = await createTicket(patchOf(values.set).set ?? {}, opId);
+      return out({ ticket: values.json ? t : ticketRow(t), status: 'created' }, [`Run \`sign-off-axi ticket${on} --id ${t.id}\` to read it back`, `Pass --ticket ${t.id} to raise or post, so the card shows this ticket`]);
+    }
+    if (id !== undefined && (values.set || values.unset || values.rev !== undefined)) {
+      if (values.rev === undefined) throw fail('An edit needs --rev <rev>, the rev you read', 'VALIDATION_ERROR', `Read it with \`sign-off-axi ticket${on} --id ${id}\`, then pass its rev`);
+      const patch = patchOf(values.set, values.unset);
+      if (!patch.set && !patch.unset) throw fail('An edit needs --set or --unset', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --rev ${values.rev} --set title="New words"`);
+      const t = await updateTicket({ id, rev: values.rev, ...patch }, opId);
+      return out({ ticket: values.json ? t : ticketRow(t), status: 'updated' }, [`It is now at rev ${t.rev}; pass that rev to the next edit`]);
+    }
+    if (id !== undefined && values.text !== undefined) {
+      const event = await commentOn(id, values.text, opId);
+      return out({ ticket: id, event: values.json ? event : { id: event.id, at: event.at, actor: event.actor ?? '', text: event.text ?? '' } });
+    }
+    if (id !== undefined && values.history) {
+      const events = await historyOf(id);
+      return out({ ticket: id, events: values.json ? events : events.length ? events.map((e) => ({ at: e.at, actor: e.actor ?? '', type: e.type, text: e.text ?? '', changes: e.changes.map((c) => `${c.field}: ${JSON.stringify(c.from)} -> ${JSON.stringify(c.to)}`).join('; ') })) : '0 events' });
+    }
+    if (id !== undefined) {
+      const t = await getTicket(id), cards = cardsNaming(file, id);
+      return out({ ticket: values.json ? t : ticketRow(t), ...(!values.json && Object.keys(t.extra).length && { extra: t.extra }), cards: values.json || cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
+    }
+    const all = await listTickets();
+    return out(values.json ? { tickets: all, cards: Object.fromEntries(all.map((t) => [t.id, cardsNaming(file, t.id).map((c) => c.key)])) } : { tickets: all.length ? all.map((t) => ({ ...ticketRow(t), cards: cardsNaming(file, t.id).length })) : '0 tickets' },
+      [`Run \`sign-off-axi ticket${on} --create --set title="<what the work is>"\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
+  } catch (e) { throw ticketFault(e, on, id); }
 }
 
-/** ticket --backfill: gives every ticket that has no description its title as the summary, so no old ticket reads blank. Tickets with words are left alone. */
-function ticketBackfill(file: string, values: Record<string, any>, on: string) {
-  if (Object.entries(values).some(([k, v]) => v !== undefined && !['backfill', 'json'].includes(k))) throw fail('--backfill is run on its own, with no other ticket field', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --backfill`);
-  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  return locked(`${file}.lock`, () => {
-    const blank = readTickets(file, warn).filter((t) => !t.description?.trim());
-    for (const t of blank) appendTicket(file, { ...t, by: undefined, description: t.title });
-    return values.json ? JSON.stringify({ board: file, backfilled: blank.map((t) => t.id) }) : toon({ board: tilde(file), backfilled: blank.length, ids: blank.map((t) => t.id) }, ['Each now opens with its title as the summary; rewrite one with `sign-off-axi ticket --id <id> --description "<summary> # Ask ... # Why ... # Done when ..."`']);
-  });
-}
 
-
-/** The board's owner makes a ticket on the page (POST /api/tickets): one line written `by: owner`, so the page shows it at once and the fleet reads it with `ticket --created`.
- *  A title, and optionally its type (ticket, bug or epic), the ticket it sits under, a priority, a project, a description and the lead who works on it. */
-const OWNER_TYPES = ['ticket', 'bug', 'epic'];
-function ownerCreate(file: string, input: any) {
-  const keys = ['title', 'description', 'type', 'parent', 'priority', 'project', 'assignee'];
-  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some((k) => !keys.includes(k))) throw new InputError(`Send one object with "title" and, optionally, ${keys.slice(1).map((k) => `"${k}"`).join(', ')}`);
-  const text = (k: string) => (typeof input[k] === 'string' && input[k].trim() ? input[k].trim() : undefined);
-  const title = text('title');
-  if (!title) throw new InputError('A ticket needs a title');
-  if (input.type !== undefined && input.type !== null && !OWNER_TYPES.includes(input.type)) throw new InputError('type must be ticket, bug or epic');
-  const all = readTickets(file, warn), parent = text('parent'), lead = text('assignee');
-  if (parent && !all.some((t) => t.id === parent)) throw new InputError(`No ticket ${parent} to put it under`);
-  const id = `${slug(title).slice(0, 48).replace(/-+$/, '') || 'ticket'}-${randomBytes(3).toString('hex')}`;
-  const next: any = { id, title, progress: 0, state: 'queued', asked: true, by: 'owner', ...(input.type && input.type !== 'ticket' && { type: input.type }), ...(parent && { parent }), ...(text('priority') && { priority: text('priority') }),
-    ...(text('project') && { project: text('project') }), description: text('description') ?? title, ...(lead && { assignee: { lead, live: false } }) };
-  const fault = ticketFault(next);
-  if (fault) throw new InputError(fault);
-  return appendTicket(file, next);
-}
-function releaseTicketHold(file: string, id: string) {
-  const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
-  if (ticket && ticketHeld(ticket)) appendTicket(file, { ...ticket, by: undefined, hold: false, hold_reason: undefined,
-    state: (rollUp(tickets).find((t) => t.id === id)?.progress ?? ticket.progress) ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
-}
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
  * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
-function ticketComment(file: string, values: Record<string, any>, on: string) {
+async function ticketComment(file: string, values: Record<string, any>, on: string) {
   const { id } = values, EXAMPLE = `sign-off-axi ticket${on} --id T-29 --comment '{"id":"3f9a1c2e7b6d4a10","at":1792820000,"text":"Is the export in this?","error":null,"picked":1792820300,"replies":[]}'`;
   if (id === undefined || !isKey(id)) throw fail('--comment needs --id <ticket id>, 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', EXAMPLE);
-  if (['title', 'progress', 'parent', 'priority', 'project', 'type', 'key', 'description', 'hold', 'hold-reason', 'asked', 'release', 'state', 'pr', 'stage', 'last-event-at'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with no other ticket field', 'VALIDATION_ERROR', EXAMPLE);
+  if (['rev', 'set', 'unset', 'create', 'fields', 'history', 'text'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with only --id', 'VALIDATION_ERROR', EXAMPLE);
   let c;
   try { c = JSON.parse(values.comment); } catch { throw fail('--comment must be one JSON object', 'VALIDATION_ERROR', EXAMPLE); }
   const fault = ticketCommentFault(c);
   if (fault) throw fail(`--comment: ${fault}`, 'VALIDATION_ERROR', EXAMPLE);
+  try { await getTicket(id); } catch (e) { throw ticketFault(e, on, id); }
   return locked(`${file}.lock`, () => {
-    if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
-    const previous = readTicketComments(file).find((x) => x.id === c.id);
-    const replies = c.replies ?? [];
-    const hasNewReply = replies.length > (previous?.replies?.length ?? 0);
     appendTicketComment(file, id, c);
-    if (hasNewReply) releaseTicketHold(file, id);
     const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
     return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
@@ -3027,8 +2931,6 @@ const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), work
 const SPLASH = readdirSync(new URL('../web/', import.meta.url)).flatMap((f) => { const m = /^splash-(\d+)x(\d+)-(light|dark)\.png$/.exec(f); return m ? [{ file: f, w: +m[1]!, h: +m[2]!, theme: m[3]! }] : []; });
 for (const { file } of SPLASH) ICONS[`/${file}`] = { type: 'image/png', bytes: readFileSync(new URL(`../web/${file}`, import.meta.url)) };
 const splashLinks = SPLASH.map(({ file, w, h, theme }) => `<link rel="apple-touch-startup-image" href="${file}" media="(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: 2) and (orientation: ${w < h ? 'portrait' : 'landscape'}) and (prefers-color-scheme: ${theme})">`).join('\n');
-/** The tool and provider marks a ticket's assignee shows (web/logos), served from the board itself: no mark is fetched from another site. */
-for (const f of readdirSync(new URL('../web/logos/', import.meta.url))) if (f.endsWith('.svg')) ICONS[`/logos/${f}`] = { type: 'image/svg+xml', bytes: readFileSync(new URL(`../web/logos/${f}`, import.meta.url)) };
 /** The page names its stylesheets and script by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
 const stamp = (name: string) => createHash('sha256').update(ICONS[`/${name}`]!.bytes).digest('hex').slice(0, 12);
 const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/g, (_, name) => `href="${name}.css?v=${stamp(`${name}.css`)}"`)
@@ -3057,7 +2959,7 @@ const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex
 /** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
 const stampOf = (path: string) => { try { const st = statSync(path); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return ''; } };
 /** The files beside the board that hold what it shows: every answer, comment, ticket, read and handed-over reply changes the board's state. */
-const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery', 'report-actions', 'report-learnings'];
+const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery', 'report-actions', 'report-learnings'];
 /** The files a board read is made from that are named without reading the board: the board itself, its sidecars, and the config and token beside it. */
 const stateSources = () => [file, config, tokenFile(file), ...SIDECARS.map((side) => `${file.replace(/\.json$/, '')}.${side}.jsonl`)];
 /** The files a read was built from beyond those, with the stamp each had: a run's proof or a mock replaced on disk is a new read. */
@@ -3161,7 +3063,6 @@ const state = () => {
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
-  const tickets = withKeys(withRecords(rollUp(readTickets(file, warn)), file));
   const heads = new Map<string, Set<string>>();
   for (const { evidence: e } of items) if (e?.proof_series_id) { const set = heads.get(e.proof_series_id) ?? new Set<string>(); set.add(/^[a-f0-9]{40}$/.test(e.current_head ?? '') ? e.current_head! : 'unknown'); heads.set(e.proof_series_id, set); }
   const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [], kinds = readKinds(file, warn);
@@ -3197,9 +3098,6 @@ const state = () => {
     promoted: readPromoted(file, warn),
     // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
-    tickets,
-    // The Story, the first view of Tickets, worked out over every ticket: the first view reads this and its rows, never the whole roll-up.
-    story: storyOf(tickets),
     projects: readProjects(file, warn),
     // A report's own three actions, as the person took them, and the rules their rejections left on the owners.
     report_actions: readReportActions(file),
@@ -3209,8 +3107,6 @@ const state = () => {
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
  * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
  * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
-/** With a fleet home configured, a task record can change with no board file changing: the state is read again after this many milliseconds. */
-const FLEET_REREAD = 10000;
 let built: { stamps: Map<string, string>; until: number; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
 /** The state as it is now, rebuilt only when a file it was made from has changed, or when a sign-in's link passes its time (no file changes then,
  *  and the state's own `expired` must say so at once); `tag` names the exact bytes for If-None-Match. */
@@ -3222,7 +3118,7 @@ function stateRead() {
   try { body = state(); } finally { stamps = building; building = undefined; }
   const json = Buffer.from(JSON.stringify(body!));
   // The next moment this body is out of date: the soonest sign-in link that has not passed yet. Until then no file can change it.
-  const until = Math.min(fleetHomeOf(file) ? Date.now() + FLEET_REREAD : Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
+  const until = Math.min(Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
   const made = { stamps: stamps!, until, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
   // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
@@ -3247,7 +3143,7 @@ const rowOf = (d: any) => {
   return card ? { ...row, evidenceCard: { ...card, media: (card.media ?? []).filter((m: any) => m.type?.startsWith('image/')).slice(0, 1) } } : row;
 };
 /** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, one card in full, or the ticket roll-up. */
-type View = { name: 'asks' | 'items' | 'card' | 'tickets' | 'story' | 'lists'; offset: number; limit: number; key: string };
+type View = { name: 'asks' | 'items' | 'card' | 'lists'; offset: number; limit: number; key: string };
 /** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
 function viewOf(url: string): View | undefined {
   const q = new URL(url, 'http://board').searchParams, name = q.get('view');
@@ -3255,13 +3151,12 @@ function viewOf(url: string): View | undefined {
   const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
   const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
   if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
-  if (name === 'asks' || name === 'items' || name === 'tickets' || name === 'story' || name === 'lists') return { name, offset, limit, key: '' };
-  throw new InputError(`unknown view ${name}: use asks, items, card, tickets, story or lists`);
+  if (name === 'asks' || name === 'items' || name === 'lists') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items, card or lists`);
 }
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
  * (the ticket roll-up and the activity) come with the page that asks for them. */
-const TICKET_ACTIVITY_LIMIT = 200;
 function viewRead(read: NonNullable<typeof built>, view: View) {
   const id = `${view.name}:${view.offset}:${view.limit}:${view.key}`, kept = read.views.get(id);
   if (kept) return kept;
@@ -3275,7 +3170,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
   const today = (at: unknown) => typeof at === 'string' && new Date(at).toDateString() === new Date().toDateString();
   const counts = { asks: items.filter(waiting).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
     // A report is a guided report's kind and a plan is its own type: both are what the board calls a report.
-    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length,
+    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length,
     // Cleared is what the person answered and the board counts as answered: a design review Main has not passed yet still sits under Designs.
     cleared_today: items.filter((d) => today((answers[d.key] as any)?.at) && !gone.has(d.key) && !(d.kind === 'design' && !d.promoted)).length,
     proofs_today: items.filter((d) => d.type === 'evidence' && today(d.filed) && !gone.has(d.key) && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result)).length };
@@ -3294,21 +3189,9 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded, done: s.done,
       dismissed: s.dismissed, promoted: s.promoted, reopened: s.reopened, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
-  } else if (view.name === 'story') {
-    // The first view of Tickets: the Story's figures and the ten rows it lists, never the roll-up of every ticket behind them, which is what made it 2.4 MB.
-    const byId = new Map(((s.tickets ?? []) as any[]).map((t) => [t.id, t])), rows = [...s.story.moving, ...s.story.blocked].map((id: string) => byId.get(id));
-    body = { counts, version: s.version, story: s.story, week: readTicketWeek(file), tickets: rows, decisions: [], page: { view: 'story', offset: 0, limit: rows.length, total: (s.tickets ?? []).length } };
-  } else if (view.name === 'tickets') {
-    // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), week: readTicketWeek(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
-      page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
-    // A row carries the ticket it links, so its chip says how far that ticket is, without the whole roll-up.
-    const linked = new Set(page.map((d) => d.ticket).filter(Boolean)), shown = new Set(page.map((d) => d.key));
-    // A reply on a ticket is a row of its own on Today, so the board's ticket threads come with the first screen too, with the tickets they name.
-    const threads = ((s.trail ?? []) as any[]).filter((t) => t.kind === 'ticket');
-    for (const t of threads) linked.add(t.key);
+    const shown = new Set(page.map((d) => d.key));
     // The activity a row shows at a glance (an answer's reply, a note left on a mock) comes with the page that shows it, never the whole board's.
     const forRow = (list: any[]) => ((list ?? []) as any[]).filter((x) => shown.has(x.key) || x.kind === 'ticket');
     // The board's own lists (every answer, every dismissal, what was read and restored) come with the page that names their rows: a first screen
@@ -3319,7 +3202,6 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     const deeper = ofRows(s.deeper), askIds = new Set(deeper.map((a) => a.id));
     body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
-      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
       answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
       reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
       discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), reopened: ofRows(s.reopened), deeper,
@@ -3584,18 +3466,8 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
-  const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
+  const tickets = await ticketsApi(req, (req.url ?? '').split('?')[0]!);
   if (tickets) return tickets;
-  if (req.method === 'POST' && req.url === '/api/tickets') {
-    // An answers-only board (one the fleet feeds) takes a ticket too: like an answer, it is the person's input for the fleet to read, with `ticket --created`.
-    if (readOnly()) return [403, { error: 'This board is read-only' }];
-    if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: 'Send JSON' }];
-    let body = '';
-    for await (const chunk of req) body += chunk;
-    let input: any;
-    try { input = JSON.parse(body); } catch { return [400, { error: 'Send one JSON object: {"title": "...", "type"?, "parent"?, "priority"?, "project"?, "description"?, "assignee"?}' }]; }
-    try { return [200, { ticket: await locked(`${file}.lock`, () => ownerCreate(file, input)) }]; } catch (e) { if (e instanceof InputError) return [400, { error: e.message }]; throw e; }
-  }
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/done', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
   // The leash is the person's own setting in config.yaml, which the board applies to the answers it takes, so an answers-only board takes it too.
@@ -3694,7 +3566,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // Approve, Refine, Reject and Reopen on a report: the three actions its own block declares, recorded as the fleet side reads them.
     let input: any;
     try { input = JSON.parse(body); } catch { return [400, { error: 'Send one JSON object: {"key","action","note"?,"reason"?"}' }]; }
-    try { await locked(`${file}.lock`, () => reportAction(file, input)); } catch (e) { if (e instanceof InputError) return [409, { error: e.message }]; throw e; }
+    try { await locked(`${file}.lock`, () => reportAction(file, input)); } catch (e) { if (e instanceof InputError) return [409, { error: e.message }]; if (e instanceof TicketError) return ticketFailure(e); throw e; }
     return [200, state()];
   }
   if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {
@@ -3778,12 +3650,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  const save = () => {
-    const a = appendAnswer(file, d, option, note.trim(), unsent(d), undefined, follow === true);
-    if (a && d.ticket && plainAsk(d)) releaseTicketHold(file, d.ticket);
-    return a;
-  };
-  answered(d.ticket && plainAsk(d) ? await locked(`${file}.lock`, save) : save(), d);
+  answered(appendAnswer(file, d, option, note.trim(), unsent(d), undefined, follow === true), d);
   return [200, state()];
 }
 

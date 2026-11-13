@@ -1,4 +1,4 @@
-// The new look's colours: every merged screen in the new look (Today, Decide, Designs, Reports, Tickets) and its sheets, at 390x844 and 1280x800, light and dark,
+// The new look's colours: every merged screen in the new look (Today, Decide, Designs, Reports) and its sheets, at 390x844 and 1280x800, light and dark,
 // captured at 2x over the DevTools protocol with exact device metrics (a headless Chromium of its own) beside the approved prototype in the same state,
 // and every colour each page draws read from the computed styles in the browser (text, grounds, borders, outlines, shadows, gradients, icon fills and strokes,
 // native control accents, ::before and ::after) and checked against the prototype's palette, on the board and on the prototype alike.
@@ -71,10 +71,8 @@ let ws;
 const errors = [], report = [], problems = [], found = {};
 try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo }).trim().split('\n').pop();
-  // Tickets for the Tickets screen and a ticket's sheet (an epic, a P0 ticket under it, one on hold, a done system one), and a P0 ask and a P1 report on them.
+  // A P0 ask and a P1 report on a ticket (the tickets themselves live behind the ticket adapter and have their own journey).
   const so = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args]), board = join(dir, 'board.json');
-  for (const args of [['--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0'],
-    ['--id', 'T-31', '--description', 'Summary line.', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the release notes', '--asked', 'yes'], ['--id', 'T-40', '--description', 'Summary line.', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) so('ticket', board, ...args);
   so('post', board, '--ask-ref', 'message-feel', '--ticket', 'T-29', '--priority', 'P0', '--key', 'friday', '--title', 'Ship the settings page on Friday?', '--why', 'Support is fully staffed on Friday.', '--outcome', 'yes=It ships Friday.', '--outcome', 'no=It waits a week.',
     '--recommend', 'yes', '--recommend-reason', 'Support is on hand.', '--default', 'no');
   const reportKey = JSON.parse(readFileSync(board, 'utf8')).items.filter((i) => i.kind === 'report').at(-1).key;
@@ -98,13 +96,13 @@ try {
   const STATES = {
     390: [['today', '#', '', 'v=today'], ['search', '#find', '', 'v=today&s'], ['decide', '#waiting', '', 'v=decide'], ['ask', '#decide/ship', '.decide .pick-option', `v=decide&o=${pq}`],
       ['reports', '#reports', '', 'v=reports'], ['report', `#reports/${reportKey}`, '', `v=reports&rep=${pq}`], ['designs', '#designs', '', 'v=designs'], ['design', '#designs/onboarding', '', 'v=designs&d=epics-prototype-redesign-2'],
-      ['tickets', '#tickets', '', 'v=tickets'], ['ticket', '#ticket/T-29', '', 'v=tickets&t=firstmate-addons/addons-epics-prototype'], ['evidence', '#evidence', '', 'v=evidence', 'listed'],
+      ['evidence', '#evidence', '', 'v=evidence', 'listed'],
       // A card's own screen: the P0 ask's sheet (its panel and Activity) and a report's sheet opened from the list (its parts, Ticket row and Activity).
       ['ask-detail', '#decide/friday', '', `v=decide&o=${pq}`], ['report-detail', '#reports', `.rp-list a[data-row][href="#reports/${reportKey}"]`, 'v=reports'],
       // Last, an answer and the toast it raises over Decide: the yes/no in light, the pick-one in dark.
       ['toast', (theme) => (theme === 'light' ? '#decide/digest' : '#decide/export'), ['.decide .pick-option', '.decide-bar .answer'], 'v=decide']],
     1280: [['today', '#', '', 'v=today'], ['decide', '#decide/friday', '', 'v=decide'], ['reports', '#reports', '', 'v=reports'], ['designs', '#designs', '', 'v=designs'],
-      ['tickets', '#tickets', '', 'v=tickets'], ['ticket', '#ticket/T-29', '', 'v=tickets&t=firstmate-addons/addons-epics-prototype'], ['evidence', '#evidence', '', 'v=evidence', 'listed'],
+      ['evidence', '#evidence', '', 'v=evidence', 'listed'],
       // A card's own screen on the desk: a report opened from the list beside it, and a proof (listed, as Evidence's list is not yet in the new look).
       ['report-detail', '#reports', `.rp-list a[data-row][href="#reports/${reportKey}"]`, 'v=reports'], ['proof-detail', '#evidence/ev1', '', 'v=evidence', 'listed']],
   };
@@ -148,11 +146,11 @@ try {
   }
   writeFileSync(join(dest, 'palette.txt'), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A throwaway board with asks (one P0 on a ticket), a sign-in, a design to review, five updates, two reports, and four tickets (an epic, a P0 ticket under it, one on hold and a done one).',
-    steps: ['Open Today, Search, Decide and an ask, Reports and a report, Designs and a design, Tickets and a ticket, Evidence, and an answer\'s toast at 390x844, and the desk\'s screens at 1280x800 (2x), light and dark, over the DevTools protocol with exact device metrics.',
+    start: 'A throwaway board with asks (one P0 on a ticket), a sign-in, a design to review, five updates, two reports.',
+    steps: ['Open Today, Search, Decide and an ask, Reports and a report, Designs and a design, Evidence, and an answer\'s toast at 390x844, and the desk\'s screens at 1280x800 (2x), light and dark, over the DevTools protocol with exact device metrics.',
       'Read every colour each page draws from its computed styles in the browser (text, grounds, borders, outlines, shadows, gradients, icon fills and strokes, ::before and ::after), on the board and on the approved prototype in the same state, size and theme.',
       'Check each against the prototype\'s palette (its :root and dark blocks, and the colours it writes in place), and set the board beside the prototype.'],
-    result: 'On a phone and on a desk, in light and in dark, Today, Decide, Designs, Reports and Tickets and their sheets draw only the approved prototype\'s colours: a warm canvas and cards, ink for the main buttons, links, focus and the toast, red for what waits, amber for a warning, the prototype\'s P0-P3 chips, and no blue. The prototype itself draws only the same palette. Evidence, not yet in the new look, is listed with whatever colours it still draws outside it.' }, null, 2) + '\n');
+    result: 'On a phone and on a desk, in light and in dark, Today, Decide, Designs, Reports and their sheets draw only the approved prototype\'s colours: a warm canvas and cards, ink for the main buttons, links, focus and the toast, red for what waits, amber for a warning, the prototype\'s P0-P3 chips, and no blue. The prototype itself draws only the same palette. Evidence, not yet in the new look, is listed with whatever colours it still draws outside it.' }, null, 2) + '\n');
   console.log(report.join('\n'));
   if (side === 'after') assert.deepEqual(problems, [], 'every checked screen draws only the prototype\'s palette');
 } finally {

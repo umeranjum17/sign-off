@@ -50,7 +50,7 @@ function assertRecordsAccepted(r) {
   const out = r.stdout + r.stderr;
   if (r.status === 0) return;
   assert.doesNotMatch(out, /byte-identical/, out);
-  assert.match(out, /no judge is set|approved design: spec design-pick-listing: no live capture \(designs\.1440\.dark\.png\)/, out);
+  assert.match(out, /no judge is set|approved design: spec design-pick-listing: no live capture \(designs\.after\.dark\.1440w\.png\)/, out);
 }
 
 const recordOf = (home, name, runId) => JSON.parse(readFileSync(join(home, 'evidence', name, '.done-done', 'runs', `${runId}.json`), 'utf8'));

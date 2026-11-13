@@ -7,12 +7,16 @@ import { join } from 'node:path';
 
 // The Actions block, replayed end to end on the real CLI and the real board: a report that declares none fails the lint,
 // Refine sends it back and the owner's version 2 lands on the same key with its diff, Reject closes it and records the rule,
-// Approve mints the build ticket the fleet reads, and Reopen puts a closed report back.
+// Approve makes the build ticket through the ticket adapter, and Reopen puts a closed report back.
 const cli = new URL('../dist/cli.js', import.meta.url).pathname;
 const scratch = mkdtempSync(join(tmpdir(), 'sign-off-actions-'));
 const home = join(scratch, 'home');
 mkdirSync(home);
-const env = { ...process.env, HOME: home };
+// The tickets live behind the ticket adapter; the stand-in keeps them in its own folder, which is where Approve's ticket is read back from.
+const standin = join(scratch, 'standin');
+mkdirSync(standin);
+const adapter = new URL('./support/ticket-adapter-standin.mjs', import.meta.url).pathname;
+const env = { ...process.env, HOME: home, SIGN_OFF_TICKETS_ADAPTER: adapter, TICKET_STANDIN_DIR: standin };
 for (const name of ['SIGN_OFF_FILER', 'CLAUDE_CODE_SESSION_ID', 'npm_command', 'npm_config_package', 'SIGN_OFF_BOARD']) delete env[name];
 const run = (...args) => {
   try { return { out: execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env }), code: 0 }; }
@@ -191,7 +195,7 @@ test('Reject closes the report, records the reason as the owner\'s rule, starts 
   assert.equal(reopened.report_actions['paint-budget'].action, 'reopen', 'Reopen puts the report back on its actions');
 });
 
-test('Approve starts the build through the ticket the fleet reads, and only once', async () => {
+test('Approve starts the build through the ticket adapter, and only once', async () => {
   const board = join(scratch, 'approve-board.json');
   const first = run('post', board, '--kind', 'report', '--from', write('approve-v1.json', report({ key: 'ship-the-block' })), '--filer', 'agent-41');
   assert.equal(first.code, 0, first.out);
@@ -199,22 +203,20 @@ test('Approve starts the build through the ticket the fleet reads, and only once
 
   const bad = await post(url, 'api/report-action', { key: 'ship-the-block', action: 'approve' });
   assert.equal(bad.status, 200, JSON.stringify(bad.body));
-  const tickets = lines(`${board.replace(/\.json$/, '')}.tickets.jsonl`);
-  assert.equal(tickets.length, 1);
-  assert.equal(tickets[0].id, 'build-ship-the-block');
-  assert.equal(tickets[0].state, 'queued');
-  assert.equal(tickets[0].stage, 'queued');
-  assert.equal(tickets[0].asked, true);
-  assert.match(tickets[0].description, /Ada starts the build; the first pull request lands by 2026-11-06/);
+  // The board writes no ticket file; the ticket is in the adapter's backend, made by one create.
+  assert.equal(existsSync(`${board.replace(/\.json$/, '')}.tickets.jsonl`), false);
+  const made = JSON.parse(run('ticket', board, '--json').out).tickets;
+  assert.equal(made.length, 1);
+  assert.match(made[0].body, /Ada starts the build; the first pull request lands by 2026-11-06/);
   const action = lines(`${board.replace(/\.json$/, '')}.report-actions.jsonl`).at(-1);
   assert.equal(action.action, 'approve');
   assert.equal(action.result, 'build');
   assert.equal(action.owner, 'Ada', 'the owner comes from the report\'s own actions');
-  assert.equal(action.ticket, 'build-ship-the-block');
+  assert.equal(action.ticket, made[0].id, 'the action records the id the adapter gave');
 
   const again = await post(url, 'api/report-action', { key: 'ship-the-block', action: 'approve' });
   assert.equal(again.status, 409, 'one approval, one build');
-  assert.equal(lines(`${board.replace(/\.json$/, '')}.tickets.jsonl`).length, 1);
+  assert.equal(JSON.parse(run('ticket', board, '--json').out).tickets.length, 1, 'one approval, one ticket');
 });
 
 test('a report that names the key it replaces archives the old card in the same write, and a missing key writes nothing', () => {

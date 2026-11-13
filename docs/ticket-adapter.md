@@ -2,7 +2,7 @@
 
 sign-off shows and edits tickets through one adapter: an executable that speaks this interface in front of whatever backend holds the tickets. The backend is the source of truth. sign-off keeps no ticket data of its own, no file and no cache, holds no rules about tickets, and never names a backend, a status word or a label convention. Any backend that implements this document works with it.
 
-Status: v1, frozen. The board does not call an adapter yet. A change a client or an adapter could notice is a new interface number, never an edit of v1; a client refuses an adapter that answers another number.
+Status: v1, frozen. The board reads and writes its tickets only through this adapter. A change a client or an adapter could notice is a new interface number, never an edit of v1; a client refuses an adapter that answers another number.
 
 The interface has four parts, all in this repository: this document, a [JSON Schema](ticket-adapter/schemas) for every request and response, [worked examples](ticket-adapter/examples) that the schemas accept, and the [conformance script](../test/ticket-adapter-conformance.mjs), which runs any adapter against them. When the document and the script disagree, the script is right and the document is a bug.
 

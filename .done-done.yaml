@@ -136,18 +136,6 @@ journeys:
   # and an open thread (one per agent and topic: two cards of one ticket under one thread named by it) in time order with the agent's words on the left, the person's own as bubbles on the right with Read or Sent and Not read under them, and a pull request inline as a card. The required Designs capture rides in the same run.
   inbox-chat:
     command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/inbox-chat-proof.sh'
-  # Tickets opens on the Story at 390 and 1280, light and dark: the week by day and by project, the releases with their progress, what is in flight, what is blocked and why; Epics lists cards only for epics
-  # of three or more tickets (count, owner, next step) and a card opens that epic; the flat list is behind All tickets; a ticket page leads with its key and shows its summary. TICKETS_STORY_BOARD serves a copy of a real board.
-  tickets-story:
-    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-story-proof.sh'
-  # A link opens its ticket by backlog slug, key, old id or short hash, and a ticket filed during the run opens by its slug; 390 and 1280, light and dark, then the
-  # approved design-pick listing (designs.1440.dark.png) in the same run. TICKETS_LINKS_BOARD=<a copy of a real board's folder> drives real links.
-  tickets-links:
-    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-links-proof.sh'
-  # The first view of Tickets reads only the Story (its figures and the rows it lists), never the whole roll-up: payload.json holds the read before and after in rows
-  # and bytes; 390 and 1280, light and dark, All tickets reading the roll-up on demand, then designs.1440.dark.png. TICKETS_FIRST_VIEW_BOARD=<a copy of a real board's folder>.
-  tickets-first-view:
-    command: 'npm run build > /dev/null && .agents/skills/done-done-verify-sign-off/tickets-first-view-proof.sh'
   # The Inbox as a conversation with everyone: the people rail, a one-to-one thread with sent/read/replied, #fleet muted with
   # the agents' own talk, a mention that opens the ticket it names, and a search that finds what an agent said; 390 and 1280,
   # light and dark, then the approved design-pick listing (designs.1440.dark.png) in the same run.
@@ -262,28 +250,9 @@ journeys:
   # in light and dark, each picture's sharpness against its frame and the bytes loaded. IMAGES_SIDE=before SIGN_OFF_REPO=<built base checkout> records the base.
   images:
     command: 'npm run build > /dev/null && for t in light dark; do node .agents/skills/done-done-verify-sign-off/image-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done'
-  # The Tickets tab and a ticket in the new look, one width per run (TICKETS_WIDTH=390|1280|1440), light and dark, measured in the browser; TICKETS_PROTO and TICKETS_PROTO_TREE (the prototypes' index.html) save each state beside the prototype's.
-  # Create, assign and epic grouping, one width and theme per run (CREATE_WIDTH=360|390|445|1280|1440, CREATE_THEME=light|dark); the required Designs capture rides in the same run.
-  tickets-create:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-create-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${CREATE_THEME:-light}" "${CREATE_WIDTH:-390}" && node .agents/skills/done-done-verify-sign-off/designs-1440-dark.mjs "$DONE_DONE_EVIDENCE_ROOT"'
-  ticket-stage:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/ticket-stage-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # Every empty, loading and error state, one width and theme per run (EMPTY_WIDTH=390|1280, EMPTY_THEME=light|dark), measured in the browser, with the populated Tickets screen.
   empty-states:
     command: 'npm run build > /dev/null && EMPTY_CITE=1 node .agents/skills/done-done-verify-sign-off/empty-states-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${EMPTY_THEME:-light}" "${EMPTY_WIDTH:-390}"'
-  # The Tickets screen's Activity tab, one width and theme per run (ACTIVITY_WIDTH=360|390|445|1280|1440, ACTIVITY_THEME=light|dark): All tickets with its Activity card, the day timeline with every row's tags,
-  # a row opened (the sheet on a phone, the dialog on a desk; Escape returns focus to the row), a filtered view and a filter that matches nothing with Clear filters.
-  activity:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/activity-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${ACTIVITY_THEME:-light}" "${ACTIVITY_WIDTH:-390}"'
-  tickets:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TICKETS_THEME:-light,dark}" "${TICKETS_WIDTH:-390}"'
-  # Tickets' See all on a phone, one width and theme per run (SEEALL_WIDTH=360|390|445|1280|1440, SEEALL_THEME=light|dark): On hold expanded, then a touch on To do's See all with the list moving under the finger expands To do and opens no ticket; a desk has no See all.
-  tickets-seeall:
-    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-seeall-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${SEEALL_THEME:-light}" "${SEEALL_WIDTH:-390}"'
-  # Tickets: a card of each kind linked and unlinked, an unknown ticket, polling, hold paths and lifecycle Activity across 390/1280 and light/dark.
-  # Keep the full matrix in the authorized task evidence directory; copy eight Activity frames, two collapsed phone frames and two desktop polling frames, plus factual state text and steps, into the sealed run.
-  ticket:
-    command: 'npm run build > /dev/null && export TICKET_REVIEW_ROOT="${SIGNOFF_TICKET_ACTIVITY_ROOT:?set SIGNOFF_TICKET_ACTIVITY_ROOT to the authorized data/signoff-ticket-activity directory}/ticket-matrix-$DONE_DONE_RUN_ID" && for w in 390 1280; do for t in light dark; do TICKET_WIDTH=$w node .agents/skills/done-done-verify-sign-off/ticket-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t || exit 1; done; done'
   # Evidence's inline previews on a throwaway board of eight proofs: the list at 390 in light and dark (each row's project icon, done-done's word and first capture), one row opened in place with its captures in a strip, Previews on, and the list on a 1280 desk.
   proof-state:
     command: 'npm run build > /dev/null && test -n "$PROOF_BASE_REPO" && mkdir -p "$DONE_DONE_EVIDENCE_ROOT/before" && SIGN_OFF_REPO="$PROOF_BASE_REPO" PROOF_STATE_BEFORE=1 node .agents/skills/done-done-verify-sign-off/proof-state-shots.mjs "$DONE_DONE_EVIDENCE_ROOT/before" && node .agents/skills/done-done-verify-sign-off/designs-listing-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" && node .agents/skills/done-done-verify-sign-off/proof-state-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
@@ -314,14 +283,6 @@ journeys:
   # A report that sets its approve words (approve_result, approved_heading) shows them; one that sets none keeps today's. 390 and 1280, then the Designs capture at 1440, dark.
   approve-words:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/approve-words-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
-  # Tickets from Beads (CLI only, screen: none): the board reads and writes a Beads store through the Juggernaut wrapper and keeps no tickets file; then the Designs capture at 1440, dark.
-  beads-tickets:
-    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-tickets-proof.sh'
-  # A held ticket from Beads names what it waits on (the ticket sheet's Hold row and a Waiting on row), at 390 and 1280, light and dark; then the Designs capture at 1440, dark.
-  beads-waiting:
-    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-waiting-proof.sh'
-  beads-waiting-row:
-    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/beads-waiting-row-proof.sh'
   board-actions:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-actions-proof.sh "$DONE_DONE_EVIDENCE_ROOT"'
   # The board's own motion, one width per run (FLASH_WIDTH=390|1280, FLASH_THEME=light|dark): the first load with its read held (the skeleton and the
@@ -388,9 +349,6 @@ journeys:
   upgrade:
     command: node .agents/skills/done-done-verify-sign-off/core-journey.mjs "$DONE_DONE_EVIDENCE_ROOT" --upgrade
     upgrade: true
-  # A new ticket needs a summary and old ones get one (CLI only, screen: none): refused without --description, ticket --backfill; then the Designs capture at 1440, dark.
-  ticket-summary:
-    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/ticket-summary-proof.sh'
   # A board lock whose holder is gone is cleared by the next write (CLI only, screen: none): a dead pid's lock no longer answers BUSY, a live one's still does; then the Designs capture at 1440, dark.
   board-lock:
     command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-lock-proof.sh'
@@ -400,6 +358,9 @@ journeys:
   # Each card shows one state in list --json and status --json (CLI only, screen: none); then the Designs capture at 1440, dark.
   card-state:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440 && node --test test/card-state.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/card-state.log" 2>&1'
+  # The Tickets screens read and write only through the ticket adapter (SIGN_OFF_TICKETS_ADAPTER), with the stand-in adapter: the list, a ticket with an unknown extra key under More fields, a conflict showing both versions, a failure with its message and Retry, and an incomplete list; one width and theme per run (TICKETS_WIDTH=390|1280, TICKETS_THEME=light|dark), then the Designs capture at 1440, dark.
+  tickets-adapter:
+    command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/tickets-adapter-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" "${TICKETS_THEME:-light}" "${TICKETS_WIDTH:-390}" && DESIGNS_DAYS_BACK=2 DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440'
 approved_requirements:
   - kind: spec
     name: design-pick-listing

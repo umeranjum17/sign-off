@@ -17,7 +17,6 @@ const settle = (ms = 500) => browser('eval', `async () => { await new Promise(r 
 const records = [];
 try {
   const base = run('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env }).trim().split('\n').at(-1);
-  for (const id of ['T-1', 'T-2']) run(process.execPath, [resolve('dist/cli.js'), 'ticket', join(dir, 'board.json'), '--id', id, '--description', 'Summary line.', '--title', id === 'T-1' ? 'Ship the settings page' : 'Prepare release notes', '--asked', 'yes', '--progress', '40'], { env });
   // Four plain asks side by side (newest first), so Next and Previous stay inside one kind of sheet.
   for (const n of [1, 2, 3, 4]) run(process.execPath, [resolve('dist/cli.js'), 'post', join(dir, 'board.json'), '--ask-ref', 'message-demo', '--key', `swap-${n}`, '--title', `Swap question ${n}: ship the change?`, '--about', 'Umer can answer this one from the sheet.', '--why', 'It keeps the proof honest.', '--outcome', 'yes=It ships.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'It is ready.', '--default', 'yes'], { env });
   for (const [width, theme] of [[390, 'light'], [390, 'dark'], [1280, 'light']]) {
@@ -42,8 +41,8 @@ try {
         records.push({ theme, width, tap: button === 'last-child' ? 'next' : 'previous', ...after });
       }
       if (theme === 'light') {
-        // A ticket's sheet and a report's page also swap in place (Evidence uses the same reader as Reports).
-        for (const [area, selector, root] of [['tickets', '.tk-row', '.tk-over'], ['reports', '.rp-page a.dl-face', '#reader']]) {
+        // A report's page also swaps in place (Evidence uses the same reader as Reports).
+        for (const [area, selector, root] of [['reports', '.rp-page a.dl-face', '#reader']]) {
           browser('open', base); browser('open', base + '#' + area); settle(1200);
           browser('eval', `() => { document.querySelector(${JSON.stringify(selector)}).click(); return 1; }`); settle(700);
           browser('eval', `() => { window.__root = document.querySelector(${JSON.stringify(root)}); document.querySelector('.detail-sequence button:last-child').click(); return 1; }`); settle(500);

@@ -18,6 +18,9 @@ const dir = mkdtempSync(join(tmpdir(), 'so-inbox-')), board = join(dir, 'board.j
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
   XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache') };
 delete env.SIGN_OFF_FILER;
+// The tickets live behind the ticket adapter: the repo's stand-in adapter keeps them in its own folder, which the board reads (the stand-in's words are its own).
+env.SIGN_OFF_TICKETS_ADAPTER = join(repo, 'test/support/ticket-adapter-standin.mjs'); env.TICKET_STANDIN_DIR = join(dir, 'standin'); mkdirSync(env.TICKET_STANDIN_DIR, { recursive: true });
+{ const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z'); writeFileSync(join(env.TICKET_STANDIN_DIR, 'store.json'), JSON.stringify({ counter: 9, tickets: [['T-1', 'Ship the CSV export'],['T-5', 'Roll out the export to every team']].map(([id, title], n) => ({ id, rev: `r-${n + 1}`, title, body: '', kind: 'kind-a', status: 'stage-1', assignee: null, labels: [], parent: null, links: [], created_at: stamp, updated_at: stamp, extra: {} })), events: {}, ops: {} })); }
 const cli = (...args) => { const r = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), ...args], { encoding: 'utf8', timeout: 120000, env }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const name = (state) => `${state}.${theme}.${width}w`;
@@ -39,7 +42,6 @@ cli('post', board, '--kind', 'plan', '--from', join(dir, 'plan.json'));
 const report = { ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8')), filed: new Date(Date.now() - 150 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z') };
 writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'));
-cli('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
 
 const server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'inherit'] });
 let base = '';
@@ -234,7 +236,6 @@ try {
     await api('/api/messages', { kind: 'comment', key: 'ship', text: 'Is QA booked for Thursday?' });
     // One agent, one topic, two cards: export-agent asks which teams get the export first (the person answers in words and gets a reply), then asks about its copy (the person answers in words, and the agent's wait reads it).
     // Each step waits a second, so the two cards and what was said on them read in the order they happened.
-    cli('ticket', board, '--id', 'T-5', '--description', 'Summary line.', '--title', 'Roll out the export to every team', '--project', 'Settings', '--progress', '20');
     ask('export-agent', 'teams', 'Which teams get the export first?', 'Two teams asked for it this month.', 'Settings goes first.', 'Everyone at once.', 'T-5');
     await wait(1100);
     await api('/api/answers', { key: 'teams', answer: 'text', note: 'Start with Settings, then Billing.' });

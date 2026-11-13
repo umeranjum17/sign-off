@@ -18,6 +18,9 @@ const dir = mkdtempSync(join(tmpdir(), 'so-trail-')), board = join(dir, 'board.j
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
   XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache') };
 delete env.SIGN_OFF_FILER;
+// The tickets live behind the ticket adapter: the repo's stand-in adapter keeps them in its own folder, which the board reads (the stand-in's words are its own).
+env.SIGN_OFF_TICKETS_ADAPTER = join(repo, 'test/support/ticket-adapter-standin.mjs'); env.TICKET_STANDIN_DIR = join(dir, 'standin'); mkdirSync(env.TICKET_STANDIN_DIR, { recursive: true });
+{ const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z'); writeFileSync(join(env.TICKET_STANDIN_DIR, 'store.json'), JSON.stringify({ counter: 9, tickets: [['T-1', 'Ship the CSV export']].map(([id, title], n) => ({ id, rev: `r-${n + 1}`, title, body: '', kind: 'kind-a', status: 'stage-1', assignee: null, labels: [], parent: null, links: [], created_at: stamp, updated_at: stamp, extra: {} })), events: {}, ops: {} })); }
 const cli = (...args) => { const r = spawnSync(process.execPath, [join(repo, 'dist/cli.js'), ...args], { encoding: 'utf8', timeout: 120000, env }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const name = (state) => `${state}.${theme}.${width}w`;
@@ -41,7 +44,6 @@ for (const f of ['phone-today.webp', 'phone-today-dark.webp', 'desk-today.webp']
 const report = { ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8')), filed: new Date(Date.now() - 150 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z') };
 writeFileSync(join(dir, 'report.json'), JSON.stringify(report));
 cli('post', board, '--kind', 'report', '--from', join(dir, 'report.json'));
-cli('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40');
 writeFileSync(join(dir, 'design.json'), JSON.stringify({ ...JSON.parse(readFileSync(join(repo, 'fixtures/contract/design.v1/valid-basic.json'), 'utf8')), key: 'dashboard', title: 'Ship the fleet dashboard redesign?',
   preview: 'design/phone-today.webp', journeys: [{ id: 'dashboard', title: 'Dashboard', screens: [{ id: 'today', title: 'Today', views: { phone_light: 'design/phone-today.webp', phone_dark: 'design/phone-today-dark.webp', computer_light: 'design/desk-today.webp' } }] }],
   filer: 'dashboard-agent', group: 'Dashboard', filed: new Date(Date.now() - 3 * 3600_000).toISOString().replace(/\.\d+Z$/, 'Z') }));

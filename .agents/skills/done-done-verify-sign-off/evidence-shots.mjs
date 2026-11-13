@@ -44,7 +44,7 @@ earlier.forEach((c, i) => {
 });
 for (const r of rows) {
   const ticket = r.ask && (tickets.get(r.ask.title) ?? `T-${tickets.size + 1}`);
-  if (ticket && !tickets.has(r.ask.title)) { tickets.set(r.ask.title, ticket); sh(['ticket', board, '--id', ticket, '--description', 'Summary line.', '--title', r.ask.title, '--progress', String(r.ask.pct)]); }
+  if (ticket && !tickets.has(r.ask.title)) tickets.set(r.ask.title, ticket);
   const media = r.capture ? [`${r.key}.jpg`] : undefined;
   if (media) writeFileSync(join(dir, media[0]), Buffer.from(r.capture.split(',')[1], 'base64'));
   const about = (r.about || 'No note.').slice(0, 500);

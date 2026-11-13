@@ -25,10 +25,6 @@ try {
   cpSync(join(repo, 'docs/logo.svg'), join(dir, 'project.svg'));
   cpSync(join(repo, 'fixtures/contract/design.v1/design'), join(dir, 'design'), { recursive: true });
   so('project', board, '--name', 'sign-off', '--icon', 'project.svg');
-  so('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Release the project icons', '--project', 'sign-off', '--progress', '70', '--priority', 'P0');
-  so('ticket', board, '--id', 'T-9', '--description', 'Summary line.', '--title', 'Clear project identity everywhere', '--project', 'sign-off');
-  so('ticket', board, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Make report rows useful', '--project', 'sign-off', '--progress', '40', '--parent', 'T-9');
-  so('ticket', board, '--id', 'T-30', '--description', 'Summary line.', '--title', 'Check inherited project icons', '--parent', 'T-29', '--progress', '40');
   if (process.env.REPORT_ROWS_MUXR_ICON) { cpSync(process.env.REPORT_ROWS_MUXR_ICON, join(dir, 'muxr.svg')); so('project', board, '--name', 'Muxr', '--icon', 'muxr.svg'); so('ticket', board, '--id', 'T-39', '--description', 'Summary line.', '--title', 'Make Muxr notifications clear', '--project', 'Muxr', '--progress', '20'); }
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   post('report', { ...fx('report.v5/valid-full.json'), key: 'research', title: 'Which notification service fits a small team?', project: process.env.REPORT_ROWS_MUXR_ICON ? 'Muxr' : 'sign-off', ticket: process.env.REPORT_ROWS_MUXR_ICON ? 'T-39' : 'T-29', filed: now });
@@ -50,16 +46,10 @@ try {
   const measures = [];
   for (const width of [360, 390, 445, 1280, 1440]) for (const theme of ['light', 'dark']) {
     axi('emulate', '--viewport', `${width}x${width < 1024 ? 844 : 800}x1${width < 1024 ? ',mobile,touch' : ''}`);
-    for (const area of ['reports', 'waiting', 'designs', 'evidence', ...([390, 1280].includes(width) ? ['tickets', 'ticket/T-29', '', 'find'] : [])]) {
-      run(`await page.open(${JSON.stringify(url + '#' + (area === 'ticket/T-29' ? 'tickets' : area))}); await page.eval(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); });`);
+    for (const area of ['reports', 'waiting', 'designs', 'evidence', ...([390, 1280].includes(width) ? ['', 'find'] : [])]) {
+      run(`await page.open(${JSON.stringify(url + '#' + area)}); await page.eval(() => { localStorage.setItem('so-theme', '${theme}'); location.reload(); });`);
       sh('sleep', ['0.5']); axi('snapshot');
       if (area === 'find') { run(`await page.eval(() => { const b = document.querySelector('#find'); b.value = 'o'; b.dispatchEvent(new Event('input')); });`); sh('sleep', ['0.5']); axi('snapshot'); }
-      if (area === 'ticket/T-29') {
-        for (const id of ['T-9', 'T-29']) {
-          run(`await page.eval(() => document.querySelector('a.tk-row[href="#ticket/${id}"]').click());`);
-          sh('sleep', ['0.5']); axi('snapshot');
-        }
-      }
       const result = JSON.parse(run(`console.log(JSON.stringify(await page.eval(async () => {
         await document.fonts.ready; await Promise.all([...document.images].map(i => i.decode().catch(() => {})));
         const rows = [...document.querySelectorAll('main .ui-row, dialog[open] .ui-row')], report = location.hash === '#reports';
@@ -71,7 +61,7 @@ try {
           overflowing: [...document.querySelectorAll('main .ui-row *')].filter(e => e.getBoundingClientRect().right > w + 1).map(e => e.className),
           squashed_text: (() => { const ctx = document.createElement('canvas').getContext('2d'); const out = []; for (const e of document.querySelectorAll('body *')) { const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.data.trim()); const text = nodes.map((n) => n.data).join(' ').replace(/\\s+/g, ' ').trim(); const s = getComputedStyle(e); const w = e.offsetWidth; const h = e.offsetHeight; if (!(e instanceof HTMLElement) || !text || !e.getClientRects().length || ((w <= 1 || h <= 1) && s.overflow !== 'visible') || s.visibility !== 'visible') continue; ctx.font = s.fontStyle + ' ' + s.fontWeight + ' ' + s.fontSize + ' ' + s.fontFamily; const chars = w / (ctx.measureText('abcdefghijklmnopqrstuvwxyz').width / 26); const words = text.split(' ').length; const tops = new Set(); for (const n of nodes) { const r = document.createRange(); r.selectNodeContents(n); for (const b of r.getClientRects()) if (b.width) tops.add(Math.round(b.top)); } if ((chars < 8 && ctx.measureText(text).width > w + 1) || tops.size > words) out.push({ element: e.tagName.toLowerCase() + (e.id ? '#' + e.id : e.classList[0] ? '.' + e.classList[0] : ''), text: text.slice(0, 40), chars: Math.round(chars * 10) / 10, lines: tops.size, words }); } return out; })() };
       })));`).trim());
-      const name = `${area === 'waiting' ? 'decide' : area === 'ticket/T-29' ? 'epic' : area === '' ? 'today' : area === 'find' ? 'search' : area}.${theme}.${width}w`;
+      const name = `${area === 'waiting' ? 'decide' : area === '' ? 'today' : area === 'find' ? 'search' : area}.${theme}.${width}w`;
       axi('screenshot', join(review, name + '.png'));
       if (review !== dest && area === 'reports' && (process.env.REPORT_ROWS_JUDGED ?? '360,390,445,1280,1440').split(',').includes(String(width))) cpSync(join(review, name + '.png'), join(dest, name + '.png'));
       result.console = axi('console', '--type', 'error'); const network = axi('network');
@@ -81,7 +71,6 @@ try {
       if (!before) {
         assert.equal(result.thumbnailOverflow, 0); assert.deepEqual(result.monograms, []); assert.deepEqual(result.console_errors, []); assert.deepEqual(result.failed_requests, []); assert.equal(result.overflow, false); assert.deepEqual(result.overflowing, []); assert.deepEqual(result.squashed_text.filter(x => /rp-ticket|rkc|ui-icon/.test(x.element)), []);
         assert.ok(result.rows.length || (area === 'designs' && width >= 1024 && result.designCards > 0)); assert.ok(result.rows.every(r => !r.mono && !r.kindGlyph && (r.loaded || (r.neutral && /retro/.test(r.title)))), name + ': the project icon on every tile, the neutral mark only for a project with no icon, never a kind glyph');
-        if (area === 'ticket/T-29') assert.ok(result.ticketHeaderIcon && result.ticketTreeIcon, name + ': shared header and inherited epic-tree icons');
         if (area === 'designs' && width < 1024) assert.ok(result.rows.some(r => r.icon?.includes('first-frame.webp')), name + ': first real design frame');
         if (area === 'reports') {
           assert.ok(result.rows.every(r => r.kind && !r.oldBar && (r.title.includes('retro') ? r.ticket === undefined : r.ticket)), name + ': the ticket chip only where a ticket is linked');

@@ -99,10 +99,9 @@ test('a first screen is one small page of the board, paging covers the rest, one
   assert.ok(items.body.decisions.every((d) => (d.sections ?? []).every((s) => !('body' in s) && !('blocks' in s))), 'no row carries a report body, only the parts it is made of');
   assert.ok(items.body.decisions.find((d) => d.key === 'plan-0').sections.length > 0, "a plan's row still names the parts its list draws");
   assert.ok(items.body.decisions.filter((d) => d.evidenceCard).every((d) => d.evidenceCard.media.length <= 1), 'a row carries at most one capture');
-  // The Tickets screen's own read: the roll-up, with no items to carry it.
-  const tickets = await get('api/decisions?view=tickets');
-  assert.deepEqual([tickets.body.decisions.length, Array.isArray(tickets.body.tickets)], [0, true]);
-  assert.equal(tickets.body.counts.tickets, all.body.tickets.length);
+  // The board keeps no tickets: there is no tickets view, and nothing of one rides on the board's own reads.
+  assert.equal((await fetch(url + 'api/decisions?view=tickets')).status, 422);
+  assert.ok(!('tickets' in all.body) && !('tickets' in items.body));
 
   // One card whole: the report body, the guided page's writing and the proof as checked, for the screen that opens it.
   const card = await get('api/decisions?view=card&key=plan-0');
@@ -113,11 +112,10 @@ test('a first screen is one small page of the board, paging covers the rest, one
   assert.equal((await fetch(url + 'api/decisions?view=card&key=nope')).status, 404);
   assert.equal((await fetch(url + 'api/decisions?view=nope')).status, 422);
 
-  // The whole board is unchanged: every item, its report body, its proof card and its ticket roll-up.
+  // The whole board is unchanged: every item, its report body and its proof card.
   assert.equal(all.body.decisions.length, board.decisions.length);
   assert.equal(all.body.decisions.find((d) => d.key === 'plan-0').sections[0].body.length, 9_000);
   assert.equal(all.body.decisions.find((d) => d.key === 'plan-0').evidenceCard.result, 'RUN PASS');
-  assert.ok(Array.isArray(all.body.tickets));
 
   // A view is kept like the board it came from: a poll of an unchanged board is a 304 with no body, and an answer changes it.
   const etag = first.res.headers.get('etag');

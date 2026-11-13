@@ -64,10 +64,10 @@ The user often reads the board on a phone. Each card must make sense in 10 secon
 
 ## Link each card to its ticket
 
-When the work belongs to a ticket and you know its id, pass `--ticket <id>` on every `raise` and `post` for it (any `--type` or `--kind`, or `"ticket"` in the message or `--from` item). The card then shows a Ticket row, the ticket's title and progress, that opens the ticket with every card on it.
+When the work belongs to a ticket and you know its id, pass `--ticket <id>` on every `raise` and `post` for it (any `--type` or `--kind`, or `"ticket"` in the message or `--from` item). The card then shows a Ticket row that opens the ticket with every card on it.
 
-- It is optional and only a reference: leave it out when you know no ticket, and never invent an id. A card whose ticket is not on the board shows no row, and works as before.
-- A ticket stands alone: `npx -y sign-off-axi ticket --id <id> --title "<the work>" --description "<one-line summary> # Ask ... # Why ... # Done when ..." --progress <0-100>` makes it (a new ticket without a description is refused; `ticket --backfill` gives old ones their title as the summary), and `--progress` again as the work moves. Tickets nest as epics > tickets > tasks: `--parent <id>` puts one under another, and one with others under it is as far along as their average, so move the progress of the ones with nothing under them. Add `--priority P0-P3` and `--project <name>` when you know them, `--hold yes` while the work waits (`--hold no` when it moves again), `--asked yes` when the user asked for the work, `--release <label>` for the release it ships in, `--state queued|"in progress"|"on hold"|done` to set where it is listed (it wins over progress and hold) and `--pr <url>` (repeat or comma-separate) for its pull requests: the ticket's page shows the release, the state and each linked PR, and `--pr` replaces the list, so send them all. An empty value clears a field. Write only your own tickets. `ticket --id <id>` shows a ticket and its cards; `ticket` lists them all.
+- It is optional and only a reference: leave it out when you know no ticket, and never invent an id. The board never checks it, and the card works as before.
+- Tickets live in the ticket system behind the board's ticket adapter, never on the board: read and write them with `npx -y sign-off-axi ticket` (`--fields` says what the backend has; `--create --set title=...` makes one; `--id <id> --rev <rev> --set ...` edits it with the rev you read; `--text` comments). Never invent a status or kind word: use the ones `--fields` lists.
 
 ## Say how urgent a card is, and give your project its icon
 

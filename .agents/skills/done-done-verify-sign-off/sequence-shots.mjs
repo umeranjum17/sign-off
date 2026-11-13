@@ -19,7 +19,6 @@ const records = [], reportsOnly = process.env.SEQUENCE_ONLY === 'reports'; // th
 try {
   const base = run('bash', ['.agents/skills/done-done-verify-sign-off/seed-board.sh', dir], { env }).trim().split('\n').at(-1);
   copyFileSync('docs/logo.svg', join(dir, 'project.svg')); cli('project', join(dir, 'board.json'), '--name', 'sign-off', '--icon', 'project.svg');
-  for (const id of ['T-1', 'T-2']) cli('ticket', join(dir, 'board.json'), '--id', id, '--description', 'Summary line.', '--title', id === 'T-1' ? 'Ship the settings page' : 'Prepare release notes', '--asked', 'yes', '--progress', '40');
   const design = JSON.parse(readFileSync(join(dir, 'design-message.json'), 'utf8'));
   writeFileSync(join(dir, 'second-design.json'), JSON.stringify({ ...design, key: 'settings-review', title: 'Approve the settings review?' }));
   cli('post', join(dir, 'board.json'), '--kind', 'design', '--from', join(dir, 'second-design.json'));
@@ -63,7 +62,7 @@ try {
       run('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', join(dir, 'motion.ffconcat'), '-vf', 'fps=30,scale=390:844:force_original_aspect_ratio=decrease,pad=390:844:(ow-iw)/2:(oh-ih)/2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', join(out, 'sequence-motion.mp4')]);
     }
     });
-    for (const [area, selector] of [['reports', '.rp-page a.dl-face'], ['designs', '.dz-list a[href], .dz-strip a[href]'], ['tickets', '.tk-row']].filter(([area]) => !reportsOnly || area === 'reports')) {
+    for (const [area, selector] of [['reports', '.rp-page a.dl-face'], ['designs', '.dz-list a[href], .dz-strip a[href]']].filter(([area]) => !reportsOnly || area === 'reports')) {
       capture(area, () => {
       browser('open', base + '#' + area); settle();
       browser('eval', `async () => { for (let i = 0; i < 40 && !document.querySelector(${JSON.stringify(selector)}); i++) await new Promise(r => setTimeout(r, 250)); document.querySelector(${JSON.stringify(selector)}).click(); return 1; }`); settle();
@@ -85,7 +84,7 @@ try {
     }
   }
   writeFileSync(join(out, 'sequence-checks.json'), JSON.stringify(records, null, 2));
-  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: before ? ['Open each detail kind and the Evidence list in both themes at five widths', 'Read the existing headers before detail navigation'] : ['Browse an open ask with previous/next arrows and a position at 360, 390, 445, 1280 and 1440 in light and dark', 'Use J/K to move in the originating list order across asks, proofs, reports, designs and tickets, keeping each sequence', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows', 'Read the report head: it holds its pager, and on a phone the title sits below the previous and next buttons, not under them'], result: before ? 'Baseline detail headers and list rows captured before navigation changes' : 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
+  writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(resolve('package.json'), 'utf8')).version }, start: 'The originating filtered list', steps: before ? ['Open each detail kind and the Evidence list in both themes at five widths', 'Read the existing headers before detail navigation'] : ['Browse an open ask with previous/next arrows and a position at 360, 390, 445, 1280 and 1440 in light and dark', 'Use J/K to move in the originating list order across asks, proofs, reports and designs, keeping each sequence', 'Reload and confirm the same sequence and position', 'Read header position and disabled end arrows', 'Read the report head: it holds its pager, and on a phone the title sits below the previous and next buttons, not under them'], result: before ? 'Baseline detail headers and list rows captured before navigation changes' : 'All detail kinds retain their list sequence with visible header navigation', captures: records }, null, 2));
   if (out !== sealed) { mkdirSync(sealed, { recursive: true }); for (const r of records.filter(r => r.ask)) for (const ext of ['png', 'dom.json']) copyFileSync(join(out, `sequence.${r.cell}.${ext}`), join(sealed, `sequence.${r.cell}.${ext}`)); for (const name of ['sequence-motion.mp4', 'steps.json']) copyFileSync(join(out, name), join(sealed, name)); }
 } finally {
   browser('stop');

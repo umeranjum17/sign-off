@@ -51,7 +51,7 @@
   const pending = new Map();
   const keepPending = (saved) => { if (pending.size) state = { ...state, answers: { ...state.answers, ...Object.fromEntries([...pending].filter(([k]) => k !== saved)) } }; };
 
-  /** A part of the board as it comes back: rows with the counts and the page they are, one card whole, or the ticket roll-up. */
+  /** A part of the board as it comes back: rows with the counts and the page they are, or one card whole. */
   const view = (path) => fetch(path).then(async (res) => {
     const body = await res.json().catch(() => ({ error: `The server replied ${res.status}` }));
     if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status });
@@ -69,14 +69,12 @@
   function mergeView(body) {
     // The whole board (an answer's own reply, or an older client reading it whole) is the board: it replaces what the parts had gathered.
     if (!body.page) return void ((state = body), (wholeBoard = true));
-    // Everything a part says about the board itself is the board's: its address, its counts, who may answer it, its ticket roll-up outside the rows.
-    const { decisions = [], tickets: rolled = [], trail = [], rounds = [], messages = [], annotations = [], comments = [], page = state.page, ...board } = body;
+    // Everything a part says about the board itself is the board's: its address, its counts, who may answer it, outside the rows.
+    const { decisions = [], trail = [], rounds = [], messages = [], annotations = [], comments = [], page = state.page, ...board } = body;
     const rows = new Map(state.decisions.map((d) => [d.key, d]));
     if (body.card) rows.set(body.card.key, { ...body.card, whole: true });
     // A page brings each row as the board has it now, a card already open included: its card is read again under the same key when the address names it.
     for (const d of decisions) rows.set(d.key, d);
-    const roll = new Map((state.tickets ?? []).map((t) => [t.id, t]));
-    for (const t of rolled) roll.set(t.id, t);
     // A card's own activity joins the board's lists, each entry once, so opening a card never doubles its thread.
     const joined = (name) => { const have = new Set((state[name] ?? []).map((x) => JSON.stringify(x))); return [...(state[name] ?? []), ...(body[name] ?? []).filter((x) => !have.has(JSON.stringify(x)))]; };
     // A page names the cards it read last, and the board's own lists (an answer, a dismissal, what was read or restored) come with it for those
@@ -89,7 +87,6 @@
     const kept = (name, of = (k) => k) => ({ ...Object.fromEntries(Object.entries(state[name] ?? {}).filter(([k]) => !mine.has(of(k)))), ...body[name] });
     const listed = (name) => (full ? body[name] : [...(state[name] ?? []).filter((x) => !mine.has(x?.key ?? x)), ...(body[name] ?? [])]);
     state = { ...state, ...board, decisions: [...rows.values()], page,
-      tickets: page.view === 'tickets' ? rolled : roll.size ? [...roll.values()] : state.tickets,
       ...Object.fromEntries(['trail', 'rounds', 'messages', 'annotations', 'comments'].map((name) => [name, joined(name)])),
       // A part that says nothing of a list leaves it alone: a card brings its own answer and nobody else's, and a list it never mentions stays as it was. 'done' is the rail's own marks, kept like them so a thread stays Done after a reload.
       ...Object.fromEntries(['dismissed', 'promoted', 'seen', 'deeper'].filter(had).map((name) => [name, listed(name)])),
@@ -822,10 +819,8 @@
     };
     return el('div', { class: 'proof-block' }, el('p', { class: 'ui-dl' }, 'Proof'), row);
   }
-  /** The ticket a card names, when it is on the board: tickets stand alone, so a card without one, or naming one the board has not got, shows nothing. */
-  const ticketOf = (d) => (d?.ticket ? (state.tickets ?? []).find((t) => t.id === d.ticket) : undefined);
-  /** A card's ticket as one panel row under what the card says (ui.css): the ticket's title and progress. The row opens the ticket's page. */
-  const ticketRow = (d) => { const p = uiProps(ticketProp(ticketOf(d))); if (p) p.classList.add('ui-tk'); return p; };
+  /** A card's ticket as one panel row under what the card says (ui.css): the ticket's id. The row opens the ticket's page. */
+  const ticketRow = (d) => { const p = uiProps(ticketProp(d?.ticket)); if (p) p.classList.add('ui-tk'); return p; };
   let ticketBack = '';
   /** What a card on a ticket's page is, in a word, and where it stands: waiting, answered, its proof's result or its review. */
   const tkKind = (d) => (d.type === 'evidence' ? 'Proof' : d.kind === 'design' || d.type === 'design' ? 'Design' : d.type === 'plan' ? 'Plan' : ['reports', 'notes'].includes(area(d)) ? 'Report' : 'Ask');
@@ -891,7 +886,7 @@
     const gone = new Set(state.dismissed ?? []), last = new Map();
     for (const t of [...(state.trail ?? [])].filter((x) => x.kind !== 'ticket').sort(bySecond)) last.set(t.key, t);
     // A reply on a ticket comment opens its ticket.
-    const asCard = (t) => { const k = tkById(t.key); return k && { key: `ticket:${k.id}`, onTicket: k }; };
+    const asCard = (t) => ({ key: `ticket:${t.key}`, onTicket: { id: t.key, title: (moreReady && tkById(t.key)?.title) || `Ticket ${t.key}` } });
     // Replies counts the whole board — a reply can sit on a card no page has reached yet — so the section waits for the board's pages and counts them
     // once, rather than showing one reply and then two a moment later.
     if (!paged && !wholeBoard) return '';
@@ -900,7 +895,7 @@
       .filter(([d]) => d && !gone.has(d.key)).sort(([, x], [, y]) => Date.parse(y.reply.at) - Date.parse(x.reply.at));
     if (!rows.length) return '';
     return el('section', { class: 't-wait t-replies', 'aria-label': 'Replies' }, el('h2', { class: 'ui-sec' }, 'Replies', el('span', { class: 'n' }, String(rows.length))),
-      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTypeTile(k) : cardTile(d), title: k ? k.title : title(d),
+      el('ul', { class: 'ui-card ui-list' }, ...rows.map(([d, t]) => { const k = d.onTicket, a = el('a', { class: 'ui-row', href: k ? `#ticket/${k.id}` : hrefOf(d) }, ...uiRow({ tile: k ? tkTile(false) : cardTile(d), title: k ? k.title : title(d),
         meta: [trailWhen(t.reply.at), t.reply.text ?? (t.reply.link ? linkName(t.reply.link) : 'Posted a new version')].join(' · ') })); a.onclick = () => (jump = d.key); return el('li', {}, a); })));
   }
   /** A result's mark: the pass tick only for passed proof, a cross for failed, an alert for not finished or unchecked. */
@@ -1009,7 +1004,7 @@
   /** A proof's panel (ui.css): done-done's word, its priority, the ask it serves with its progress, and its pull request. */
   const proofHead = (d) => d.proofHead ?? 'Unknown';
   const releaseWord = (d) => { const r = d.evidence?.release_state; return r?.state === 'released' && typeof r.version === 'string' && r.version.trim() && typeof r.destination === 'string' && r.destination.trim() ? `Released ${r.version} · ${r.destination}` : r?.state === 'unreleased' ? 'Not released' : 'Unknown'; };
-  const evProps = (d) => { const p = uiProps(d.evidence && uiProp({ mark: 'dot', name: 'Proof head', value: proofHead(d) }), d.evidence && uiProp({ mark: 'dot', name: 'Release', value: releaseWord(d) }), d.evidenceCard?.runState && uiProp({ mark: 'dot', name: 'Run', value: d.evidenceCard.runState }), d.status && uiProp({ mark: 'dot', name: 'Status', value: el('span', { class: 'ev-status' }, d.status) }), !d.status || judged(d) || d.evidenceCard || d.evidence ? uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }) : '', priorityProp(prio(d)), ticketProp(ticketOf(d), 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
+  const evProps = (d) => { const p = uiProps(d.evidence && uiProp({ mark: 'dot', name: 'Proof head', value: proofHead(d) }), d.evidence && uiProp({ mark: 'dot', name: 'Release', value: releaseWord(d) }), d.evidenceCard?.runState && uiProp({ mark: 'dot', name: 'Run', value: d.evidenceCard.runState }), d.status && uiProp({ mark: 'dot', name: 'Status', value: el('span', { class: 'ev-status' }, d.status) }), !d.status || judged(d) || d.evidenceCard || d.evidence ? uiProp({ mark: 'shield', name: 'done-done', value: el('span', { class: `ev-word ${judged(d)}` }, judgedWord(d)) }) : '', priorityProp(prio(d)), ticketProp(d.ticket, 'Its ask'), changeProp(d)); p.classList.add('ev-props'); return p; };
   /** One update as a sheet over the list on a phone: its project and time, its whole title, the capture, then its panel, what it says, its Activity and the verdict. */
   function proofPane(d) {
     const project = projectOf(d), said = plain((d.about ?? '').replace(HELD, '').replace(UNCONFIRMED, '')), name = plain(headline(d)), why = plain(unchecked(d));
@@ -1216,10 +1211,8 @@
     ...(label && { 'aria-label': label }) }, el('span', { class: 'k' }, glyph(mark), name), ' ', el('span', { class: 'v' }, ...[value].flat()));
   /** A card's priority as its chip, only where one is set. */
   const priorityProp = (p) => p && uiProp({ mark: 'flag', name: 'Priority', value: el('span', { class: `ui-pc ${p.toLowerCase()}` }, p) });
-  /** The ticket a card belongs to: its title in full, then a bar with its percent once work on it has begun (full at 100%). The row opens the ticket's page. */
-  const ticketProp = (t, name = 'Ticket') => t && uiProp({ mark: 'layers', name, cls: 'tall', href: `#ticket/${t.id}`, label: `${name}: ${t.title}, ${t.progress}% done`,
-    value: [el('span', { class: 'wt', dir: 'auto' }, t.title), ' ', el('span', { class: 'bp' }, ...(t.progress > 0 ? [el('span', { class: 'ui-bar', 'aria-hidden': 'true' }, el('i', { style: `width: ${t.progress}%` })),
-      el('span', { class: 'n' }, `${t.progress}%`)] : [el('span', { class: 'n' }, 'Not started')]))] });
+  /** The ticket a card belongs to: a row with its id, which opens the ticket's page. The board holds no ticket data, so the row names the ticket and the page says the rest. */
+  const ticketProp = (id, name = 'Ticket') => id && uiProp({ mark: 'layers', name, href: `#ticket/${id}`, label: `${name} ${id}`, value: el('span', { dir: 'ltr' }, id) });
   /** The change a card links: a pull request by its number, any other link by the site it opens. */
   const changeProp = (d) => { const c = changeHref(d), pr = /\/(?:pull|pulls|merge_requests)\/(\d+)/.exec(c)?.[1];
     return c && uiProp({ mark: 'pr', name: pr ? 'Pull request' : 'Change', href: c, label: `${pr ? 'Pull request' : 'Change'} ${pr ? `#${pr}` : new URL(c).host}, ${headline(d)}`, value: el('span', {}, pr ? `#${pr}` : new URL(c).host) }); };
@@ -1352,7 +1345,7 @@
   /** A design's group is what its filer typed: a project's name, or sometimes a raw key (fd-wrapper-design). A name no project has that reads as a key is not shown as one. */
   const plainGroup = (d) => { const g = d.group; if (!g) return g; const known = (state.projects ?? []).find((p) => p.name.toLowerCase() === g.toLowerCase()); return known ? known.name : /^[\w.]+([-_.][\w.]+)+$/.test(g) && !/\s/.test(g) && g === g.toLowerCase() ? '' : g; };
   const projectName = (d) => d.project || ((d.kind === 'design' || d.type === 'design') ? plainGroup(d) : d.group) || (d.type === 'evidence' ? projectOf(d) : d.proof && projectOf(state.decisions.find((x) => x.key === d.proof) ?? {}))
-    || (ticketOf(d) && tkProject(ticketOf(d))) || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
+    || (d.by && (state.projects ?? []).find((p) => p.name.toLowerCase() === d.by.toLowerCase())?.name) || undefined;
   /** One project picture and tile for every list; use the pinned record, with a neutral project icon when the project has none. */
   function projectPic(name, fallback = () => glyph('layers')) {
     const p = name && (state.projects ?? []).find((p) => p.name.toLowerCase() === name.toLowerCase());
@@ -1373,13 +1366,11 @@
     else if (frame) { const img = el('img', { class: 'design-thumb', src: src(designUrl(d, frame)), alt: '' }); const none = () => img.replaceWith(projectPic(projectName(d), boardPic)); img.addEventListener('error', none); img.addEventListener('load', () => { if (img.naturalWidth < 2) none(); }); tile.replaceChildren(img); }
     return tile;
   };
-  /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its ticket's progress once it has some (a full bar when done), or else its project (or what it is) and when. */
-  const progressOf = (n) => (n > 0 ? Math.min(n, 100) : undefined);
+  /** A card as the new look's row, a link to where it opens: its tile, its title and priority, then its project (or what it is) and when. */
   function cardRow(d) {
-    const t = ticketOf(d), what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report'), shown = d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d);
-    // The name leads with the words the row shows (title, priority, percent), then says what the percent is of.
-    const link = el('a', { class: 'ui-row', href: hrefOf(d), ...(t?.progress > 0 && { 'aria-label': `${shown}${d.priority ? ` ${d.priority}` : ''} ${t.progress}% done, ticket ${t.title}` }) }, ...uiRow({ tile: cardTile(d), title: shown, priority: d.priority, badge: trailBadge(d.key),
-      meta: d.type === 'signin' ? el('span', {}, what, d.expires || openedAt(d) ? ' · ' : '', signinRow(d)) : [what, d.filed && filedAt(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }));
+    const what = projectName(d) ?? (area(d) === 'waiting' ? kind(d) : NAMES[d.type] ?? 'Report'), shown = d.type === 'signin' ? `Sign in to ${d.title}` : d.type === 'evidence' ? headline(d) : title(d);
+    const link = el('a', { class: 'ui-row', href: hrefOf(d) }, ...uiRow({ tile: cardTile(d), title: shown, priority: d.priority, badge: trailBadge(d.key),
+      meta: d.type === 'signin' ? el('span', {}, what, d.expires || openedAt(d) ? ' · ' : '', signinRow(d)) : [what, d.filed && filedAt(d.filed)].filter(Boolean).join(' · ') }));
     link.onclick = () => (jump = d.key);
     return el('li', {}, link);
   }
@@ -1453,19 +1444,17 @@
       state.version ? el('div', { class: 'ui-props' }, el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, 'Version'), el('span', { class: 'v' }, el('span', {}, state.version)))) : ''));
   }
   const hasMore = (by) => by.answered.length || by.designs.length || state.leash || state.version || !(FROZEN || state.readonly || state.answers_only);
-  /** Search: each card's title and what it says, matched as typed, in groups (Asks, Proof, Reports, Answered, Designs, Tickets) of the first four rows each. */
+  /** Search: each card's title and what it says, matched as typed, in groups (Asks, Proof, Reports, Answered, Designs) of the first four rows each. */
   const searchSheet = sheetOf('t-search');
   let query = '';
   function openSearch() {
     if (searchSheet.open) return searchSheet.querySelector('input').focus();
-    const box = el('input', { type: 'search', id: 'find', 'aria-label': 'Search the board', placeholder: 'An ask, a proof, a report or a ticket', autocomplete: 'off', enterkeyhint: 'search' }), out = el('div', {});
+    const box = el('input', { type: 'search', id: 'find', 'aria-label': 'Search the board', placeholder: 'An ask, a proof or a report', autocomplete: 'off', enterkeyhint: 'search' }), out = el('div', {});
     const show = () => {
       const q = query.trim().toLowerCase(), gone = new Set(state.dismissed ?? []), hit = (...s) => s.join(' ').toLowerCase().includes(q);
       const cards = q ? state.decisions.filter((d) => !gone.has(d.key) && hit(title(d), d.about ?? '', projectName(d) ?? '')).reverse() : [];
       const group = (name, ...as) => [name, cards.filter((d) => as.includes(area(d))).slice(0, 4).map(cardRow)];
-      // A ticket is found by its readable name or its slug as well as its title, and names itself the way its rows do.
-      const tickets = q ? (state.tickets ?? []).filter((t) => hit(t.title, t.id, t.key ?? '')).slice(0, 4).map((t) => el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${t.id}` }, ...uiRow({ tile: tkTypeTile(t), title: t.title, after: t.key ? tkKey(t.key) : '', progress: progressOf(t.progress), meta: t.key || 'Not started' })))) : [];
-      const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs'), ['Tickets', tickets]].filter(([, rows]) => rows.length);
+      const groups = [group('Asks', 'waiting'), group('Proof', 'evidence'), group('Reports', 'reports', 'notes'), group('Answered', 'answered'), group('Designs', 'designs')].filter(([, rows]) => rows.length);
       out.replaceChildren(...(!q ? [el('p', { class: 't-grp' }, 'Type to search the whole board.')] : groups.length ? groups.flatMap(([name, rows]) => [el('p', { class: 't-grp' }, name), el('ul', { class: 'ui-card ui-list' }, ...rows)])
         : [typeof emptyState === 'function' ? emptyState('empty', { mark: 'list', title: `Nothing matches “${query.trim()}”`, text: 'Try another word, or a shorter one.', small: true }) : el('p', { class: 't-grp' }, `Nothing matches “${query.trim()}”.`)]));
     };
@@ -1481,110 +1470,15 @@
   // Search, the dock's round button or the sidebar's, opens over the screen it is tapped on.
   addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]')) e.preventDefault(), openSearch(); });
 
-  /* Tickets, as the approved prototype draws them: Your asks or System, the done dot grid, then In progress, On hold and To do; a ticket opens over the list on a phone
-     (its project and state, its title in full, its priority, progress and what it sits under, the tickets under it, its cards and their Activity) and in a third column on a desk.
-     An epic is a ticket with tickets under it, and those may have sub-tasks: the lists hold the tickets that sit under none, each as far along as what is under it (the server rolls it up). */
-  const TK_WORDS = { done: 'Done', hold: 'On hold', moving: 'In progress', todo: 'To do' };
+  /* Tickets: the screens are app-more.js's and read the tickets through the board's ticket API. What this file draws of them is a card's Ticket row and a ticket's tile. */
   // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
   const TK_MARKS = { chip: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21"/>', flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
     layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>',
     'no-person': '<circle cx="12" cy="8" r="3.2"/><path d="M5.5 19.5c0-3.3 2.9-5.5 6.5-5.5M4 4l16 16"/>',
     pause: '<path d="M9 6v12M15 6v12"/>' };
+  /** A ticket's tile; the one with other tickets under it wears the epic's mark. */
+  const tkTile = (epic) => { const s = el('span', { class: 'ui-icon tk-tile', role: 'img', 'aria-label': epic ? 'Has tickets under it' : 'Ticket' }); s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#tk-${epic ? 'e' : 't'}"/></svg>`; return s; };
   const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
-  let tkWhose = '', tkProj = '';
-  const tkAll = () => state.tickets ?? [];
-  const tkById = (id) => tkAll().find((t) => t.id === id);
-  const tkStateOf = (t) => ({ queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' }[t.state] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo'));
-  const TICKET_STUCK_SECONDS = 6 * 60 * 60;
-  const tkStatus = (t) => {
-    if (tkUnder(t).length) return [];
-    const age = Date.now() / 1000 - t.last_event_at;
-    return [t.stage ? el('span', { class: 'ui-pc tk-stage' }, t.stage) : '',
-      t.last_event_at !== undefined && t.stage !== 'done' && age > TICKET_STUCK_SECONDS
-        ? el('span', { class: 'tk-stuck' }, `stuck ${age < 86400 ? Math.floor(age / 3600) + 'h' : Math.floor(age / 86400) + 'd'}`) : ''];
-  };
-  const tkUnder = (t) => tkAll().filter((x) => x.parent === t.id);
-  /** The tickets a ticket sits under, nearest first; a parent not on the board, or a loop of parents, ends the line. */
-  const tkAbove = (t) => { const up = []; for (let x = tkById(t.parent); x && x !== t && !up.includes(x); x = tkById(x.parent)) up.push(x); return up; };
-  const tkRoot = (t) => tkAbove(t).at(-1) ?? t;
-  // A ticket under another takes the project and the asking of the ticket at the top of its line, unless it names its own project.
-  const tkProject = (t) => t.project ?? tkRoot(t).project;
-  const tkWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
-  /** Under an epic its tickets; under a ticket its sub-tasks. */
-  const tkKids = (t) => (tkAbove(t).length ? 'sub-task' : 'ticket');
-  const tkKey = (k) => el('span', { class: 'tk-key', dir: 'ltr' }, k);
-  const tkType = (t) => ({ epic: 1, ticket: 1, bug: 1, decision: 1, evidence: 1, merge: 1 }[t.type] ? t.type : tkUnder(t).length ? 'epic' : 'ticket');
-  const tkTypeTile = (t) => { const k = tkType(t), s = el('span', { class: `ui-icon tk-tile t-${k}`, role: 'img', 'aria-label': k });
-    s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#tk-${k[0]}"/></svg>`; return s; };
-  /** A mark from web/logos, drawn as a mask in the text colour. */
-  const logoMark = (src, name) => el('span', { class: 'tk-logo', role: 'img', 'aria-label': name, style: `--logo: url("${/^\/logos\/[\w-]+\.svg$/.test(src ?? '') ? src : '/logos/generic.svg'}")` });
-  // Filled by app-more.js when the screens file lands: the owner line and a short reason are drawn after the first paint.
-  let tkOwnerLine = () => '', tkShort = (t) => t, tkResolve = () => {};
-  /** The tickets the lists hold (those under no ticket on the board), of the kind and project picked. The kinds show only while the board has both. */
-  function tkLists() {
-    const roots = tkAll().filter((t) => !tkById(t.parent)), asked = roots.filter((t) => t.asked), both = asked.length > 0 && asked.length < roots.length;
-    const kind = both ? tkWhose : '', ofKind = roots.filter((t) => !kind || !!t.asked === (kind === 'asks')), shown = ofKind.filter((t) => !tkProj || tkProject(t) === tkProj);
-    const byPrio = (x, y) => (x.priority ?? 'P9').localeCompare(y.priority ?? 'P9') || (Date.parse(y.at) || 0) - (Date.parse(x.at) || 0);
-    const of = (s) => shown.filter((t) => tkStateOf(t) === s).sort(byPrio);
-    return { roots, both, kind, asked: asked.length, ofKind, shown, done: of('done'), moving: of('moving'), hold: of('hold'), todo: of('todo') };
-  }
-  /** The head of All tickets says the board's one total, the same words the Story's head says: every ticket, how many are done and how many are open. */
-  function tkHero() {
-    const all = tkAll(), open = all.filter((t) => tkStateOf(t) !== 'done').length;
-    return el('section', { class: 'ui-card ui-hero tk-hero' }, el('div', { class: 'hl' }, el('span', { class: 'lab' }, 'All tickets')),
-      el('div', { class: 'hv' }, el('span', { class: 'big' }, String(all.length)), el('span', { class: 'tk-hero-sub' }, ` tickets · ${all.length - open} done · ${open} open`)));
-  }
-  /** The tabs at the top of Tickets: every ticket, the epics with their children, and Activity, the timeline of what moved on them. */
-  function tkTabs(on) {
-    const b = (v, name, hash = `#${v}`) => { const x = el('button', { type: 'button', 'aria-pressed': String(on === v) }, name); x.onclick = () => { if (on !== v) buzz('tick'), location.hash = hash; }; return x; };
-    return el('div', { class: 'ui-seg tk-seg', role: 'group', 'aria-label': 'Tickets view' }, b('story', 'Story', '#tickets'), b('epics', 'Epics'), b('tickets', 'All tickets', '#tickets/all'), b('activity', 'Activity'));
-  }
-  /** Who asked for a ticket: the ones the board's owner asked for, and the fleet's own upkeep. */
-  const TK_WHO = { asks: 'From you', system: 'Fleet upkeep' };
-  /** The filter: a round button in the header (marked while one is picked) that opens a sheet of who asked (while the board has both) and of the projects with tickets, each with Every one. */
-  const tkFilterSheet = sheetOf('tk-filter');
-  function tkFilter(L) {
-    const names = [...new Set(L.ofKind.map(tkProject).filter(Boolean))].sort((x, y) => x.localeCompare(y));
-    if (!names.length && !L.both) return '';
-    const b = el('button', { class: `ui-rb tk-rb${tkProj || L.kind ? ' on' : ''}`, 'aria-label': tkProj || L.kind ? `Filter tickets: ${[TK_WHO[L.kind], tkProj].filter(Boolean).join(', ')}` : 'Filter tickets', 'aria-haspopup': 'dialog' });
-    b.innerHTML = '<svg class="glyph" viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 6h13M6 10h8M8.5 14h3"/></svg>';
-    b.onclick = () => {
-      const pick = (name, n, tile) => { const x = el('button', { class: 'ui-pr tk-pick', ...(tkProj === name && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, tile, name || 'Every project'), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), tkProj === name ? glyph('check') : ''));
-        x.onclick = () => { tkProj = name; tkFilterSheet.close(); render(); }; return x; };
-      const who = (v, n) => { const x = el('button', { class: 'ui-pr tk-pick', ...(L.kind === v && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, TK_WHO[v] ?? 'Everyone'), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), L.kind === v ? glyph('check') : ''));
-        x.onclick = () => { tkWhose = v; tkProj = ''; tkFilterSheet.close(); render(); }; return x; };
-      tkFilterSheet.replaceChildren(el('div', {}, sheetHead('tk-filter', 'Filter tickets'),
-        ...(L.both ? [el('p', { class: 'ui-dl' }, 'Who asked'), el('div', { class: 'ui-props' }, who('', L.roots.length), who('asks', L.asked), who('system', L.roots.length - L.asked))] : []),
-        ...(names.length ? [el('p', { class: 'ui-dl' }, 'Project'), el('div', { class: 'ui-props' }, pick('', L.ofKind.length, ''),
-          ...names.map((p) => pick(p, L.ofKind.filter((t) => tkProject(t) === p).length, el('span', { class: 'tk-pt', 'aria-hidden': 'true' }, projectPic(p)))))] : [])));
-      tkFilterSheet.showModal();
-      tkFilterSheet.querySelector('h2').focus();
-    };
-    return b;
-  }
-  // A tap is aimed where the finger went down. When the list moves under it before the tap lands (a redraw, an image, the page settling), the tap lands on the row that slid under
-  // the finger and opens a ticket; a tap that began on a section's See all or Show fewer does that button's work instead.
-  let tkSeeDown = null;
-  addEventListener('pointerdown', (e) => { const b = e.target.closest?.('body.tickets .ui-sec button.see'); tkSeeDown = b && { label: b.closest('section')?.getAttribute('aria-label'), at: e.timeStamp }; }, true);
-  addEventListener('click', (e) => {
-    const down = tkSeeDown;
-    tkSeeDown = null;
-    if (!down || e.timeStamp - down.at > 1000 || e.target.closest?.('.ui-sec button.see')) return;
-    e.preventDefault(), e.stopPropagation();
-    [...document.querySelectorAll('main section[aria-label]')].find((s) => s.getAttribute('aria-label') === down.label)?.querySelector('.ui-sec button.see')?.click();
-  }, true);
-  /** The Tickets screen. On a phone: the title row, Your asks or System, the hero, then In progress, On hold, To do and Done, and two tiles, with the open ticket as a sheet over them.
-   * On a desk: one filled screen, the head across, then the hero over In progress, On hold over To do, and the open ticket (the first one moving when none is picked). */
-  let tkUp = '';
-  function tkSheet(t) {
-    const rise = !tkUp, x = el('a', { class: 'x', href: ticketBack || '#tickets', 'aria-label': 'Close' }, glyph('x'));
-    tkUp = t.id;
-    return el('div', { class: `tk-over${rise ? ' up' : ''}`, 'data-key': t.id }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
-      el('section', { class: 'tk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': t.title }, el('div', { class: 'grab', 'aria-hidden': 'true' }), ...ticketPage(t, x)));
-  }
-  addEventListener('keydown', (e) => e.key === 'Escape' && !e.defaultPrevented && document.querySelector('.tk-sheet') && !document.querySelector('dialog[open]') && (location.hash = ticketBack || '#tickets'));
-  /** A ticket: its project and where it stands, its title in full, its priority, progress, what it sits under and when it last moved; then the tickets under it, the cards that name it
-   * and their Activity, newest first. */
   function tkSettle() {
     if (phone()) return;
     for (const l of document.querySelectorAll('.tk-card .tk-rows')) {
@@ -1934,7 +1828,7 @@
     const url = summary ? `sheet:${d.key}:${unread(d)}:${kindParts(d).filter(([p]) => partRead(d, p)).length}` : d?.guided ? `guide:${d.key}` : d?.kind === 'design' ? `design:${d.key}` : d?.type === 'evidence' ? `evidence:${d.key}` : d ? reportUrl(d) : '';
     const answer = d?.guided ? '' : d?.type === 'plan' || d?.kind === 'design' || d?.type === 'evidence' ? JSON.stringify(state.answers[d.key] ?? null) : '';
     const plan = d?.type === 'plan' || d?.guided ? JSON.stringify(d) : '';
-    const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([ticketOf(d) ?? null, d ? threadOf(d) : null]);
+    const evidence = d?.type === 'evidence' ? JSON.stringify([d, (state.messages ?? []).filter((m) => m.key === d.key), (state.rounds ?? []).filter((r) => r.key === d.key)]) : '', ticket = JSON.stringify([d?.ticket ?? null, d ? threadOf(d) : null]);
     if (reader.dataset.url === url && reader.dataset.answer === answer && reader.dataset.plan === plan && reader.dataset.evidence === evidence && reader.dataset.ticket === ticket) return d && (reader._guide?.sync(), 1) && (reader.querySelector('h1').textContent = d.type === 'evidence' ? headline(d) : sheet ? plain(d.title) : d.title);
     Object.assign(reader.dataset, { answer, plan, evidence, ticket });
     Object.assign(reader.dataset, { url, key: d?.key ?? '', from });
@@ -2079,9 +1973,8 @@
     return el('span', { class: 'pk-thumb', 'aria-hidden': 'true' }, /\.html?$/i.test(path) ? guardFrame(el('iframe', { src: url, title: '', sandbox: 'allow-scripts', tabindex: '-1', loading: 'eager' }), `thumbnail of ${d.title}`) : el('img', { src: url, alt: '', loading: 'eager', decoding: 'async' }));
   }
   function designRow(d) {
-    const t = ticketOf(d);
     return el('li', { id: `item-${d.key}` }, el('a', { class: 'ui-row', href: designHref(d) },
-      ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · '), progress: progressOf(t?.progress) }), isPick(d) ? pickThumb(d) : '', selMark(d.key)));
+      ...uiRow({ tile: cardTile(d), title: d.title, priority: d.priority, badge: trailBadge(d.key), meta: [designStatus(d), d.filed && day(d.filed)].filter(Boolean).join(' · ') }), isPick(d) ? pickThumb(d) : '', selMark(d.key)));
   }
 
   /** Archived: what was discarded or dismissed from a screen, and the evidence and reports archived a day after they were filed. One quiet line at the list's end opens them
@@ -2143,7 +2036,7 @@
   const whoOf = (d) => projectName(d) || (d.type === 'signin' ? d.waits : d.by) || 'Agent';
   /** What an ask carries, as one panel under its question (ui.css): its priority, and the ticket it belongs to (Its ask) with its progress, which opens the ticket's page.
    *  An ask with neither shows no panel: a ticket is only a reference, and a card without one shows nothing more. */
-  const askProps = (d) => uiProps(priorityProp(priOf(d)), ticketProp(ticketOf(d), 'Its ask'));
+  const askProps = (d) => uiProps(priorityProp(priOf(d)), ticketProp(d.ticket, 'Its ask'));
 
   /** An answered ask Decide opens again, to see the answer or change it: one the person picked or wrote, not a sign-in, a review, a verdict or a card answered with another. */
   const redo = (d) => !state.readonly && d.type !== 'signin' && d.type !== 'evidence' && d.type !== 'plan' && d.kind !== 'design' && !state.answers[d.key]?.merged_by && !!(d.options?.length || d.reply);
@@ -2171,11 +2064,11 @@
   /** A row (ui.css): the ask's icon tile, its question with its priority chip, then its ticket's progress once the ticket has any (a full bar when it is done), else whose it is and when it was filed (a sign-in counts its link down);
    *  the swipe actions sit under it, and on a desk a hover shows the same two as round buttons. */
   function decideRow(d, i, gone) {
-    const g = gone?.group ?? sideOf(d), rec = recOf(d), t = ticketOf(d);
+    const g = gone?.group ?? sideOf(d), rec = recOf(d);
     const meta = d.type === 'signin' ? el('span', {}, `${whoOf(d)} · `, signinRow(d)) : `${whoOf(d)}${d.filed ? ` · ${filedAt(d.filed)}` : ''}`;
     const sel = deskSel === d.key && !gone, opens = askHref(d).startsWith('#decide/');
     const face = el('a', { class: 'dl-face ui-row', href: askHref(d), draggable: 'false', ...(!(gone && gone.how === 'later') && { id: `item-${d.key}` }), ...(opens && { 'data-row': '' }), ...(sel && { 'aria-current': 'true' }) },
-      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), ...(t?.progress > 0 ? { progress: t.progress } : { meta }) }), selMark(d.key));
+      ...uiRow({ tile: cardTile(d), title: d.type === 'signin' ? `Sign in to ${d.title}` : title(d), priority: priOf(d), badge: trailBadge(d.key), meta }), selMark(d.key));
     const act = (cls, mark, words) => el('div', { class: `dl-act ${cls}`, 'aria-hidden': 'true' }, glyph(mark), el('span', {}, words));
     const quick = (cls, mark, words, tip, fn) => { const b = el('button', { class: cls, 'aria-label': `${words}, ${d.title}`, title: tip }, glyph(mark)); b.onclick = fn; return b; };
     const hover = deskSel === null || gone || state.readonly ? '' : el('span', { class: 'dl-hover' }, rec ? quick('yes', 'check', rec.label, `Answer ${rec.label}`, () => quickAnswer(d.key)) : '',
@@ -2743,9 +2636,11 @@
     const inboxAt = at === 'inbox', all = moreReady ? inboxThreads(merged) : [], needs = all.filter((t) => t.needs).length;
     const showingTickets = at === 'tickets' || at === 'ticket' || at === 'activity' || at === 'epics';
     if (moreReady) {
-      if (showingTickets && (!ticketScreen || (!ticketsRead && !tkStoryOnly()))) readTickets(!ticketScreen, tkStoryOnly());
+      if (showingTickets && !ticketScreen) readTickets();
+      // A card or a comment that names a ticket reads its title from the adapter, once, the first time the board draws one.
+      else if (!showingTickets && !tk.tickets && !tk.error && !ticketRequest && ((state.trail ?? []).some((x) => x.kind === 'ticket') || state.decisions.some((d) => d.ticket))) readTickets(true);
       ticketScreen = showingTickets;
-      if (key && (at === 'tickets' ? key !== 'all' : at === 'ticket' && tkLoad() === 'ready' && !tkById(key))) tkResolve(key);
+      if (at === 'tickets' && key && key !== 'all') location.replace(`#ticket/${key}`);
     }
     // The asks Decide steps through, in the list's order, Later last.
     const decideQueue = decideCtx.all.filter((d) => d.type === 'signin' || (d.type !== 'plan' && d.kind !== 'design'));
@@ -2824,7 +2719,7 @@
       !selecting && !state.readonly && !FROZEN && bulk.length ? reportsMore(by.reports, bulk) : '');
     const update = at === 'evidence' && ((key && state.decisions.find((d) => d.key === key && !gone.has(d.key) && d.type === 'evidence')) || by.evidence.find((d) => d.type === 'evidence'));
     const th = inboxAt && threadFor(all, key, !!opening), inboxRead = th?.d && opening && !inPlace(th.d) && (phone() || th.d.type !== 'evidence') ? th.d : undefined;
-    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' || at === 'epics' ? key : '', at === 'tickets' ? (key === 'all' ? 'all' : 'story') : ['activity', 'epics'].includes(at) ? at : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
+    const content = at === 'channels' ? [channelsScreen(key)] : inboxAt ? inboxScreen(all, key, !!opening) : showingTickets ? tickets(by, at === 'ticket' || at === 'epics' ? key : '', ['activity', 'epics'].includes(at) ? at : '') : [...(deskSplit ? [at === 'evidence' ? evidenceDesk(top, by.evidence, archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence')), update)
       : at === 'reports' ? reportsDesk(top, rpPage(), shownReport, by.reports.length > 0, by.reports) : decideDesk(top, by.asks, hidden, decideQueue, key, decideDone, answeredToday)] : at === 'designs' && !phone() && by.designs.length ? [] : [top]), ...(deskSplit ? [] : (at === 'waiting' || at === 'decide') && !state.readonly ? [at === 'decide' && !shownAsk ? emptyState('empty', { mark: 'waiting', title: 'That question isn’t waiting', text: 'It may already be answered. Pick another from the list.' }) : '', decideList(by.asks, hidden, decideDone, answeredToday), at === 'decide' && shownAsk ? askSheet(shownAsk) : '']
       : at === 'designs' ? designGroups(by.designs, top, key, state.decisions.filter((d) => gone.has(d.key) && !merged.has(d.key) && area(d) === 'designs')) : at === 'evidence' ? [...evidenceList(by.evidence, top), archived(state.decisions.filter((d) => gone.has(d.key) && d.type === 'evidence'))] : at === 'reports' && !state.readonly ? [rpPage()] : at === 'answered' && by.answered.length ? done(by.answered) : at ? [by[at].length ? el('div', { class: `list in-${at}${state.readonly ? ' readonly' : ''}` }, ...by[at].map(row))
       : at === 'answered' && state.decisions.some((d) => gone.has(d.key) && isAnswered(d)) ? emptyState('empty', { mark: 'answered', title: 'All done items cleared' }) : screenEmpty(at)] : today(by))];
@@ -2997,7 +2892,7 @@
         const card = await view(`/api/decisions?view=card&key=${encodeURIComponent(open)}`).catch(() => undefined);
         if (card?.card && wrote === was) mergeView(card), (changed = true);
       }
-      if (moreReady && /^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true, tkStoryOnly())) changed = true;
+      if (moreReady && /^#(?:tickets?|activity|epics)(?:\/|$)/.test(location.hash) && await readTickets(true)) changed = true;
       if (!changed) return;
       // One redraw for what the poll read: the lists come in with the page, and the rest of the board draws once when its own pages land.
       await readLists();

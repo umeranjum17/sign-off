@@ -26,7 +26,6 @@ try {
   cpSync(join(repo, 'docs/logo.svg'), join(dir, 'project.svg'));
   cpSync(join(repo, 'docs/media'), join(dir, 'media'), { recursive: true });
   so('project', board, '--name', 'sign-off', '--icon', 'project.svg');
-  so('ticket', board, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Designs one tap away on a phone', '--project', 'sign-off', '--progress', '40', '--priority', 'P1');
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   for (const [i, title] of ['Which notification service fits a small team?', 'Why messages were sent twice', 'Where the weekly digest stands', 'How the board loads on a slow phone',
     'What the fleet shipped this week', 'Where design reviews wait', 'Why the dock moved', 'What a ticket rolls up'].entries())
