@@ -754,9 +754,14 @@
   /* The report kit: blocks an agent names as data and the board draws, all from tokens.css. Content sits on the page in the one gutter; only a callout is a card, and nothing inside a card is another card.
      A gallery and a video may run wider than the reading column on a desk (up to 65rem), to the right, so a frame is big enough to judge. */
   .kt { margin: 0.25rem 0 1rem; min-width: 0; }
-  /* A board on a report, read as a list: its steps, then its shapes, the moves between them and the zones. Flat on the page like the kit's other blocks, never a card; the canvas comes in a later slice. */
+  /* A board on a report: its list of steps, shapes, moves and zones, flat on the page like the kit's other blocks and never a card, and one way into
+     the board itself, which opens full screen on its own page (web/board.html). */
   .kb-board { display: grid; gap: 0.75rem; margin: 0.25rem 0 1rem; min-width: 0; }
   .kb-board .kb-title { margin: 0; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); color: var(--tk-text); }
+  .kb-board .kb-open { display: inline-flex; align-items: center; gap: 0.5rem; justify-self: start; min-height: var(--tk-tap); padding: 0 0.875rem; border: 1px solid var(--tk-line); border-radius: var(--tk-r-ctl); color: var(--tk-text); font-size: var(--tk-fs-meta); font-weight: var(--tk-fw-medium); text-decoration: none; }
+  .kb-board .kb-open:hover { background: var(--tk-inset); }
+  .kb-board .kb-open:focus-visible { outline: 2px solid var(--tk-text); outline-offset: 2px; }
+  .kb-board .kb-open svg { width: var(--tk-icon-s); height: var(--tk-icon-s); }
   .kb-board .kb-part h4 { margin: 0 0 0.25rem; font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); color: var(--tk-text-secondary); }
   .kb-board .kb-list { display: grid; gap: 0.25rem; margin: 0; padding-left: 1.125rem; font-size: var(--tk-fs-secondary); line-height: var(--tk-lh-secondary); color: var(--tk-text); }
   .kb-board .kb-list li span { display: block; color: var(--tk-text-secondary); }

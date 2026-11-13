@@ -1596,10 +1596,12 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       return E('figure', 'kt kt-video gd-wide', frame, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
     }
     // ---- a board on a section, read as a list: its steps, then the shapes, the moves between them and the zones. The canvas comes in a later slice, so a board reads here, in an export and on a read-only board.
-    function boardList(b) {
+    function boardList(b, section) {
       const name = new Map((b.shapes ?? []).map((s) => [s.id, s.label]));
       const part = (head, rows) => rows.length ? E('div', 'kb-part', E('h4', '', head), E('ul', 'kb-list', ...rows)) : '';
-      return el('section', { class: 'kb-board', 'aria-label': `Board: ${b.title}` }, E('h3', 'kb-title', b.title),
+      // The board the agent drew opens full screen: its canvas, its steps and sign-off's own bar. A Mermaid board has no canvas yet, so it stays a list.
+      const open = b.shapes?.length ? [el('a', { class: 'kb-open', href: `/board/${encodeURIComponent(key)}/${section}` }, gic('expand'), E('span', '', 'Open board'))] : [];
+      return el('section', { class: 'kb-board', 'aria-label': `Board: ${b.title}` }, E('h3', 'kb-title', b.title), ...open,
         part('Steps', (b.steps ?? []).map((x) => E('li', '', E('b', '', x.title), ...(x.text ? [E('span', '', x.text)] : [])))),
         part('Shapes', (b.shapes ?? []).map((s) => E('li', '', E('b', '', s.label), ...(s.note ? [E('span', '', s.note)] : [])))),
         part('Moves', (b.arrows ?? []).map((a) => E('li', '', E('b', '', `${name.get(a.from) ?? a.from} → ${name.get(a.to) ?? a.to}`), ...(a.label ? [E('span', '', a.label)] : []), ...(a.note ? [E('span', '', a.note)] : [])))),
@@ -1706,7 +1708,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         return E('li', '', b, ...srcLink(it), body);
       });
       const top = s.heading || s.body ? [head(s.heading, s.body, doc && s.id === answerId ? 'The answer' : undefined, s.id, 'heading', 'body')] : [];
-      const rest = [...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.board ? [boardList(s.board)] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id)];
+      const rest = [...(s.diagram ? [diagramFig(s.diagram)] : []), ...(s.gallery ? [galleryFig(s.gallery)] : []), ...(s.board ? [boardList(s.board, sections.indexOf(s))] : []), ...(s.blocks ?? []).map((b) => blockFig(s, b)), ...(cmp ? [cmpTable(s.items, cmp)] : items.length ? [E('ul', 'gd-rows', ...items)] : []), ...acts(s.id, s.details), rc(s.id)];
       return doc ? foldCard(s, top, rest) : card(s.id, s.stage, ...top, ...rest);
     };
     /** A document's section: its heading is the switch that folds it, everything after the heading is the fold. Only the answer starts open; a section with no heading of its own stays open. */

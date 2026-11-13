@@ -159,3 +159,37 @@ export function checkBoard(board: any, retired: string[] = []): BoardFault | Boa
   }
   return { ok: true, form: 'shapes', shapes: shapes.length, arrows: arrows.length, lines: ls.length, zones: zones.length, steps: steps.length };
 }
+
+/** A shape's fill by its tone: the canvas draws light colours and the editor inverts them for dark, as every other page colour. */
+const TONE: Record<string, string> = { start: '#b2f2bb', end: '#d0bfff', ok: '#b2f2bb', warn: '#ffec99', bad: '#ffc9c9' };
+const SHAPE_OF: Record<string, string> = { round: 'ellipse', diamond: 'diamond' };
+
+/** A step's words, and the elements the canvas frames for it: the ids a step names, as the scene's own element ids. */
+export type BoardStep = { title: string; text?: string; ids: string[] };
+/** The canvas scene of a board: its geometry as absolute boxes and lines in the editor's own skeleton form, plus each step's frame. */
+export function scene(board: any) {
+  const ids = new Map<string, string[]>();
+  const add = (id: string, ...elements: string[]) => ids.set(id, [...(ids.get(id) ?? []), ...elements]);
+  const zones = (board.zones ?? []).flatMap((z: any) => {
+    const box = zoneBox(board, z), label = zoneLabelBox(board, z);
+    add(z.id, `z:${z.id}`, `zl:${z.id}`);
+    return [
+      { type: 'rectangle', id: `z:${z.id}`, x: box.x, y: box.y, width: box.w, height: box.h, strokeStyle: 'dashed', strokeColor: '#868e96', backgroundColor: 'transparent', strokeWidth: 1, roughness: 0 },
+      { type: 'text', id: `zl:${z.id}`, x: label.x, y: label.y, width: label.w, height: label.h, text: z.label, fontSize: MOVE_FONT, strokeColor: '#868e96' },
+    ];
+  });
+  const shapes = board.shapes.map((s: any) => {
+    const b = boxOf(s);
+    add(s.id, s.id);
+    return { type: SHAPE_OF[s.kind] ?? 'rectangle', id: s.id, x: b.x, y: b.y, width: CELL_W, height: CELL_H, roundness: { type: 3 },
+      backgroundColor: s.kind === 'note' ? '#fff3bf' : TONE[s.tone] ?? '#a5d8ff', fillStyle: 'solid', label: { text: labelLines(s.label)!.join('\n'), fontSize: FONT } };
+  });
+  const arrows = lines(board).map((l) => {
+    for (const id of l.ids) add(id, `l:${l.a}|${l.b}`);
+    return { type: 'arrow', id: `l:${l.a}|${l.b}`, x: l.x1, y: l.y1, width: l.x2 - l.x1, height: l.y2 - l.y1, points: [[0, 0], [l.x2 - l.x1, l.y2 - l.y1]],
+      start: { id: l.a }, end: { id: l.b }, startArrowhead: l.back.length ? 'arrow' : null, endArrowhead: 'arrow', strokeStyle: l.dashed ? 'dashed' : 'solid',
+      ...(l.text ? { label: { text: l.text, fontSize: MOVE_FONT } } : {}) };
+  });
+  const steps: BoardStep[] = (board.steps ?? []).map((s: any) => ({ title: s.title, ...(s.text ? { text: s.text } : {}), ids: s.focus.flatMap((id: string) => ids.get(id) ?? []) }));
+  return { elements: [...zones, ...shapes, ...arrows], steps, title: board.title as string };
+}
