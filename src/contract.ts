@@ -4,19 +4,20 @@ import { accessSync, constants, readFileSync, realpathSync, statSync } from 'nod
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { CAPTION_MAX, EVIDENCE_STATUSES, GUARDS, isKey, MEDIA_MAX, PRIORITIES, REPORT_ACTIONS, REPORT_FORMS, REPORT_PARTS, REPORT_PURPOSES } from './store.js';
 import { nestedCard, ownColours } from './pagestyle.js';
+import { checkBoard } from './board.js';
 
 /** A message that does not match: what is wrong, and the one line that says how to fix it. */
 export class ContractError extends Error {
   constructor(message: string, readonly help: string) { super(message); }
 }
 /** The kinds, with the schema number of each. */
-export const SCHEMAS: Record<string, number> = { ask: 1, report: 5, evidence: 1, gate: 1, finding: 1, plan: 3, design: 2 };
-/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3 and 4 (4 with no purpose), plan 1 and 2, and design 1 (screens of one view each). */
-const OLDER: Record<string, number[]> = { report: [2, 3, 4], plan: [1, 2], design: [1] };
+export const SCHEMAS: Record<string, number> = { ask: 1, report: 6, evidence: 1, gate: 1, finding: 1, plan: 3, design: 2 };
+/** Older schemas this sign-off-axi still takes, so a board that holds them loads and re-posts: the page-based report 2, the guided report 3, 4 and 5 (4 with no purpose, 5 without a board), plan 1 and 2, and design 1 (screens of one view each). */
+const OLDER: Record<string, number[]> = { report: [2, 3, 4, 5], plan: [1, 2], design: [1] };
 /** The guided schemas: a report 3 and a plan 2 are fields the board draws as one guided page, not a page the agent draws. */
-export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
-/** The schemas with versioned engagement, whose owning filer is required: report 4 and 5, plan 3. */
-export const engaged = (m: any) => (m?.kind === 'report' && [4, 5].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
+export const guided = (m: any) => (m?.kind === 'report' && [3, 4, 5, 6].includes(m.schema)) || (m?.kind === 'plan' && [2, 3].includes(m.schema));
+/** The schemas with versioned engagement, whose owning filer is required: report 4, 5 and 6, plan 3. */
+export const engaged = (m: any) => (m?.kind === 'report' && [4, 5, 6].includes(m.schema)) || (m?.kind === 'plan' && m.schema === 3);
 export const KINDS = Object.keys(SCHEMAS);
 const COMMON = ['contract', 'kind', 'schema', 'key', 'title', 'filer', 'ticket', 'priority', 'link', 'about'];
 const FIELDS: Record<string, string[]> = {
@@ -126,13 +127,20 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
   const checkRun = (fields: string[]) => {
     const r = m.run;
     if (!r || typeof r !== 'object' || Array.isArray(r)) throw bad('run', 'must be an object', `Set "run" to {${fields.map(show).join(', ')}}`);
-    const odd = Object.keys(r).find((f) => !fields.includes(f));
+    const optional = m.kind === 'evidence' ? ['proof_series_id', 'current_head', 'proof_verdict', 'proof_ref', 'release_state'] : [];
+    const odd = Object.keys(r).find((f) => !fields.includes(f) && !optional.includes(f));
     if (odd !== undefined) throw bad(`run.${escaped(odd) || '""'}`, 'is not a field of run', `Remove ${show(odd)}; run has only ${fields.join(', ')}`);
     const missing = fields.find((f) => !Object.hasOwn(r, f));
     if (missing) throw bad(`run.${missing}`, 'is required', `Add "${missing}" to "run"`);
     if (!isKey(r.run_id)) throw bad('run.run_id', 'must be 1-128 of A-Z a-z 0-9 . _ -', 'Set "run_id" to the done-done run id');
     if (!(typeof r.commit === 'string' && /^[a-f0-9]{40}$/.test(r.commit))) throw bad('run.commit', 'must be a full 40-character lowercase commit', 'Set "commit" to the full hash, such as the output of git rev-parse HEAD');
     for (const f of fields.slice(2)) text(`run.${f}`, r[f], 1000, `the run's ${f} Checks line, in 1000 characters or fewer`);
+    if (r.proof_series_id !== undefined && !isKey(r.proof_series_id)) throw bad('run.proof_series_id', 'must be a stable key', 'Set a stable series id');
+    if (r.current_head !== undefined && !/^[a-f0-9]{40}$/.test(r.current_head)) throw bad('run.current_head', 'must be a full commit', 'Set the authoritative current head');
+    if (r.proof_verdict !== undefined && !['pass', 'fail', 'inconclusive'].includes(r.proof_verdict)) throw bad('run.proof_verdict', 'is invalid', 'Use pass, fail or inconclusive');
+    if (r.proof_ref !== undefined && (!r.proof_ref || typeof r.proof_ref.path !== 'string' || !r.proof_ref.path || /^(?:[\\/]|[A-Za-z]:)/.test(r.proof_ref.path) || r.proof_ref.path.split(/[\\/]/).includes('..') || !/^[a-f0-9]{64}$/.test(r.proof_ref.sha256 ?? '') || (r.proof_ref.issuer !== 'done-done' || r.proof_ref.validated !== true) || Object.keys(r.proof_ref).some((k) => !['path', 'sha256', 'issuer', 'validated'].includes(k)))) throw bad('run.proof_ref', 'is invalid', 'Set the result path and sha256');
+    const release = r.release_state;
+    if (release !== undefined && (!release || !['unknown', 'unreleased', 'released'].includes(release.state) || Object.keys(release).some((k) => !['state', 'version', 'destination'].includes(k)) || (release.state === 'released' ? ![release.version, release.destination].every((x) => typeof x === 'string' && x.trim() && x.length <= 200) : release.version !== undefined || release.destination !== undefined))) throw bad('run.release_state', 'is invalid', 'Name the state and, when released, version and destination');
   };
   /** A list of min to max objects, each with only `fields`: a plan's sections, decisions and steps, or `v` for a list inside one. */
   const list = (f: string, min: number, max: number, fields: string[], example: string, v: any = m[f]): any[] => {
@@ -221,9 +229,11 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     text(field, v, 256, `${kinds} path from the board file's folder, such as "${example}"`);
     if (/^([\\/]|[A-Za-z]:)/.test(v) || v.split(/[\\/]/).includes('..') || /[?#\\]/.test(v) || !re.test(v)) throw bad(field, `${show(v)} must be a relative ${kinds} path with no .., ?, # or \\`, `Set "${field.replace(/^.*\./, '')}" to the file next to the message, such as "${example}"`);
   };
-  /** The report kit: 1 to 12 blocks a section draws in the board's own style, in the order given. A block is data (words, files, rows); it never carries markup or colour. */
+  /** The report kit: 1 to 12 blocks a section draws in the board's own style, in the order given (a document keeps its original flow: up to 40 blocks and 100 table rows). A block is data (words, files, rows); it never carries markup or colour. */
+  const document = m.kind === 'report' && m.layout === 'document';
+  const maxBlocks = document ? 40 : 12, maxRows = document ? 100 : 30;
   const blocks = (field: string, v: any) => {
-    if (!Array.isArray(v) || v.length < 1 || v.length > 12) throw bad(field, 'must list 1 to 12 blocks', `Set "${field}" to blocks such as {"type":"callout","title":"Read this first","text":"..."}; the types are ${KIT_BLOCKS.join(', ')}`);
+    if (!Array.isArray(v) || v.length < 1 || v.length > maxBlocks) throw bad(field, `must list 1 to ${maxBlocks} blocks`, `Set "${field}" to blocks such as {"type":"callout","title":"Read this first","text":"..."}; the types are ${KIT_BLOCKS.join(', ')}`);
     v.forEach((o: any, n: number) => {
       const at = `${field}[${n}]`;
       if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad(at, 'must be an object', `Write each block as {"type":"callout",...}; the types are ${KIT_BLOCKS.join(', ')}`);
@@ -262,7 +272,7 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       } else if (o.type === 'table') {
         only(['columns', 'rows'], '{"type":"table","columns":["Measured","App promo"],"rows":[["AI calls","3"]]}');
         if (!Array.isArray(o.columns) || o.columns.length < 1 || o.columns.length > 20) throw bad(`${at}.columns`, 'must list 1 to 20 column names', 'Set "columns" to the original headings');
-        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > 30) throw bad(`${at}.rows`, 'must list 1 to 30 rows', 'Set "rows" to arrays of cells, preserving ragged rows');
+        if (!Array.isArray(o.rows) || o.rows.length < 1 || o.rows.length > maxRows) throw bad(`${at}.rows`, `must list 1 to ${maxRows} rows`, 'Set "rows" to arrays of cells, preserving ragged rows');
         for (const src of localLinks(JSON.stringify([o.columns, o.rows]))) kitFile(`${at}.rows`, src, /./, 'file', 'report.md');
         const occupied: boolean[][] = o.rows.map(() => []);
         const cell = (c: any, field: string, remaining: number) => {
@@ -334,14 +344,13 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     }
     if (m.purpose === 'plan') {
       const d = m.sections[of('design')];
-      need('design', !!(d.diagram || (d.items ?? []).some((it: any) => it.diagram) || m.visual?.diagram), 'needs a diagram (on the section, an item or the visual)', 'Draw the design as inline SVG in an .html page and add "diagram": [{"label": "Flow", "src": "diagrams/flow.html"}] (see the skill)');
+      need('design', !!(d.diagram || d.board || (d.items ?? []).some((it: any) => it.diagram) || m.visual?.diagram), 'needs a diagram or a board (on the section, an item or the visual)', 'Draw the design as inline SVG in an .html page and add "diagram": [{"label": "Flow", "src": "diagrams/flow.html"}], or put a board on the section (see the skill)');
       need('slices', items('slices').length >= 1 && items('slices').every((it: any) => it.size), 'must list each slice with its "size"', 'Give each slice an item with "size", such as "S, half a day"');
       need('tests', items('tests').length >= 1, 'must list how each slice is tested and proven', 'Add an item per slice: the test and the proof that it works');
     }
   };
   /** The guided page every plan 2 and report 3 is: what I understood, one picture, sections with expandable items, and the next step. Returns the section ids. */
   const guide = (minSections: number): string[] => {
-    const document = m.kind === 'report' && m.layout === 'document';
     if (m.layout !== undefined && !document) throw bad('layout', 'must be document on a report', 'Leave layout out for the guided workflow');
     if (!document) {
     list('understood', 1, 6, ['label', 'text'], '{"label":"You asked","text":"Make the first start smooth."}').forEach((o, n) => {
@@ -374,8 +383,8 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
     if (Object.hasOwn(v, 'diagram')) diagrams('visual.diagram', v.diagram);
     // A report 5 is built of its kind's parts: up to 10 sections, each naming the part it is, and items that carry a source's link, a finding's confidence or a slice's size.
     }
-    const v5 = m.kind === 'report' && m.schema >= 5, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
-    const ids = list('sections', minSections, document ? 80 : v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
+    const v5 = m.kind === 'report' && m.schema >= 5, v6 = m.kind === 'report' && m.schema >= 6, parts = v5 ? REPORT_PARTS[m.purpose] ?? [] : [];
+    const ids = list('sections', minSections, document ? 80 : v5 ? 10 : 6, ['id', 'stage', 'heading', 'body', 'items', 'details', 'diagram', 'gallery', 'blocks', 'pins', ...(v5 ? ['part'] : []), ...(v6 ? ['board'] : [])], '{"id":"steps","stage":"recommend","heading":"Eight steps, 22 to 31 Oct","body":"..."}').map((o, n) => {
       const at = `sections[${n}]`;
       if (!(typeof o.id === 'string' && /^[a-z0-9-]{1,40}$/.test(o.id))) throw bad(`${at}.id`, 'must be 1-40 of a-z 0-9 -', 'Set "id" to a short slug such as "steps"');
       if (!['found', 'recommend'].includes(o.stage)) throw bad(`${at}.stage`, `${show(o.stage)} is not found or recommend`, 'Set "stage" to "found" (what I found) or "recommend" (what I recommend)');
@@ -400,6 +409,11 @@ export function checkMessage(m: any, want?: string, flags = false, fresh = false
       if (Object.hasOwn(o, 'gallery')) gallery(`${at}.gallery`, o.gallery);
       if (Object.hasOwn(o, 'blocks')) blocks(`${at}.blocks`, o.blocks);
       if (Object.hasOwn(o, 'pins')) pinList(`${at}.pins`, o.pins);
+      // A board is data on the section: checked by the same geometry the reader lists, one fault at a time with its fix.
+      if (Object.hasOwn(o, 'board')) {
+        const fault = checkBoard(o.board);
+        if (!fault.ok) throw bad(`${at}.board.${fault.field}`, fault.problem, fault.fix);
+      }
       return o.id;
     });
     const twice = ids.findIndex((id, n) => ids.indexOf(id) < n);

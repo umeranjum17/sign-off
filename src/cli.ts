@@ -14,14 +14,16 @@ import { parseArgs } from 'node:util';
 import { encode } from '@toon-format/toon';
 import { acknowledgeOwner, checkOwner, deliveries, dispatchOwners, registerOwner } from './owner.js';
 import { AxiError, runAxiCli } from 'axi-sdk-js';
-import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, appendTicket, readTickets, readTicketActivity, readTicketWeek, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, rollUp, appendTicketComment, readTicketComments, ticketCommentFault, ticketFault, ticketTwin, releaseIsWhen, ticketHeld, TICKET_TYPES, type Ticket, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
+import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, appendTicketComment, readTicketComments, ticketCommentFault, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
+import { boardIds, checkBoard, preview, scene } from './board.js';
 import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
 import { copiesOf, differs, type Copy } from './images.js';
-import { fleetIdsOf, homeOf, readTask, type Assignee } from './fleet.js';
+import { homeOf } from './fleet.js';
+import { ADAPTER_VAR, type Ticket, TicketError, comment as commentOn, create as createTicket, describe as describeTickets, get as getTicket, history as historyOf, list as listTickets, statusOf, update as updateTicket } from './tickets.js';
 import { commsConfig, findChannelMessage, readChannels } from './channels.js';
 import { deliverVault, errors, readVaultExpiry, sweepVault, takeVaultExpiries, VaultError, type VaultExpiry } from './vault.js';
 
@@ -68,7 +70,7 @@ examples:
   sign-off-axi post --type signin --key npm-login --service npm --link https://example.com/login --unlocks "Publish the release" --waits "Main" --expires 15m
   sign-off-axi signin done --key npm-login
   sign-off-axi dismiss ship-the-new-sign-in-screen-this-week
-  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40
+  sign-off-axi ticket --create --set title="Ship the new settings page"
   sign-off-axi project --name Beacon --icon icons/beacon.png
   sign-off-axi init
   sign-off-axi doctor
@@ -114,7 +116,7 @@ One decision is one card: look at the open cards first. --merge <key> (up to 10)
 they are hidden while this one waits, and its answer closes them too, with the same value and a note naming this key. A merged card merges nothing itself, a card is named by one ask until that ask is answered, and an answered or dismissed card cannot be merged.
 A new ask that repeats an open ask on the same decision (the same answers, titles that share at least 80% of their words), from anyone, is not posted: the refusal names the card to wait on. When one is answered, every open ask on the same decision takes the answer and leaves Decide.
 --proof <key> names an evidence update already on the board that this ask rests on: Decide shows its capture and result at the top.
---ticket <id> names the ticket this ask belongs to (see \`sign-off-axi ticket --help\`): the ask shows a Ticket row that opens it. Optional; a ticket not on the board shows no row.
+--ticket <id> names the ticket this ask belongs to (see \`sign-off-axi ticket --help\`): the ask shows a Ticket row that opens it. Optional, and only a reference: the board never checks the ticket exists.
 --priority P0-P3 says how urgent the ask is, P0 the most: the card shows it as a chip, and the board can sort by it. Optional; leave it out when you do not know.
 The user answers with one tap and can undo it for a few seconds.
 --from adds every decision in a decisions file: ${FORMAT}
@@ -128,7 +130,7 @@ examples:
 `,
   validate: `usage: sign-off-axi validate <message.json>... [--kind <kind>] [--expect-invalid] [--new]
 Checks message files against the communication contract without posting them: ${CONTRACT}
-A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 5 (schemas 2 to 4 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
+A message is one JSON object with "contract": 1, its "kind" and its "schema". This build checks kinds ask, evidence, gate and finding at schema 1, design at schema 2 (schema 1 still passes), report at schema 6 (schemas 2 to 5 still pass) and plan at schema 3 (schemas 1 and 2 still pass).
 A report 3 to 5 and a plan 2 or 3 are guided pages: fields the board draws as one scroll, no page of your own (see report init). Every report names what it is for in "purpose", required on a report 5 and on any new report, and so is its "project".
 An evidence message's media paths read from the message file's folder: each file must be there, inside it, and 50 MB or less.
 A report is a page to tap through: its "view" (.html) and "preview" (its picture, beside it) are checked for their shape here; the files themselves are checked at post, from the board file's folder, filled with no FILL: lines left (see report init).
@@ -219,7 +221,7 @@ Runs the board in the foreground until Ctrl-C; --port 0 picks a free port, and i
 examples:
   sign-off-axi serve --port 0
 `,
-  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--video <value>=<file>]... [--score <value>=<number>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>]
+  post: `usage: sign-off-axi post [board.json] [--type decision|design|diagram|interactive] --title "<question>" [--key <key>] [--about <text>] [--option <value>=<label>]... [--mock <value>=<path>]... [--video <value>=<file>]... [--score <value>=<number>]... [--link <value>=<url>]... [--view <path>] [--tradeoff <text>] [--recommend <value>] [--default <value>] [--close done|release] [--filer <id>] [--replaces <key>]
        sign-off-axi post [board.json] --type evidence --title "<what this shows>" --about "<short note>" --media <file>... [--attach <file>]... [--link <commit or URL>] [--detail <text>] [--filer <id>]
        sign-off-axi post [board.json] --from <board file> --replace [--filer <id>]
        sign-off-axi post [board.json] --kind <kind> --from <message.json|-> [--filer <id>]
@@ -227,13 +229,14 @@ examples:
        sign-off-axi post [board.json] --type report --title "<the answer>" --about "<why it matters>" --view <page.html> --preview <picture> [--key <key>] [--link <commit or URL>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --link <sign-in URL> --unlocks "<what it unlocks>" --waits "<who waits>" [--expires <ISO time or 15m>] [--key <key>] [--filer <id>]
        sign-off-axi post [board.json] --type signin --service "<name>" --start '<command as a JSON list>' --unlocks "<what it unlocks>" --waits "<who waits>" [--key <key>] [--filer <id>]
---ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row, its title and progress, that opens the ticket.
-It is optional, and only a reference: the ticket need not exist yet, and one not on the board shows no row. With --kind or --from it fills "ticket" on each message or item that has none.
+--replaces <key> works on a decision, design, diagram, interactive, report or --kind post: the card with that key moves to Archived (reason Replaced by newer) in the same write, and is refused if it is not on the board.
+--ticket <id> works on every form above: the card names the ticket it belongs to (see \`sign-off-axi ticket --help\`) and shows a Ticket row that opens the ticket.
+It is optional, and only a reference: the ticket need not exist yet,. With --kind or --from it fills "ticket" on each message or item that has none.
 --priority P0-P3 works on every form above too: how urgent the card is, P0 the most, shown as a chip. Optional; with --kind or --from it fills "priority" on each message or item that has none.
 Posts an item for the user. --type decision (the default) is a yes/no or pick-one question, exactly like raise, with the same question standard and flags (--ask-ref, --why, --outcome, --recommend-reason, --silent-by, --merge).
 A new Decide question requires --ask-ref <captain-message-id-or-hold-id> (ask_ref in a message or feed); follow-ups belong in the backlog, not the board. Existing cards, plans, reports, evidence and engagement records are unchanged.
 --kind posts one contract message (${CONTRACT}), read from a file or from stdin with --from -: it must be that kind and pass every rule,
-else it is refused with one fix line and nothing is written. A key already on the board takes only the same message again; anything else exits 2.
+else it is refused with one fix line and nothing is written. A report keeps its key: post a higher "version" with "changes" to advance it, or retry the same message. Other changed messages under a used key exit 2.
 --kind evidence copies its media, read from the message file's folder (the current folder for stdin), into evidence/<number>/ like --type evidence;
 a "run" is the update's proof: its outcome line heads the card, so write it as the result the user can see. With no key it posts the next update-<number>.
 --kind gate holds a done-done run for the user: it waits like an ask; run done-done respond --action <the picked value>.
@@ -332,40 +335,29 @@ examples:
 Brings back a card that dismiss hid. See \`sign-off-axi dismiss --help\`.
 `,
   ticket: `usage: sign-off-axi ticket [board.json] [--json]
-       sign-off-axi ticket [board.json] --id <id> [--json]
-       sign-off-axi ticket [board.json] --id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--type epic|ticket|bug|decision|evidence|merge] [--key <PREFIX-N>] [--description <text>] [--hold yes|no] [--hold-reason <text>] [--asked yes|no] [--release <text>] [--state <state>] [--pr <url>]... [--stage queued|building|review|merging|done] [--last-event-at <epoch seconds or ISO UTC>] [--filer <id>]
-       sign-off-axi ticket [board.json] --backfill [--json]
+       sign-off-axi ticket [board.json] --id <id> [--history] [--json]
+       sign-off-axi ticket [board.json] --id <id> --rev <rev> [--set <name>=<value>]... [--unset <key>]... [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --create --set <name>=<value>... [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --id <id> --text <words> [--op-id <key>] [--json]
+       sign-off-axi ticket [board.json] --fields [--json]
        sign-off-axi ticket [board.json] --id <id> --comment '<json>'
-A ticket is one piece of work: its id, title, percent done and, optionally, the ticket it sits under, its priority, its project (whose icon its rows show),
-whether it is on hold and whether you asked for it (the board's Tickets screen then marks it From you in its filter). It stands alone: nothing else needs it.
-An epic is a ticket with tickets under it, and those may have sub-tasks under them (--parent): a ticket with tickets under it is as far along as they are on average.
-With no --id, lists every ticket with how many cards name it. With --id alone, shows that ticket and its cards, newest first.
-With any other flag, writes it: a new ticket needs --title (progress starts at 0); a later write changes only the fields given, and an empty value ("") takes one off.
-A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item:
-its screen then shows a Ticket row, the title and progress, that opens the ticket, which lists its asks, designs, proof and reports.
-A card whose ticket is not on the board shows no row; a ticket with no cards shows an empty page.
---stage is the sync-published stage, independent of progress. --last-event-at takes whole epoch seconds or an ISO UTC time ending in Z; stored as epoch seconds. Empty values clear either field.
---filer (or SIGN_OFF_FILER) names who writes the line, as on post; the board's Activity then says who moved the ticket. A line written without one shows no who, and a bare session id names nobody, so it is not kept.
---release labels the release (up to 40 characters). --state is queued, "in progress", "on hold" or done; it takes precedence over progress/hold for grouping.
---type says what the row is, and gives it that type's own glyph and colour on the Tickets screen: epic, ticket, bug, decision, evidence or merge. Without one a ticket is a ticket, or an epic once tickets sit under it.
---key is the ticket's readable name, a prefix and a number as JG-101: rows, the sheet and search show it in place of the long id, which drops to a small line under it. Without one the id is the name.
-A new ticket needs --description (refused without one); \`ticket --backfill\` gives every old ticket without one its title as the summary.
---description is the ticket's own words, as the sheet draws them: a summary paragraph first, then lines starting "# " for a heading, "- " for a list item, "> " for a quote, and [words](https://link) for a link. A description with none of those reads as plain text.
---hold yes (or --state "on hold") needs --hold-reason, the words that say why: a hold with no reason is refused, and the reason shows in its row and on the ticket. Empty --hold-reason clears the reason, and releasing a hold clears it too.
---pr takes full HTTP(S) URLs, repeatable or comma separated; it replaces the linked PR list. Empty --release, --state or --pr clears that field.
-Without --state, grouping stays Done at 100%, else On hold with --hold yes, else In progress above 0%, else To do.
-It writes one line to <board>.tickets.jsonl beside the board (${FORMAT}).
+The board holds no tickets: they live in the system behind the ticket adapter, the one executable named by SIGN_OFF_TICKETS_ADAPTER (${ADAPTER_VAR}). Every command here is one call to it and shows what it answered, or its error as it came: its code and message, never an empty list.
+With no --id, lists every ticket with how many cards name it; a list the adapter cannot give whole is an error. With --id alone, shows that ticket, every field it carries beyond the named ones (extra) and its cards, newest first. --history shows its events, as the backend recorded them.
+--fields shows which fields the backend knows, the words each allows and which operations it has.
+--create makes a ticket from --set fields (title is the one the interface requires; the backend says what else it needs). --id with --rev edits one: only the --set and --unset given are sent, never the rest of the ticket,
+and --rev is the rev you read; a ticket that changed since is refused as a conflict, with its current rev. --text adds a comment, where the backend has comments.
+--set name=value sets a field whole: title, body, kind, status, assignee, labels, parent, links. extra.<key>=<value> sets one key of extra and leaves the others. A value is plain words, unless it is null or starts with [ or { and is JSON: --set labels='["a","b"]'.
+--unset <key> removes a key of extra. --op-id is a key of up to 128 characters that makes a write safe to repeat: the same command with the same key never writes twice (one is made for you when you give none).
+A card names its ticket with --ticket <id> on raise and post (every --type and --kind), or "ticket" in a message or --from item: its screen then shows a Ticket row that opens the ticket, which lists its asks, designs, proof and reports.
 --comment hands over a comment the person made on the ticket elsewhere (the fleet dashboard), in that dashboard's thread record: {"id","at","text","error","picked","replies":[{"at","text","by"}]},
 times in whole seconds since 1970. Send it again as it moves: the board shows it Sent, Delivered (no error), Read (picked) and Replied (the last reply) on the ticket, and a reply in Today.
 It writes one line to <board>.ticket-comments.jsonl; the latest line for a comment id wins.
 examples:
-  sign-off-axi ticket --id T-9 --title "The new settings page" --priority P1 --project Settings --asked yes
-  sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40 --parent T-9 --priority P0
-  sign-off-axi ticket --id T-29 --progress 80
-  sign-off-axi ticket --id T-29 --key JG-101 --type epic
-  sign-off-axi ticket --id T-29 --description "Ship the settings page. # What ships - the page - the store listings > The captain: keep it small"
-  sign-off-axi ticket --id T-29 --hold yes --hold-reason "Waiting on the store review"
+  sign-off-axi ticket --create --set title="Ship the new settings page" --set extra.estimate=3
+  sign-off-axi ticket --id T-29 --rev r-9001 --set title="Ship the settings page" --unset estimate
+  sign-off-axi ticket --id T-29 --text "Needs a screenshot."
   sign-off-axi ticket --id T-29
+  sign-off-axi ticket --fields
   sign-off-axi ticket --json
 `,
   project: `usage: sign-off-axi project [board.json] [--json]
@@ -412,10 +404,13 @@ examples:
   sign-off-axi feedback fleet-dashboard-full --reply "The colours now come from the new tokens." --link https://github.com/owner/repo/pull/245
   sign-off-axi feedback fleet-dashboard-full --acted --link https://github.com/owner/repo/pull/245
 `,
-  report: `usage: sign-off-axi report init <folder> --purpose research|plan|decision|audit|incident|status|other [--page] [--gallery]
+  report: `usage: sign-off-axi report init <folder> --purpose research|plan|decision|audit|incident|status|other [--page] [--gallery] [--board]
        sign-off-axi report init <folder> --plan
        sign-off-axi report kind <key> <kind> --project <name> --by <who> [--board board.json]   (or --from <file> of key<TAB>kind<TAB>project lines)
 Writes the guided template to fill: <folder>/report.json (--purpose is required), or <folder>/plan.json with --plan. A file already there is kept.
+--board writes <folder>/board.json, a whiteboard to fill and put in a section's "board" field: shapes on grid cells, arrows by id, steps to explain.
+The check refuses the first rule it breaks, with one fix line: a shape per cell, no line through a shape, no label over a shape or another label,
+no line across a zone's label, and no label longer than its line. Only report schema 6 carries a board, so an older sign-off refuses one.
 Every report names what it is for in "purpose", its kind: research (research and discovery), plan (implementation plan), decision (decision and recommendation),
 audit, incident (incident and retro), status, or other. --purpose fills it in and writes that kind's parts to fill, one section each, which post then requires
 (research: question, scope, method, sources with links and a user report, options, findings with their confidence, not-checked, recommendation, open-questions;
@@ -437,6 +432,7 @@ A report is for an explanation the user asked for, or a concept, design or trade
 report kind sets the kind and the project of a report posted before every report had them, and records --by, who set it; the board itself is not changed, only <board>.kinds.jsonl. All the lines of --from are checked before the first is written.
 examples:
   sign-off-axi report init .sign-off/reports/sign-in-flow --purpose research
+  sign-off-axi report init .sign-off/reports/ticket-line --purpose plan --board
   sign-off-axi report kind sign-in-flow research --project Beacon --by agent-41
 `,
   init: `usage: sign-off-axi init [dir] [--agent auto|<name>[,<name>]...]
@@ -545,8 +541,8 @@ const MANY = ['option', 'outcome', 'merge'];
 const CONTRACT_TYPES = ['decision', 'ask', 'evidence', 'report', 'plan', 'design'];
 /** The stored item as the message it came from: the board's own `filed` stamp is not part of a message that names none, and the notice record (`announced`) is the board's too. */
 const asSent = ({ filed: _filed, announced: _announced, ...rest }: any) => rest;
-/** A report names its own `filed` time, so only the notice record goes. */
-const asReport = ({ announced: _announced, ...rest }: any) => rest;
+/** A report names its own `filed` time; history and the notice record belong to the board. */
+const asReport = ({ announced: _announced, versions: _versions, ...rest }: any) => rest;
 /** The projects the board knows, for a refusal that names them. */
 const knownProjects = (file: string) => { const all = existsSync(file) ? readProjects(file).map((p) => p.name) : []; return all.length ? `known projects: ${all.join(', ')}` : 'no project is registered on this board yet (sign-off-axi project --name <project> --icon <picture>), so name the one the report is about'; };
 /** A new report names its kind and its project, whatever its schema; one already on the board stays a re-post of its own key (an older one is named with report kind). */
@@ -700,11 +696,13 @@ const archivable = (file: string, decisions: Decision[]) => ((x) => (x.readonly 
 function board(file: string, say = warn) {
   if (!existsSync(file)) return [];
   const decisions = loadDecisions(file), answers = readAnswers(file, say);
-  const hidden = new Set(readDismissed(file, answers, readRounds(file), say, archivable(file, decisions)));
+  const kinds = readHidden(file, answers, readRounds(file), say, archivable(file, decisions));
+  const why = new Map<string, 'dismissed' | 'deferred' | 'archived'>([...kinds.archived.map((k) => [k, 'archived'] as const), ...kinds.deferred.map((k) => [k, 'deferred'] as const), ...kinds.dismissed.map((k) => [k, 'dismissed'] as const)]);
+  const hidden = new Set(why.keys());
   for (const key of Object.keys(answers)) if (!decisions.some((d) => d.key === key)) say(`left out the answer for ${key}: that question is no longer in ${basename(file)}`);
   // A discard holds while its card is hidden and nothing came after it: no restore, no plain dismiss, no answer or round.
   const promoted = new Set(readPromoted(file, say)), discards = new Map(readDiscards(file).filter((x) => x.last && hidden.has(x.key)).map(({ key, reason, at }) => [key, { reason, at }]));
-  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), ...(discards.has(d.key) && { discarded: discards.get(d.key) }), ...(promoted.has(d.key) && { promoted: true }) }));
+  return decisions.map((d) => ({ ...d, answer: Object.hasOwn(answers, d.key) ? answers[d.key] : undefined, dismissed: hidden.has(d.key), state: cardState({ hidden: why.get(d.key), answered: Object.hasOwn(answers, d.key) && !awaitsVerdict(d.type, answers[d.key]) }), ...(discards.has(d.key) && { discarded: discards.get(d.key) }), ...(promoted.has(d.key) && { promoted: true }) }));
 }
 function ready(file: string, on: string, root?: string) {
   if (!existsSync(file)) throw fail(`no board yet at ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi raise${on} --title "<question>"\` first`);
@@ -719,7 +717,7 @@ function ready(file: string, on: string, root?: string) {
 function list(args: string[]) {
   const { file, values, on } = parse('list', args, TIERS);
   const rows = board(file), waiting = rows.filter(asksUser), answered = rows.filter((d) => d.answer && !awaitsVerdict(d.type, d.answer) && !d.dismissed).length;
-  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }) })) });
+  if (values.json) return JSON.stringify({ board: file, decisions: rows.map(({ dismissed, ...d }) => ({ ...d, ...(d.type === 'signin' && { link: undefined }), ...(dismissed && { dismissed }), ...(waiting.some((w) => w.key === d.key) && d.filed && { waiting_since: d.filed }) })) });
   const help = [
     ...(waiting.length ? [`Run \`sign-off-axi open${on}\` to show the board to the user`] : []),
     ...(answered ? [`Run \`sign-off-axi answers${on}\` to read the ${answered} saved answers`] : []),
@@ -1050,12 +1048,14 @@ async function waitInto(file: string, values: Record<string, any>, onBoard: stri
 }
 
 const slug = (title: string) => title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 64).replace(/^-+|-+$/g, '') || 'decision';
-/** Runs fn while holding an exclusive lock file that names its pid, so two agents raising at once never drop a decision,
- * and a lock a crash left behind can be told apart from one in use. */
+/** Runs fn while holding an exclusive lock file that names its pid, so two agents raising at once never drop a decision.
+ * A lock is in one of four states, and only the third has a way out: absent (take it), held by a live pid (wait), held by a pid that is gone
+ * (reclaim it, below, then take it), or empty (wait: the writer may not have put its pid in yet; past `tries` it fails and names the file). */
 async function locked<T>(lock: string, fn: () => T | Promise<T>, busy = 'another raise is still writing the board', tries = 150): Promise<T> {
   for (;;) {
     try { writeFileSync(lock, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); break; } catch (e: any) {
       if (e.code !== 'EEXIST') throw e;
+      if (deadOwner(lock)) reclaimDead(lock);
       if (!tries--) {
         throw staleLock(lock) ? fail(`a sign-off-axi that stopped mid-write left ${basename(lock)} behind`, 'BUSY', `Run \`rm ${shellPath(lock)}\`, then try again`)
           : fail(busy, 'BUSY', `If no sign-off-axi is running, delete ${tilde(lock)} and try again`);
@@ -1075,7 +1075,7 @@ function post(args: string[], cmd = 'post') {
   const typed: Flags = cmd === 'post' ? { replace: { type: 'boolean' }, kind: { type: 'string' }, purpose: { type: 'string' }, project: { type: 'string' }, type: { type: 'string' }, tradeoff: { type: 'string' }, mock: { type: 'string', multiple: true }, video: { type: 'string', multiple: true }, score: { type: 'string', multiple: true },
     media: { type: 'string', multiple: true }, attach: { type: 'string', multiple: true }, link: { type: 'string', multiple: true }, view: { type: 'string' }, preview: { type: 'string' }, chapter: { type: 'string', multiple: true },
     ...Object.fromEntries(SIGNIN_FIELDS.map((f) => [f, { type: 'string' as const }])) } : {};
-  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
+  const { file, named, values, on } = parse(cmd, args, { from: { type: 'string' }, filer: { type: 'string' }, 'ask-ref': { type: 'string' }, replaces: { type: 'string' }, ticket: { type: 'string' }, priority: { type: 'string' }, ...typed,
     ...Object.fromEntries(RAISE_FIELDS.map((f) => [f, { type: 'string' as const, multiple: MANY.includes(f) }])) });
   const given = [...RAISE_FIELDS, 'type', 'purpose', 'project', 'tradeoff', 'mock', 'video', 'score', 'media', 'attach', 'link', 'view', 'preview', 'chapter', ...SIGNIN_FIELDS].filter((f) => values[f] !== undefined);
   // Only a design takes --link more than once (one per option); any other type keeps its one item link, the last given.
@@ -1091,6 +1091,11 @@ function post(args: string[], cmd = 'post') {
   }
   if (values.from !== undefined && given.length) throw fail(`--from cannot be combined with --${given[0]}`, 'VALIDATION_ERROR', `Put every field in the --from file, or ${cmd} with flags only`);
   for (const f of ['ticket', 'priority']) if (values.replace && values[f] !== undefined) throw fail(`--${f} does not apply to --replace`, 'VALIDATION_ERROR', `Put "${f}" on each item of the feed that has one`);
+  if (values.replaces !== undefined) {
+    if (!isKey(values.replaces)) throw fail(`--replaces ${values.replaces} must be a card key of 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass the key of the card this one replaces');
+    const unfit = values.replace ? '--replace' : ['evidence', 'explainer', 'signin'].includes(values.type) ? `--type ${values.type}` : undefined;
+    if (unfit) throw fail(`--replaces does not apply to ${unfit}`, 'VALIDATION_ERROR', 'Use it on a decision, design, diagram, interactive, report or --kind post');
+  }
   if (values.replace) return replace(file, named, on, values.from, filerOf(values), values['ask-ref']);
   const filer = filerOf(values, true);
   const type = values.type ?? 'decision', told = ASK_FLAGS.find((f) => values[f] !== undefined);
@@ -1110,7 +1115,7 @@ function post(args: string[], cmd = 'post') {
   if (type !== 'design' && (values.tradeoff !== undefined || values.mock !== undefined || values.video !== undefined || values.score !== undefined)) throw fail('--tradeoff, --mock, --video and --score need --type design', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
   const view = type === 'diagram' || type === 'interactive';
   if (view !== (values.view !== undefined)) throw fail(view ? `--type ${type} needs --view <path>` : '--view needs --type diagram or interactive', 'VALIDATION_ERROR', 'Run `sign-off-axi post --help`');
-  if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer);
+  if (type === 'decision') return storeIncoming(file, named, on, buildIncoming(values, {}, filer, file), filer, false, values.replaces);
   const root = resolve(dirname(file));
   if (view) {
     // The same real-path check the board serves with, so a post that passes always renders.
@@ -1123,7 +1128,7 @@ function post(args: string[], cmd = 'post') {
     let size: Stats;
     try { size = statSync(actual); } catch (e: any) { throw fail(`--view ${values.view} ${reasonOf(e.code)}`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram'); }
     if (!size.isFile() || size.size > MOCK_BYTES) throw fail(`--view ${values.view} must be a file of 5 MB or less`, 'VALIDATION_ERROR', 'Shrink the picture, or post an interactive page instead of a diagram');
-    return storeIncoming(file, named, on, buildIncoming(values, { type, view: values.view }, filer, file), filer);
+    return storeIncoming(file, named, on, buildIncoming(values, { type, view: values.view }, filer, file), filer, false, values.replaces);
   }
   const mocks = values.mock?.map((m: string) => {
     const at = m.indexOf('=');
@@ -1148,7 +1153,7 @@ function post(args: string[], cmd = 'post') {
   if (mocks) for (const m of mocks) { const demo = demos.get(m.value); if (demo) (m as MockRef).video = demo(); }
   const lost = optionLinks.find((l) => !mocks?.some((m: { value: string }) => l.startsWith(`${m.value}=`)));
   if (type === 'design' && lost !== undefined) throw fail(`--link ${lost} must be <value>=<url> with a --mock for that value`, 'VALIDATION_ERROR', 'sign-off-axi post --type design --title "<question>" --option a=A --option b=B --mock a=mocks/a.html --link a=https://example.com/a --recommend a');
-  return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer);
+  return storeIncoming(file, named, on, buildIncoming(values, { type, tradeoff: values.tradeoff, mocks }, filer, file), filer, false, values.replaces);
 }
 
 /** --video <value>=<file> and --score <value>=<number>: each option's demo recording and its round score. Checked before anything is copied; the returned
@@ -1320,7 +1325,7 @@ function reopen(args: string[]) {
 /** The person's three actions on a report, and Reopen: Approve starts the build by minting a queued ticket the fleet reads, Refine sends it
  *  back to its owner with a note, Reject closes it and records the reason as a learning, and Reopen puts a closed one back on its block.
  *  Every one of them is a line in <board>.report-actions.jsonl, which is what the fleet side reads (docs/file-formats.md). */
-function reportAction(file: string, input: any): { action: string; key: string; at: string; who: string; ticket?: string } {
+async function reportAction(file: string, input: any): Promise<{ action: string; key: string; at: string; who: string; ticket?: string }> {
   const { key, action, note, reason } = input ?? {};
   if (!isKey(key)) throw new InputError('Name the report by its key, 1-128 of A-Z a-z 0-9 . _ -');
   if (!['approve', 'refine', 'reject', 'reopen'].includes(action)) throw new InputError('The action is approve, refine, reject or reopen');
@@ -1359,11 +1364,8 @@ function reportAction(file: string, input: any): { action: string; key: string; 
     appendReportLearning(file, { key, at, role: actions.role, ...(actions.owner && { owner: actions.owner }), who, reason: picked, ...(text && { note: text }), rule });
     return { action, key, at, who };
   }
-  // Approve: the build starts through the ticket the board already keeps for the fleet, never a second mechanism.
-  const ticket = `build-${key}`, project = d.project, title = d.title.slice(0, 160);
-  appendTicket(file, { id: ticket, title, progress: 0, state: 'queued', stage: 'queued', asked: true, type: 'ticket', by: 'sign-off',
-    ...(project && { project }), ...(d.priority && { priority: d.priority }), last_event_at: Math.floor(Date.now() / 1000),
-    description: `Approved from report ${key}. ${who} starts the build; the first pull request lands by ${actions.first_pull_request ?? 'a day the owner names'}.` });
+  // Approve: the build starts through a ticket made in the ticket system; the same op_id makes a retry after a lost answer find that ticket, not make a second.
+  const made = await createTicket({ title: d.title.slice(0, 160), body: `Approved from report ${key}. ${who} starts the build; the first pull request lands by ${actions.first_pull_request ?? 'a day the owner names'}.` }, `build-${key}`.slice(0, 128)), ticket = made.id;
   appendReportAction(file, { ...base, action: 'approve', result: 'build', ticket });
   return { action, key, at, who, ticket };
 }
@@ -1426,193 +1428,141 @@ function fleetHomeOf(board: string) {
   try { line = /^[ \t]*fleet_home[ \t]*:[ \t]*(.*?)[ \t]*(?:\s#.*)?$/m.exec(readFileSync(join(dirname(board), 'config.yaml'), 'utf8'))?.[1]; } catch {}
   return homeOf(process.env.SIGN_OFF_FLEET_HOME || line?.replace(/^(['"])(.*)\1$/, '$2'));
 }
-/** The tickets with what each one's task record names (see fleet.ts): its `assignee`, its `type` while the record names one the board knows, and the `hold_reason`
- * of a hold the record explains. The ticket's own line always wins, and with no home configured, or no record, a ticket is unchanged and reads as unassigned. */
-const withRecords = <T extends { id: string; type?: string; key?: string; hold?: boolean; state?: Ticket['state']; hold_reason?: string }>(tickets: T[], board: string): (T & { assignee?: Assignee })[] => {
-  const home = fleetHomeOf(board);
-  return home ? tickets.map((t) => {
-    const rec = readTask(home, t.id);
-    if (!rec) return t;
-    const type = t.type ?? ((TICKET_TYPES as readonly string[]).includes(rec.type ?? '') ? rec.type : undefined);
-    // A reason belongs to a hold: the record explains a hold the ticket already says it is on, and never invents one.
-    const reason = t.hold_reason ?? (ticketHeld(t) ? rec.hold_reason : undefined);
-    return { ...t, ...(rec.assignee && { assignee: rec.assignee }), ...(type && { type }), ...(t.key ?? rec.key ? { key: t.key ?? rec.key } : {}), ...(reason && { hold_reason: reason }) };
-  }) : tickets;
-};
-/** A ticket no key was given reads PROJECT-n: the project's short name and its place among that project's tickets, counted in the order they were first written, so a key never moves. */
-const withKeys = <T extends { id: string; key?: string; project?: string }>(tickets: T[]): (T & { key_derived?: boolean })[] => {
-  const prefix = new Map<string, string>(), count = new Map<string, number>(), used = new Set<string>(), taken = new Set(tickets.flatMap((t) => (t.key ? [t.key] : [])));
-  const short = (p: string) => {
-    const w = p.split(/[^A-Za-z0-9]+/).filter(Boolean), base = (w.length > 1 ? w.map((x) => x[0]).join('') : w[0] ?? 'TKT').toUpperCase();
-    for (let n = Math.min(3, base.length); n <= base.length; n++) if (!used.has(base.slice(0, n))) return base.slice(0, n);
-    let n = 2; while (used.has(`${base}${n}`)) n++; return `${base}${n}`;
-  };
-  return tickets.map((t) => {
-    if (t.key) return t;
-    const p = t.project ?? '';
-    if (!prefix.has(p)) { const k = short(p); used.add(k); prefix.set(p, k); }
-    let n = (count.get(p) ?? 0) + 1;
-    while (taken.has(`${prefix.get(p)}-${n}`)) n++;
-    count.set(p, n);
-    return { ...t, key: `${prefix.get(p)}-${n}`, key_derived: true };
-  });
-};
-/** Where a ticket stands, in the four words the Tickets screen sorts by (web/app.js tkStateOf): its state when it names one, else its progress and hold. */
-const STANDING: Record<string, 'todo' | 'moving' | 'hold' | 'done'> = { queued: 'todo', 'in progress': 'moving', 'on hold': 'hold', done: 'done' };
-const standing = (t: Pick<Ticket, 'state' | 'progress' | 'hold'>) => STANDING[t.state ?? ''] ?? (t.progress >= 100 ? 'done' : t.hold ? 'hold' : t.progress > 0 ? 'moving' : 'todo');
-/** What the Story, the first view of Tickets, shows, worked out over every ticket so the page needs none of them: the totals, up to four recorded releases with open work
- *  (three or more tickets each), the six in flight that moved last and the four held with a reason, by id, and how many of each there are. */
-function storyOf(tickets: (Ticket & { assignee?: Assignee })[]) {
-  const byId = new Map(tickets.map((t) => [t.id, t])), parents = new Set(tickets.flatMap((t) => (t.parent && byId.has(t.parent) ? [t.parent] : [])));
-  // A ticket under another takes the project of the ticket at the top of its line unless it names its own; a loop of parents ends where it comes back round.
-  const projectOf = (t: Ticket) => { let x: Ticket | undefined = t; const seen = new Set<string>(); while (x && !x.project && x.parent && !seen.has(x.id)) seen.add(x.id), x = byId.get(x.parent); return t.project ?? x?.project; };
-  const leaves = tickets.filter((t) => !parents.has(t.id)), open = tickets.filter((t) => standing(t) !== 'done');
-  const split = (list: Ticket[]) => ({ total: list.length, done: list.filter((t) => standing(t) === 'done').length, moving: list.filter((t) => standing(t) === 'moving').length, hold: list.filter((t) => standing(t) === 'hold').length });
-  const groups = new Map<string, Ticket[]>();
-  for (const t of leaves) if (/^v?\d+(\.\d+){1,3}$/.test(t.release ?? '')) { const k = `${projectOf(t) ?? ''}\n${t.release}`; groups.set(k, [...(groups.get(k) ?? []), t]); }
-  const releases = [...groups].map(([k, list]) => ({ project: k.split('\n')[0]!, release: list[0]!.release!, ...split(list), at: Math.max(...list.map((t) => Date.parse(t.at) || 0)) }))
-    .filter((g) => g.total >= 3 && g.done < g.total).sort((x, y) => y.at - x.at).slice(0, 4).map(({ at, ...g }) => g);
-  const moving = leaves.filter((t) => standing(t) === 'moving').sort((x, y) => (y.last_event_at ?? 0) - (x.last_event_at ?? 0));
-  const held = leaves.filter((t) => standing(t) === 'hold').sort((x, y) => +!!y.hold_reason - +!!x.hold_reason || (y.last_event_at ?? 0) - (x.last_event_at ?? 0)), why = held.filter((t) => t.hold_reason);
-  return { total: tickets.length, open: open.length, owned: open.filter((t) => t.assignee).length, releases, moving: moving.slice(0, 6).map((t) => t.id), moving_total: moving.length,
-    blocked: why.slice(0, 4).map((t) => t.id), held_total: held.length, held_with_reason: why.length };
-}
 /** A card that names a ticket, in the words its page uses: what it is, and its answer, waiting (a design Main has not promoted is in review) or shown when it asks nothing.
  * `ticket --json` and the board's /api/tickets say it the same way. */
 const ticketCard = (d: ReturnType<typeof board>[number]) => ({ key: d.key, kind: d.type === 'evidence' ? 'proof' : d.kind === 'design' || d.type === 'design' ? 'design' : d.type === 'plan' ? 'plan' : asks(d) ? 'ask' : 'report',
   status: d.answer && !awaitsVerdict(d.type, d.answer) ? d.answer.answer : waits(d) ? (d.kind === 'design' && !d.promoted ? 'in review' : 'waiting') : 'shown', title: d.title, filed: d.filed ?? '' });
-/** The open ticket API, GET /api/tickets and /api/tickets/<id>: the same tickets and cards `ticket --json` prints, with the board file's path left out. Undefined for any other path. */
-function ticketsApi(path: string): [number, unknown] | undefined {
-  const one = /^\/api\/tickets\/([^/]+)$/.exec(path);
-  if (path !== '/api/tickets' && !one) return undefined;
-  const folded = new Map<string, string>(), all = withRecords(rollUp(readTickets(file, warn, folded)), file), rows = board(file).filter((d) => d.ticket !== undefined && !d.dismissed);
-  // Newest card first, as the CLI and the ticket's page list them.
-  const cardsOf = (id: string) => rows.filter((d) => d.ticket === id).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  if (!one) return [200, { tickets: all.map((t) => ({ ...t, cards: cardsOf(t.id).map((d) => d.key) })) }];
-  let handle: string;
-  try { handle = decodeURIComponent(one[1]!); } catch { return [404, { error: 'No ticket with that id' }]; }
-  // A key is read as the Tickets view shows it, so the keys are made over the whole board, in its order; the ticket itself is sent as the list has it.
-  const id = ticketNamed(withKeys(all), handle, folded)?.id, t = all.find((x) => x.id === id);
-  return t ? [200, { ticket: { ...t, cards: cardsOf(t.id).map(ticketCard) } }] : [404, { error: `No ticket named ${handle} on this board` }];
-}
-/** The ticket a link names, whichever name the link was given: its id, its key in any case (SO-453), a unique start of at least 8 of a fleet id's hex (with or
- * without its jg- or fm- prefix, so an id from before the fleet re-keyed its tickets still opens the ticket), or the slug of the backlog item it was filed from.
- * An id the board folded into the open ticket that already tracks its work (`folded`, from readTickets) opens that ticket. */
-function ticketNamed<T extends { id: string; key?: string }>(all: T[], handle: string, folded: Map<string, string>): T | undefined {
-  const shown = (id: string) => all.find((t) => t.id === (folded.get(id) ?? id)), hex = /^(?:(?:jg|fm)-)?([0-9a-f]{8,32})$/i.exec(handle)?.[1]?.toLowerCase();
-  const hits = hex ? [...all.map((t) => t.id), ...folded.keys()].filter((id) => /^(?:jg|fm)-[0-9a-f]{32}$/.test(id) && id.slice(3).startsWith(hex)) : [];
-  // One piece of work can sit under both prefixes: jg- is the id the fleet writes now, so it wins. Two different hashes that start alike name no one ticket.
-  const one = new Set(hits.map((id) => id.slice(3))).size === 1 ? hits.find((id) => id.startsWith('jg-')) ?? hits[0] : undefined;
-  return shown(handle) ?? all.find((t) => t.key?.toUpperCase() === handle.toUpperCase()) ?? (one ? shown(one) : undefined) ?? fleetIdsOf(handle).map(shown).find(Boolean);
-}
-/** ticket [board.json] [--id <id> [--title <text>] [--progress <0-100>] [--parent <id>] [--priority P0-P3] [--project <name>] [--hold yes|no] [--asked yes|no]]: lists the tickets,
- * shows one with the cards that name it, or writes one. A ticket stands alone in <board>.tickets.jsonl: cards name it with --ticket, and nothing else reads it.
- * What it prints carries the roll-up: a ticket with tickets under it is as far along as they are on average. */
-function ticket(args: string[]) {
-  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, title: { type: 'string' }, progress: { type: 'string' }, parent: { type: 'string' }, priority: { type: 'string' },
-    project: { type: 'string' }, type: { type: 'string' }, key: { type: 'string' }, description: { type: 'string' }, hold: { type: 'string' }, 'hold-reason': { type: 'string' }, asked: { type: 'string' }, release: { type: 'string' }, state: { type: 'string' }, stage: { type: 'string' }, 'last-event-at': { type: 'string' }, pr: { type: 'string', multiple: true }, comment: { type: 'string' }, filer: { type: 'string' }, backfill: { type: 'boolean' }, json: { type: 'boolean' } });
-  if (values.comment !== undefined) return ticketComment(file, values, on);
-  if (values.backfill) return ticketBackfill(file, values, on);
-  const { id, title, parent } = values, write = [title, values.progress, parent, values.priority, values.project, values.type, values.key, values.description, values.hold, values['hold-reason'], values.asked, values.release, values.state, values.pr, values.stage, values['last-event-at']].some((v) => v !== undefined);
-  if (id === undefined && write) throw fail('--title, --progress, --parent, --priority, --project, --type, --key, --description, --hold, --hold-reason, --asked, --release, --state, --pr, --stage and --last-event-at need --id <ticket id>', 'VALIDATION_ERROR', 'sign-off-axi ticket --id T-29 --title "Ship the new settings page" --progress 40');
-  // The board is read once per command, and its warnings print once, however many tickets name cards.
-  let byTicket: Map<string, ReturnType<typeof board>> | undefined;
-  const cardsOf = (t: Ticket) => {
-    if (!byTicket) {
-      byTicket = new Map();
-      for (const d of board(file)) if (d.ticket !== undefined && !d.dismissed) byTicket.set(d.ticket, [...(byTicket.get(d.ticket) ?? []), d]);
+/** The cards of the board that name a ticket, newest first, as a ticket's page and `ticket --id` list them. */
+const cardsNaming = (path: string, id: string) => board(path).filter((d) => d.ticket === id && !d.dismissed).reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0)).map(ticketCard);
+/** A refused request of the board's own, in the adapter's error shape. */
+const invalidRequest = (message: string): [number, unknown] => [400, { error: new TicketError('invalid', message, false, { fields: [{ field: 'request', message }] }).toJSON() }];
+/** How many of the latest-changed tickets Activity reads the history of: a call each, so the feed says how many it covers. */
+const ACTIVITY_TICKETS = 20;
+/** The ticket API of the running board: every call goes to the adapter and answers with what it said, or its error as it was (`{"error": {code, message, retryable, detail?}}`).
+ * GET /api/ticket-fields (describe), GET /api/tickets (list), GET /api/tickets/<id> (the ticket and its cards), GET /api/tickets/<id>/history, GET /api/ticket-activity,
+ * POST /api/tickets (create), POST /api/tickets/<id> (a patch: rev, set, unset) and POST /api/tickets/<id>/comment. Undefined for any other path. */
+async function ticketsApi(req: IncomingMessage, path: string): Promise<[number, unknown] | undefined> {
+  const m = /^\/api\/tickets(?:\/([^/]+?)(?:\/(history|comment))?)?$/.exec(path);
+  if (!m && path !== '/api/ticket-fields' && path !== '/api/ticket-activity') return undefined;
+  try {
+    let handle = '';
+    try { handle = decodeURIComponent(m?.[1] ?? ''); } catch { return invalidRequest('The ticket id is not valid text'); }
+    const verb = m?.[2];
+    if (req.method === 'GET') {
+      if (path === '/api/ticket-fields') return [200, await describeTickets()];
+      if (path === '/api/ticket-activity') return [200, await activityOf()];
+      if (!handle) return [200, { tickets: await listTickets() }];
+      if (verb === 'history') return [200, { events: await historyOf(handle) }];
+      if (verb) return undefined;
+      return [200, { ticket: await getTicket(handle), cards: cardsNaming(file, handle) }];
     }
-    return [...(byTicket.get(t.id) ?? [])].reverse().sort((x, y) => (Date.parse(y.filed ?? '') || 0) - (Date.parse(x.filed ?? '') || 0));
-  };
-  const row = (t: Ticket) => ({ id: t.id, title: t.title, progress: t.progress, parent: t.parent ?? '', priority: t.priority ?? '', project: t.project ?? '', type: t.type ?? '', key: t.key ?? '', description: t.description ?? '', hold: t.hold ? 'yes' : 'no', hold_reason: t.hold_reason ?? '', asked: t.asked ? 'yes' : 'no', release: t.release ?? '', state: t.state ?? '', prs: t.prs ?? [], stage: t.stage ?? '', last_event_at: t.last_event_at ?? '' });
-  if (id === undefined) {
-    const all = withRecords(rollUp(readTickets(file, warn)), file);
-    if (values.json) return JSON.stringify({ board: file, tickets: all.map((t) => ({ ...t, cards: cardsOf(t).map((d) => d.key) })) });
-    return toon({ board: tilde(file), tickets: all.length ? all.map((t) => ({ ...row(t), cards: cardsOf(t).length })) : '0 tickets' }, [`Run \`sign-off-axi ticket${on} --id <id> --title "<what the work is>" --progress <0-100>\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
+    if (req.method !== 'POST' || path.startsWith('/api/ticket-') || (verb && verb !== 'comment')) return undefined;
+    if (readOnly()) return [403, { error: new TicketError('denied', 'This board is read-only', false).toJSON() }];
+    if (!req.headers['content-type']?.startsWith('application/json')) return [415, { error: new TicketError('invalid', 'Send JSON', false).toJSON() }];
+    let raw = '';
+    for await (const chunk of req) raw += chunk;
+    let input: any;
+    try { input = JSON.parse(raw); } catch { return invalidRequest('Send one JSON object'); }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return invalidRequest('Send one JSON object');
+    const { op_id } = input;
+    if (typeof op_id !== 'string' || !op_id || op_id.length > 128) return invalidRequest('op_id must be a key of 1-128 characters, chosen once for this write');
+    if (!handle) return [200, { ticket: await createTicket(input.ticket, op_id) }];
+    if (verb === 'comment') return [200, { event: await commentOn(handle, input.text, op_id) }];
+    return [200, { ticket: await updateTicket({ id: handle, rev: input.rev, set: input.set, unset: input.unset }, op_id) }];
+  } catch (e) { return ticketFailure(e); }
+}
+const ticketFailure = (e: unknown): [number, unknown] => { if (e instanceof TicketError) return [statusOf(e), { error: e.toJSON() }]; throw e; };
+/** Activity: the events of the tickets that changed last, each from the adapter's `history`, newest first. It invents none, and says how many tickets it reads of how many there are. */
+async function activityOf() {
+  const all = await listTickets(), newest = [...all].sort((x, y) => (Date.parse(y.updated_at) || 0) - (Date.parse(x.updated_at) || 0)).slice(0, ACTIVITY_TICKETS);
+  const events = (await Promise.all(newest.map(async (t) => (await historyOf(t.id)).map((event) => ({ ticket: t.id, title: t.title, event }))))).flat();
+  events.sort((x, y) => (Date.parse(y.event.at) || 0) - (Date.parse(x.event.at) || 0));
+  return { events, covered: newest.length, total: all.length };
+}
+/** A ticket as one line of the CLI's output: the fields the interface names, the backend's own words as they are. */
+const ticketRow = (t: Ticket) => ({ id: t.id, rev: t.rev, title: t.title, kind: t.kind, status: t.status, assignee: t.assignee ?? '', parent: t.parent ?? '', labels: t.labels.join(','), updated: t.updated_at });
+/** A failure of the adapter as a CLI error: its code and message as it said them, and the step that follows from the code. */
+function ticketFault(e: unknown, on: string, id?: string) {
+  if (!(e instanceof TicketError)) return e;
+  const current = (e.detail as { current?: Ticket } | undefined)?.current;
+  const fields = ((e.detail as { fields?: { field: string; message: string }[] } | undefined)?.fields ?? []).map((f) => `${f.field}: ${f.message}`);
+  const help = e.code === 'conflict' && current ? [`${id} is now at rev ${current.rev}; read it with \`sign-off-axi ticket${on} --id ${id}\`, then send the change again with --rev ${current.rev}`]
+    : e.code === 'not_configured' ? [`Set ${'SIGN_OFF_TICKETS_ADAPTER'} to the adapter executable (docs/ticket-adapter.md)`]
+    : e.retryable ? ['Run the same command again'] : [];
+  return fail(`${e.code}: ${e.message}${fields.length ? ` (${fields.join('; ')})` : ''}`, e.code.toUpperCase(), ...help);
+}
+/** `--set name=value`: a top-level field, or `extra.<key>` for one of the backend's own. A value is a string, unless it is `null` or starts with `[` or `{`, when it is read as JSON. */
+function patchOf(sets: string[] = [], unsets: string[] = []) {
+  const set: Record<string, any> = {};
+  for (const s of sets) {
+    const at = s.indexOf('=');
+    if (at < 1) throw fail(`--set ${s} must be name=value`, 'VALIDATION_ERROR', 'Pass --set title="New words", --set labels=\'["a","b"]\' or --set extra.<key>=<value>');
+    const name = s.slice(0, at), text = s.slice(at + 1);
+    let value: unknown = text;
+    if (text === 'null' || /^[[{]/.test(text)) { try { value = JSON.parse(text); } catch { throw fail(`--set ${name}: ${text} is not valid JSON`, 'VALIDATION_ERROR', 'Quote a JSON value, or leave out the brackets to send plain words'); } }
+    const sub = /^extra\.(.+)$/.exec(name)?.[1];
+    if (sub) set.extra = { ...set.extra, [sub]: value }; else set[name] = value;
   }
-  if (!isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass a short id such as --id T-29');
-  if (!write) {
-    const t = withRecords(rollUp(readTickets(file, warn)), file).find((x) => x.id === id);
-    if (!t) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
-    const cards = cardsOf(t).map(ticketCard);
-    if (values.json) return JSON.stringify({ board: file, ticket: { ...t, cards } });
-    return toon({ board: tilde(file), ticket: row(t), cards: cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
-  }
-  const progress = values.progress === undefined ? undefined : /^\d{1,3}$/.test(values.progress) ? Number(values.progress) : NaN;
-  const event = values['last-event-at'];
-  let lastEvent: number | '' | undefined = event === '' ? '' : event === undefined ? undefined : NaN;
-  if (event && /^\d+$/.test(event)) lastEvent = Number(event);
-  else if (event && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.000)?Z$/.test(event)) {
-    const ms = Date.parse(event);
-    if (Number.isFinite(ms) && new Date(ms).toISOString() === event.replace(/(?:\.000)?Z$/, '.000Z')) lastEvent = ms / 1000;
-  }
-  // yes or no; anything else is kept as given, so the rule below refuses it by name.
-  const yesNo = (v: string | undefined) => (v === undefined ? undefined : ({ yes: true, no: false } as Record<string, boolean>)[v] ?? (v as unknown as boolean));
-  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  return locked(`${file}.lock`, () => {
-    const had = readTickets(file, warn).find((t) => t.id === id);
-    if (!had && title === undefined) throw fail(`no ticket ${id} on ${tilde(file)} yet: a new ticket needs --title`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "<what the work is>" --progress 0`);
-    // A later write changes only what it gives; an empty --parent, --priority, --project, --hold or --asked takes that field off.
-    const next: any = { ...had, id, title: title ?? had!.title, progress: progress ?? had?.progress ?? 0 };
-    // Who wrote this line is this write's own: a later write without a filer does not inherit the earlier writer.
-    const filer = values.filer ?? (process.env.SIGN_OFF_FILER || undefined);
-    delete next.by;
-    if (filer && !SESSION_ID.test(filer)) next.by = filer;
-    for (const [k, v] of Object.entries({ parent, priority: values.priority, project: values.project, type: values.type, key: values.key, description: values.description, hold: yesNo(values.hold), hold_reason: values['hold-reason'], asked: yesNo(values.asked), release: values.release, state: values.state, stage: values.stage, last_event_at: lastEvent, prs: values.pr === undefined ? undefined : values.pr.every((v: string) => v === '') ? '' : [...new Set(values.pr.flatMap((v: string) => v.split(',').map((u: string) => u.trim())))] })) if (v === '') delete next[k]; else if (v !== undefined) next[k] = v;
-    // A hold says why. Recording one (with --hold yes or --state "on hold") without a reason is refused here, where holds are written;
-    // a write that leaves an existing hold alone is never refused, so an old board keeps working, and releasing a hold drops its reason.
-    const held = ticketHeld(next), hadHeld = !!had && ticketHeld(had), touchesHold = values.hold !== undefined || values.state !== undefined || values['hold-reason'] !== undefined;
-    if (held && !hadHeld && !next.hold_reason) throw fail(`ticket ${id}: a hold needs --hold-reason "<why it is on hold>"`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --hold yes --hold-reason "Waiting on the store review"`);
-    if (held && touchesHold && !next.hold_reason) throw fail(`ticket ${id}: a hold needs --hold-reason "<why it is on hold>"`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --hold-reason "Waiting on the store review"`);
-    if (!held && values['hold-reason'] === undefined) delete next.hold_reason;
-    const fault = ticketFault(next);
-    if (fault) throw fail(`ticket ${id}: ${fault.replace(/^(title|progress|parent|priority|project|type|key|description|hold_reason|hold|asked|release|state|stage|last_event_at|prs|by)/, '--$1').replace(/^--prs\b/, '--pr').replace(/^--by\b/, '--filer').replace(/^--last_event_at\b/, '--last-event-at').replace('must be true or false', 'must be yes or no')}`, 'VALIDATION_ERROR', 'Run `sign-off-axi ticket --help`');
-    // A new ticket says what it is in words a person can read: its description opens with a one-line summary.
-    if (!had && !values.description?.trim()) throw fail(`ticket ${id}: a new ticket needs --description, a one-line summary first, then short "# Ask", "# Why" and "# Done when" sections`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --title "${title}" --description "Ship the page. # Ask - the captain wants it # Why - users look for it # Done when - it opens from the profile"`);
-    // A release names what ships, not when: a word like "later" would sit beside the priority and read as a contradiction.
-    if (values.release && releaseIsWhen(values.release)) throw fail(`ticket ${id}: --release names a release such as v1.4 or 2026-11, not when; set --priority P0-P3 for how soon it matters`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --priority P1`);
-    // The same open work under another id is one ticket, not two: write to the one that has it.
-    const twin = ticketTwin(readTickets(file, warn), next);
-    if (twin) throw fail(`ticket ${id}: ticket ${twin.id} already tracks "${twin.title}"${twin.project ? ` in ${twin.project}` : ''}`, 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${twin.id} --progress <0-100>`);
-    const same = had && JSON.stringify(row(had)) === JSON.stringify(row(next));
-    if (!same) appendTicket(file, next);
-    return toon({ board: tilde(file), ticket: row(next), status: same ? 'unchanged' : had ? 'updated' : 'created' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`, `Run \`sign-off-axi ticket${on} --id ${id} --progress <0-100>\` as the work moves`]);
-  });
+  return { ...(Object.keys(set).length && { set }), ...(unsets.length && { unset: unsets }) };
+}
+/** ticket [board.json] [--json]: lists the tickets, as the adapter has them now.
+ *  ticket --id <id> [--json]: one ticket with the cards that name it; --history its events; --text <words> comments on it; --rev <rev> with --set and --unset edits it; --create --set ... makes one;
+ *  --fields says which fields the backend knows. Nothing is kept here: every call goes to the adapter named in SIGN_OFF_TICKETS_ADAPTER. */
+async function ticket(args: string[]) {
+  const { file, values, on } = parse('ticket', args, { id: { type: 'string' }, rev: { type: 'string' }, set: { type: 'string', multiple: true }, unset: { type: 'string', multiple: true }, create: { type: 'boolean' }, fields: { type: 'boolean' },
+    history: { type: 'boolean' }, text: { type: 'string' }, 'op-id': { type: 'string' }, comment: { type: 'string' }, json: { type: 'boolean' } });
+  const { id } = values, opId = values['op-id'] ?? randomBytes(16).toString('hex'), out = (data: object, help: string[] = []) => (values.json ? JSON.stringify({ board: file, ...data }) : toon({ board: tilde(file), ...data }, help));
+  if (id !== undefined && !isKey(id)) throw fail(`--id ${id} must be 1-128 of A-Z a-z 0-9 . _ -`, 'VALIDATION_ERROR', 'Pass the id the ticket list shows');
+  if (values.comment !== undefined) return ticketComment(file, values, on);
+  const writes = [values.create, !values.create && (values.rev !== undefined || values.set || values.unset), values.text !== undefined].filter(Boolean).length;
+  if (writes > 1 || (writes && (values.fields || values.history))) throw fail('Give one thing to do: --create, an edit (--rev with --set or --unset), --text, --history or --fields', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --help`);
+  if ((values.history || values.text !== undefined || values.rev !== undefined || values.unset || (values.set && !values.create)) && id === undefined) throw fail('--history, --text, --rev, --set and --unset need --id <ticket id>', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id <id>`);
+  try {
+    if (values.fields) return out({ ...(await describeTickets()) });
+    if (values.create) {
+      if (id !== undefined || values.rev !== undefined || values.unset) throw fail('--create takes --set only', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --create --set title="What the work is"`);
+      const t = await createTicket(patchOf(values.set).set ?? {}, opId);
+      return out({ ticket: values.json ? t : ticketRow(t), status: 'created' }, [`Run \`sign-off-axi ticket${on} --id ${t.id}\` to read it back`, `Pass --ticket ${t.id} to raise or post, so the card shows this ticket`]);
+    }
+    if (id !== undefined && (values.set || values.unset || values.rev !== undefined)) {
+      if (values.rev === undefined) throw fail('An edit needs --rev <rev>, the rev you read', 'VALIDATION_ERROR', `Read it with \`sign-off-axi ticket${on} --id ${id}\`, then pass its rev`);
+      const patch = patchOf(values.set, values.unset);
+      if (!patch.set && !patch.unset) throw fail('An edit needs --set or --unset', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --id ${id} --rev ${values.rev} --set title="New words"`);
+      const t = await updateTicket({ id, rev: values.rev, ...patch }, opId);
+      return out({ ticket: values.json ? t : ticketRow(t), status: 'updated' }, [`It is now at rev ${t.rev}; pass that rev to the next edit`]);
+    }
+    if (id !== undefined && values.text !== undefined) {
+      const event = await commentOn(id, values.text, opId);
+      return out({ ticket: id, event: values.json ? event : { id: event.id, at: event.at, actor: event.actor ?? '', text: event.text ?? '' } });
+    }
+    if (id !== undefined && values.history) {
+      const events = await historyOf(id);
+      return out({ ticket: id, events: values.json ? events : events.length ? events.map((e) => ({ at: e.at, actor: e.actor ?? '', type: e.type, text: e.text ?? '', changes: e.changes.map((c) => `${c.field}: ${JSON.stringify(c.from)} -> ${JSON.stringify(c.to)}`).join('; ') })) : '0 events' });
+    }
+    if (id !== undefined) {
+      const t = await getTicket(id), cards = cardsNaming(file, id);
+      return out({ ticket: values.json ? t : ticketRow(t), ...(!values.json && Object.keys(t.extra).length && { extra: t.extra }), cards: values.json || cards.length ? cards : '0 cards name this ticket' }, [`Pass --ticket ${id} to raise or post, so the card shows this ticket`]);
+    }
+    const all = await listTickets();
+    return out(values.json ? { tickets: all, cards: Object.fromEntries(all.map((t) => [t.id, cardsNaming(file, t.id).map((c) => c.key)])) } : { tickets: all.length ? all.map((t) => ({ ...ticketRow(t), cards: cardsNaming(file, t.id).length })) : '0 tickets' },
+      [`Run \`sign-off-axi ticket${on} --create --set title="<what the work is>"\` to add one`, 'Pass --ticket <id> to raise or post, so the card shows its ticket']);
+  } catch (e) { throw ticketFault(e, on, id); }
 }
 
-/** ticket --backfill: gives every ticket that has no description its title as the summary, so no old ticket reads blank. Tickets with words are left alone. */
-function ticketBackfill(file: string, values: Record<string, any>, on: string) {
-  if (Object.entries(values).some(([k, v]) => v !== undefined && !['backfill', 'json'].includes(k))) throw fail('--backfill is run on its own, with no other ticket field', 'VALIDATION_ERROR', `sign-off-axi ticket${on} --backfill`);
-  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
-  return locked(`${file}.lock`, () => {
-    const blank = readTickets(file, warn).filter((t) => !t.description?.trim());
-    for (const t of blank) appendTicket(file, { ...t, by: undefined, description: t.title });
-    return values.json ? JSON.stringify({ board: file, backfilled: blank.map((t) => t.id) }) : toon({ board: tilde(file), backfilled: blank.length, ids: blank.map((t) => t.id) }, ['Each now opens with its title as the summary; rewrite one with `sign-off-axi ticket --id <id> --description "<summary> # Ask ... # Why ... # Done when ..."`']);
-  });
-}
 
-function releaseTicketHold(file: string, id: string) {
-  const tickets = readTickets(file, warn), ticket = tickets.find((t) => t.id === id);
-  if (ticket && ticketHeld(ticket)) appendTicket(file, { ...ticket, by: undefined, hold: false, hold_reason: undefined,
-    state: (rollUp(tickets).find((t) => t.id === id)?.progress ?? ticket.progress) ? 'in progress' : 'queued', last_event_at: Math.floor(Date.now() / 1000) });
-}
 /** ticket --id <id> --comment '<json>': the fleet dashboard hands over a comment the person made on a ticket, in its own thread record, again each time it moves
  * (picked up, answered), so the board shows how far it got and a reply lands in Today. */
-function ticketComment(file: string, values: Record<string, any>, on: string) {
+async function ticketComment(file: string, values: Record<string, any>, on: string) {
   const { id } = values, EXAMPLE = `sign-off-axi ticket${on} --id T-29 --comment '{"id":"3f9a1c2e7b6d4a10","at":1792820000,"text":"Is the export in this?","error":null,"picked":1792820300,"replies":[]}'`;
   if (id === undefined || !isKey(id)) throw fail('--comment needs --id <ticket id>, 1-128 of A-Z a-z 0-9 . _ -', 'VALIDATION_ERROR', EXAMPLE);
-  if (['title', 'progress', 'parent', 'priority', 'project', 'type', 'key', 'description', 'hold', 'hold-reason', 'asked', 'release', 'state', 'pr', 'stage', 'last-event-at'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with no other ticket field', 'VALIDATION_ERROR', EXAMPLE);
+  if (['rev', 'set', 'unset', 'create', 'fields', 'history', 'text'].some((k) => values[k] !== undefined)) throw fail('--comment is written on its own, with only --id', 'VALIDATION_ERROR', EXAMPLE);
   let c;
   try { c = JSON.parse(values.comment); } catch { throw fail('--comment must be one JSON object', 'VALIDATION_ERROR', EXAMPLE); }
   const fault = ticketCommentFault(c);
   if (fault) throw fail(`--comment: ${fault}`, 'VALIDATION_ERROR', EXAMPLE);
+  try { await getTicket(id); } catch (e) { throw ticketFault(e, on, id); }
   return locked(`${file}.lock`, () => {
-    if (!readTickets(file, warn).some((t) => t.id === id)) throw fail(`no ticket ${id} on ${tilde(file)}`, 'NOT_FOUND', `Run \`sign-off-axi ticket${on} --id ${id} --title "<what the work is>"\` to add it`);
-    const previous = readTicketComments(file).find((x) => x.id === c.id);
-    const replies = c.replies ?? [];
-    const hasNewReply = replies.length > (previous?.replies?.length ?? 0);
     appendTicketComment(file, id, c);
-    if (hasNewReply) releaseTicketHold(file, id);
     const t = readTrail(file, loadDecisions(file)).find((x) => x.kind === 'ticket' && x.id === c.id)!;
     return toon({ board: tilde(file), ticket: id, comment: c.id, shows: t.reply ? 'Replied' : t.read ? 'Read' : t.delivered ? 'Delivered' : 'Sent' }, ['Send the comment again with --comment as the lead picks it up and answers']);
   });
@@ -1691,7 +1641,10 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     // An item the feed sends without a time keeps the one it was first posted with, so a feeder that runs every few seconds never resets it.
     const first = new Map((existsSync(file) ? readItems(file).items : []).map((i) => [i?.key, i])), now = new Date().toISOString();
     for (const i of fed.items) if (first.get(i?.key)?.title !== i?.title) fits(i?.title, i?.key);
-    const feed: any[] = fed.items.map((i) => ({ filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) }));
+    const feed: any[] = fed.items.map((i) => {
+      const next = { filed: first.get(i?.key)?.filed ?? now, ...i, ...(filer && { filer }) };
+      return i?.kind === 'report' || first.get(i?.key)?.kind === 'report' ? reportPost(first.get(i.key), next, now) : next;
+    });
     // An answer belongs to its question: an answered key may not come back asking something else.
     // Evidence is answered for the media and run it shows, so those are part of its question too, as a gate's run and a finding's proposal are.
     const question = (d: Decision) => JSON.stringify([d.title, [...d.options].sort((a, b) => a.value.localeCompare(b.value)), !!d.reply, d.run, d.finding, d.evidence, d.media, d.sections, d.decisions, d.type === 'signin' ? [d.link, d.start] : '', d.type === 'plan' ? [d.about, d.view, d.steps] : '']);
@@ -1706,7 +1659,7 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     for (const had of current) {
       const d = incoming.find((x) => x.key === had.key);
       if (filer && d && had.filer && had.filer !== filer) throw fail(`key ${d.key} on ${tilde(file)} was posted by another filer`, 'CONFLICT', 'Feed it under a new key');
-      if (had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
+      if (had.kind !== 'report' && had.answer && !awaitsVerdict(had.type, had.answer) && d && question(d) !== question(had)) {
         throw fail(`key ${d.key} was answered and now holds a different question on ${tilde(file)}`, 'CONFLICT', 'Post the new question under a new key');
       }
     }
@@ -1731,9 +1684,9 @@ function replace(file: string, named: string, on: string, from?: string, filer?:
     checkMerges(incoming, resulting, current);
     // Written only when it changed, so a feeder that runs every few seconds leaves the file alone.
     const changed = JSON.stringify(old && { ...old.extra, schema: old.schema, items: old.items }) !== JSON.stringify({ ...extra, schema: 2, items });
-    if (changed) {
+    if (changed || incoming.some((d) => d.kind === 'report' && current.find((c) => c.key === d.key)?.dismissed)) {
       const before = waitingKeys(file);
-      writeItems(file, items, extra);
+      writePostedItems(file, items, incoming, extra);
       notifyEntered(file, named, before);
     }
     return toon({ board: tilde(file), items: items.length, changed }, [`Run \`sign-off-axi answers${on}\` to read the answers`]);
@@ -1942,11 +1895,12 @@ async function postKind(file: string, named: string, on: string, values: Record<
   try {
     if (m.kind === 'evidence') return await postMedia(file, named, on, { title: m.title, about: m.about, media: sources }, 'evidence', filer, { ...m, ...(filer && { filer }) });
     writeFileSync(source, JSON.stringify({ schema: 2, items: [{ ...m, ...(filer && { filer }) }] }));
-    return await storeIncoming(file, named, on, buildIncoming({ from: source }, {}, filer, file), filer, true);
+    return await storeIncoming(file, named, on, buildIncoming({ from: source }, {}, filer, file), filer, true, values.replaces);
   } catch (e) {
     if (!(e instanceof AxiError && e.code === 'CONFLICT')) throw e;
     // A key conflict refuses a contract post like any other rule: exit 2 (contract section 4); raise keeps exit 1.
     process.once('exit', () => { process.exitCode = 2; });
+    if (m.kind === 'report') throw e;
     throw fail(`${name}: ${e.message}`, 'CONFLICT', 'Post it under a new key');
   } finally {
     rmSync(scratch, { recursive: true, force: true });
@@ -2050,6 +2004,44 @@ function buildIncoming(values: Record<string, any>, extra: object, filer: string
 
 /** JSON with object fields in key order, so the same message compares equal in any field order. */
 const canon = (v: unknown) => JSON.stringify(v, (_, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : 1))) : x));
+/** Every board a report carries, with the section it sits on. */
+const reportBoards = (m: any): any[] => (m?.sections ?? []).flatMap((s: any, n: number) => (s?.board ? [{ section: n, board: s.board }] : []));
+/** The ids every earlier version of this report's boards used and the version just before it dropped: post refuses one that comes back, so an old mark never lands on a new thing. */
+const retiredIds = (had: any): string[] => {
+  const before = reportBoards(had), earlier = [had, ...(had.versions ?? []).map((v: any) => v.item)].flatMap(reportBoards);
+  const kept = new Set(before.flatMap((b) => boardIds(b.board)));
+  return [...new Set(earlier.flatMap((b) => boardIds(b.board)))].filter((id) => !kept.has(id));
+};
+/** Report transitions, shared by raise, contract post and replacement feeds. History is owned by the board, never by a producer. */
+function reportPost(had: any, next: any, now: string) {
+  if (next.kind !== 'report') throw fail(`key ${next.key} holds a report`, 'CONFLICT', 'Keep this key for its report; post another kind under its own key');
+  if (!had) return { ...asReport(next), filed: next.filed ?? now };
+  if (had.kind !== 'report') throw fail(`key ${next.key} already holds another kind of card`, 'CONFLICT', 'Use the key of the report you are updating');
+  // A board's ids are the names its marks use: one an earlier version removed may not come back under a new shape, arrow or zone.
+  for (const { section, board } of reportBoards(next)) {
+    const fault = checkBoard(board, retiredIds(had));
+    if (!fault.ok) throw fail(`key ${next.key}: sections[${section}].board.${fault.field} ${fault.problem}`, 'VALIDATION_ERROR', fault.fix);
+  }
+  const authored = had.versions?.find((v: any) => v.version === had.version)?.filed ?? had.filed;
+  if ([asReport(had), { ...asReport(had), filed: authored }].some((m) => canon(m) === canon(asReport(next)))) return had;
+  if (!(next.version > (had.version ?? 1) && next.changes?.length)) {
+    throw fail(`key ${next.key}: version ${had.version ?? 1} is already posted; a changed report needs a newer version and change notes`, 'CONFLICT',
+      `Keep this key, increase "version" above ${had.version ?? 1} and include "changes"; retry the unchanged message to post it again`);
+  }
+  const history = had.versions ?? [], version = had.version ?? 1;
+  return { ...asReport(next), ...(had.announced && { announced: had.announced }), filed: had.filed ?? now, versions: [
+    ...history.filter((v: any) => v.version !== version),
+    { version, at: history.find((v: any) => v.version === version)?.at ?? had.filed ?? now, changes: had.changes ?? [], item: asReport(had) },
+    { version: next.version, at: now, changes: next.changes, filed: next.filed },
+  ] };
+}
+/** Publish only after every transition passed validation, then restore each posted report's one live card. Callers hold the board lock. */
+function writePostedItems(file: string, items: any[], incoming: Decision[], extra?: Record<string, unknown>) {
+  writeItems(file, items, extra);
+  const hidden = new Set(readDismissed(file, readAnswers(file), readRounds(file), warn, loadDecisions(file)));
+  const reports = incoming.filter((d) => d.kind === 'report' && hidden.has(d.key)).map((d) => d.key);
+  if (reports.length) appendDismissed(file, reports, false);
+}
 /** A merge names cards on the board that take this card's answer: each is on the board, offers every option of this card, and merges nothing itself.
  * A card is named by one ask until that ask is answered, dismissed or not. A merge new to the board also names a card still open. */
 function checkMerges(incoming: Decision[], resulting: Decision[], current: ReturnType<typeof board>) {
@@ -2097,13 +2089,17 @@ function checkDesignOptions(incoming: Decision[], raw: any[], current: Decision[
 }
 
 /** exact: a contract post, where a key takes only the same message again, filer and filed included (contract section 4). */
-function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false) {
+function storeIncoming(file: string, named: string, on: string, { incoming, raw }: { incoming: Decision[]; raw: any[] }, filer?: string, exact = false, replaces?: string) {
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   return locked(`${file}.lock`, () => {
     const current = board(file), items = existsSync(file) ? readItems(file).items : [], saved = readAnswers(file), reopened = reopenedNow(file), now = new Date().toISOString();
     checkAskRefs(incoming, raw, current);
     checkDesignOptions(incoming, raw, current);
     checkMerges(incoming, [...current.filter((c) => !incoming.some((d) => d.key === c.key)), ...incoming], current);
+    if (replaces !== undefined) {
+      if (incoming.some((d) => d.key === replaces)) throw fail(`--replaces ${replaces} names the card being posted`, 'VALIDATION_ERROR', 'Name the key of the older card this one replaces');
+      if (!current.some((c) => c.key === replaces)) throw fail(`no card with key ${replaces} on ${tilde(file)} to replace`, 'NOT_FOUND', `Run \`sign-off-axi list${on} --full\` to see the keys`);
+    }
     // Proof is evidence: a new ask that offers Pass and Fail would sit in Waiting on you as an ask, so it is refused.
     const proof = incoming.find((d) => d.type === 'decision' && !d.kind && !current.some((c) => c.key === d.key) && ['pass', 'fail'].every((v) => d.options.some((o) => o.value === v)));
     if (proof) throw fail(`key ${proof.key} offers Pass and Fail: a proof is not an ask and would wait on you`, 'VALIDATION_ERROR', 'Post it with sign-off-axi post --type evidence --title "<what this shows>" --about "<short note>" --media <file>');
@@ -2114,6 +2110,12 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
     }
     const raised = incoming.map((d, i) => {
       const had = current.find((c) => c.key === d.key);
+      if (d.kind === 'report' || had?.kind === 'report') {
+        if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw fail(`key ${d.key} already has a saved answer`, 'CONFLICT', 'Use another key; the earlier answer belongs to its original card');
+        const index = items.findIndex((x) => x?.key === d.key), stored = items[index], next = reportPost(stored, raw[i], now);
+        if (next !== stored) { fits(d.title, d.key); if (stored) items[index] = next; else items.push(next); }
+        return { key: d.key, status: !had ? 'raised' : next !== stored ? `version ${d.version} posted` : had.dismissed ? 'raised again' : 'already posted', title: d.title };
+      }
       // A contract message refused for its key exits 2 like any other refusal (contract section 4); raise --title keeps exit 1.
       const contract = exact || raw[i]?.contract !== undefined || raw[i]?.kind !== undefined;
       const refuse = (why: string) => {
@@ -2123,14 +2125,11 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
       // An answer outlives its item: a new question under that key would inherit it.
       if (!had && Object.hasOwn(saved, d.key) && !awaitsVerdict(d.type, saved[d.key])) throw refuse(`already has a saved answer on ${tilde(file)} from an item no longer there`);
       // The same question from another filer, or at another time, is the same question: it keeps its first filer and time.
-      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
+      const same = (x: Decision) => JSON.stringify({ ...x, answer: undefined, dismissed: undefined, state: undefined, filer: undefined, filed: undefined, ask_ref: undefined, options: [...x.options].sort((a, b) => a.value.localeCompare(b.value)) });
       // A message that names no filed time matches the one the board stamped.
       const differs = () => exact ? canon({ ...items.find((x) => x?.key === d.key), ...(raw[i].filed === undefined && { filed: undefined }), announced: undefined }) !== canon(raw[i]) : same(had!) !== same(d);
       // A card the lead reopened (sign-off-axi reopen) may be asked again on its key: the new question or round replaces the old one, filed now, and its earlier answer stays in the thread.
-      // A report the owner redid is the same card one version on: it replaces the report in place, never a second card and never a new key, and it
-      // keeps the day it was first filed and every version it has had.
-      const bumped = !!had && had.kind === 'report' && d.kind === 'report' && Number.isInteger(d.version) && d.version! > (had.version ?? 1) && !!d.changes?.length;
-      const again = !!had && (bumped || (reopened.has(d.key) && differs()));
+      const again = !!had && reopened.has(d.key) && differs();
       if (had && !again && differs()) throw refuse(`already holds a different ${contract ? 'message' : 'question'} on ${tilde(file)}`);
       // Each new item records when it was raised, unless it names its own time.
       if (!had) {
@@ -2138,20 +2137,21 @@ function storeIncoming(file: string, named: string, on: string, { incoming, raw 
         items.push({ filed: now, ...raw[i] });
       } else if (again) {
         fits(d.title, d.key);
-        items[items.findIndex((x) => x?.key === d.key)] = { filed: bumped ? (had.filed ?? now) : now, ...raw[i],
-          ...(bumped && { versions: [...(had.versions ?? []), { version: d.version!, at: now, changes: d.changes }] }) };
+        items[items.findIndex((x) => x?.key === d.key)] = { filed: now, ...raw[i] };
       }
-      return { key: d.key, status: !had ? 'raised' : bumped ? `version ${d.version} posted` : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
+      return { key: d.key, status: !had ? 'raised' : again ? 'raised again' : had.answer && !awaitsVerdict(had.type, had.answer) ? `already answered ${had.answer.answer}` : waits({ ...had, dismissed: false }) ? 'already waiting' : 'already posted', title: d.title };
     });
     let picked: Answer[] = [];
     if (raised.some((r) => r.status === 'raised' || r.status === 'raised again' || /^version \d+ posted$/.test(r.status))) {
       const before = waitingKeys(file);
-      writeItems(file, items);
+      writePostedItems(file, items, incoming);
       // On the leash Act, then tell me, a new ask takes its agent's recommended pick at once: the person sees it and can still change it.
       if (leashOf(named) === 'act') picked = leashTake(file, 'act', raised.flatMap((r) => (r.status === 'raised' ? [r.key] : []))).took.map(({ a }) => a);
       for (const a of picked) raised.find((r) => r.key === a.key)!.status = `picked ${a.answer}`;
       notifyEntered(file, named, before);
     }
+    // The card it replaces is archived in this write, under the same board lock, so no reader sees both or neither.
+    if (replaces !== undefined) appendDismissed(file, [replaces], true, 'replaced');
     const key = raised.length === 1 ? ` --key ${raised[0].key}` : '';
     const goAhead = picked.map((a) => `The leash is Act, then tell me: go ahead with ${a.label} on ${a.key}; the person can still change it`);
     // Reports take no answer, so a post with nothing waiting asks the user to read it, never to answer.
@@ -2222,10 +2222,19 @@ const serving = (port: number, host: string, file: string) => fetch(`http://${ur
   if (e.name === 'TimeoutError') throw fail(`the board on port ${port} did not answer within 1 second`, 'BUSY', 'Run the command again in a moment');
 });
 const alive = (pid: number) => { try { return process.kill(pid, 0); } catch (e: any) { return e.code === 'EPERM'; } };
+/** The pid a lock names: 0 when it names none (empty, from before locks held one, or not yet written); undefined when there is no lock. */
+const lockPid = (lock: string) => { try { const pid = Number(readFileSync(lock, 'utf8')); return pid > 0 ? pid : 0; } catch { return undefined; } };
 /** A lock whose pid is gone (or empty, from before locks held one): a crash left it, and every later write waits on it. */
-const staleLock = (lock: string) => {
-  try { const pid = Number(readFileSync(lock, 'utf8')); return !(pid > 0 && alive(pid)); } catch { return false; }
-};
+const staleLock = (lock: string) => { const pid = lockPid(lock); return pid !== undefined && !(pid && alive(pid)); };
+/** A lock that names a pid no process has: only this is safe to take over. An empty lock is not, for a live writer is empty for a moment. */
+const deadOwner = (lock: string) => { const pid = lockPid(lock); return !!pid && !alive(pid); };
+/** Removes a lock whose owner is gone. One process at a time may do it, under `<lock>.reclaim`, and it looks again under that guard: a
+ * lock another process took in the meantime names a live pid and is left alone. A busy guard means another process is already on it. */
+function reclaimDead(lock: string) {
+  const guard = `${lock}.reclaim`;
+  try { writeFileSync(guard, `${process.pid}\n`, { flag: 'wx', mode: 0o600 }); } catch (e: any) { if (e.code === 'EEXIST') return; throw e; }
+  try { if (deadOwner(lock)) rmSync(lock, { force: true }); } finally { rmSync(guard, { force: true }); }
+}
 /** The board open started for this file, only while that pid really serves this file on that port. */
 async function running(file: string) {
   const [pid, port, host = '127.0.0.1'] = (existsSync(record(file)) ? readFileSync(record(file), 'utf8') : '').trim().split(' ');
@@ -2273,7 +2282,7 @@ const linkHelp = (file: string, url: string) => (loopback(new URL(url).hostname.
 async function status(args: string[]) {
   const { file, values, on } = parse('status', args, { json: { type: 'boolean' } });
   const live = await running(file);
-  if (values.json) return JSON.stringify({ board: file, status: live ? 'running' : 'not running', ...live });
+  if (values.json) return JSON.stringify({ board: file, status: live ? 'running' : 'not running', ...live, cards: Object.fromEntries(CARD_STATES.map((st) => [st, board(file).filter((d) => d.state === st).length])) });
   if (!live) return toon({ board: tilde(file), status: 'not running' }, [`Run \`sign-off-axi open${on}\` to start it`]);
   return toon({ board: tilde(file), status: 'running', ...live }, [linkHelp(file, live.url), `Run \`sign-off-axi stop${on}\` to close the board`]);
 }
@@ -2518,14 +2527,33 @@ const kindSections = (purpose: string) => REPORT_PARTS[purpose].map(([part, name
     ...(purpose === 'plan' && part === 'design' && { diagram: [{ label: 'Flow', src: 'FILL: diagrams/flow.html, inline SVG in light and dark' }] }) };
 });
 
+/** The whiteboard `report init --board` writes: three shapes on their cells, the two moves between them, and one step to explain them. */
+const BOARD_TEMPLATE = {
+  title: 'FILL: what the board shows, in 80 characters or fewer',
+  shapes: [
+    { id: 'start', label: 'FILL: first state', at: [0, 0], tone: 'start', note: 'FILL: what happens here, in 160 characters or fewer' },
+    { id: 'middle', label: 'FILL: middle state', at: [1, 1], note: 'FILL: what happens here, in 160 characters or fewer' },
+    { id: 'end', label: 'FILL: last state', at: [2, 2], tone: 'end' },
+  ],
+  arrows: [
+    { id: 'm1', from: 'start', to: 'middle', label: 'FILL: move' },
+    { id: 'm2', from: 'middle', to: 'end', label: 'FILL: move' },
+  ],
+  steps: [{ title: 'FILL: the step, in 80 characters or fewer', text: 'FILL: what the person sees in this step, in 240 characters or fewer', focus: ['start', 'middle'] }],
+};
+
 /** report init <folder>: the guided template (report.json, or plan.json with --plan) to fill in, or with --page the older scaffold page and its picture. */
 function report(args: string[]) {
+  // --board names a file for report kind and needs no value for report init: one subcommand, one meaning of the flag.
+  const isInit = args[0] === 'init';
   let parsed;
-  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' }, project: { type: 'string' }, board: { type: 'string' }, by: { type: 'string' }, from: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
-  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery } = parsed.values;
+  try { parsed = parseArgs({ args, allowPositionals: true, strict: true, options: { plan: { type: 'boolean' }, page: { type: 'boolean' }, purpose: { type: 'string' }, gallery: { type: 'boolean' }, project: { type: 'string' }, board: isInit ? { type: 'boolean' } : { type: 'string' }, by: { type: 'string' }, from: { type: 'string' } } }); } catch (e: any) { throw fail(e.message, 'VALIDATION_ERROR', 'Run `sign-off-axi report --help`'); }
+  const [sub, dir, extra] = parsed.positionals, { plan, page, purpose, gallery, board: withBoard } = parsed.values;
   if (parsed.values.project !== undefined && sub !== 'kind') throw fail('--project belongs to report kind; a new report carries its project in report.json', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --project <name> --by <who>');
   if (sub === 'kind') return reportKind(parsed.positionals.slice(1), parsed.values);
-  if (parsed.values.board !== undefined || parsed.values.by !== undefined || parsed.values.from !== undefined) throw fail('--board, --by and --from belong to report kind', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --by <who>');
+  if (parsed.values.by !== undefined || parsed.values.from !== undefined) throw fail('--by and --from belong to report kind', 'VALIDATION_ERROR', 'sign-off-axi report kind <key> <kind> --by <who>');
+  if (withBoard && plan) throw fail('--board does not go with --plan: a plan message carries no board in this sign-off-axi', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose plan --board, which writes a report whose design section holds the board');
+  if (withBoard && page) throw fail('--board does not go with --page: a board is data on a guided report, not a page', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose <kind> --board');
   if (purpose !== undefined && plan) throw fail('--purpose does not go with --plan: a plan is always an implementation plan', 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --plan');
   if (gallery && (plan || page)) throw fail(`--gallery does not go with --${plan ? 'plan' : 'page'}: a gallery is a section of a guided report`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research --gallery');
   if (purpose !== undefined && !REPORT_PURPOSES.includes(purpose)) throw fail(`--purpose ${purpose} must be one of ${REPORT_PURPOSES.join(', ')}`, 'VALIDATION_ERROR', 'sign-off-axi report init <folder> --purpose research');
@@ -2557,9 +2585,16 @@ function report(args: string[]) {
       writeFileSync(path, doc ? `${JSON.stringify(doc, null, 2)}\n` : template, { flag: 'wx' });
       created.push(shellPath(path));
     }
+    // --board writes a whiteboard to fill: shapes on grid cells, the moves between them by id, and the steps that explain them.
+    const boardPath = join(out, 'board.json');
+    if (withBoard) {
+      if (existsSync(boardPath)) kept.push(shellPath(boardPath));
+      else { writeFileSync(boardPath, `${JSON.stringify(BOARD_TEMPLATE, null, 2)}\n`, { flag: 'wx' }); created.push(shellPath(boardPath)); }
+    }
     return toon({ folder: shellPath(out), created: created.length ? created : 'nothing new (re-run is a no-op)', kept }, [
       `Replace every FILL: line in ${kind}.json with your own words: the answer first, one picture (bars, steps or tiles), what you understood, then the sections${plan ? ' and the decisions' : ''}`,
       `${plan ? 'A plan' : 'A design or architecture report'} needs one real diagram: a flow or architecture drawing as inline SVG, in light and dark, as "diagram" on the visual (see the skill)`,
+      ...(withBoard ? [`Replace every FILL: line in board.json, then put the whole object in a section's "board" field: a shape sits on a grid cell, an arrow names two shapes, a step says what to frame`] : []),
       ...(gallery ? ['Save each option\'s screenshots (or pages) under the board file\'s folder, a phone frame 390 wide and a desktop frame 1280 wide, and fill the gallery: its label, model, run time (UTC), and per frame its path from that folder and a caption'] : []),
       'Keep each line short: the board shows it in one scroll, the numbers behind a Details tap and the long answer behind Go deeper',
       `Run \`sign-off-axi post --kind ${kind} --from ${shellPath(path)}\` to put it on the board`,
@@ -2940,8 +2975,6 @@ const APP = { pwa: readFileSync(new URL('../web/pwa.js', import.meta.url)), work
 const SPLASH = readdirSync(new URL('../web/', import.meta.url)).flatMap((f) => { const m = /^splash-(\d+)x(\d+)-(light|dark)\.png$/.exec(f); return m ? [{ file: f, w: +m[1]!, h: +m[2]!, theme: m[3]! }] : []; });
 for (const { file } of SPLASH) ICONS[`/${file}`] = { type: 'image/png', bytes: readFileSync(new URL(`../web/${file}`, import.meta.url)) };
 const splashLinks = SPLASH.map(({ file, w, h, theme }) => `<link rel="apple-touch-startup-image" href="${file}" media="(device-width: ${w}px) and (device-height: ${h}px) and (-webkit-device-pixel-ratio: 2) and (orientation: ${w < h ? 'portrait' : 'landscape'}) and (prefers-color-scheme: ${theme})">`).join('\n');
-/** The tool and provider marks a ticket's assignee shows (web/logos), served from the board itself: no mark is fetched from another site. */
-for (const f of readdirSync(new URL('../web/logos/', import.meta.url))) if (f.endsWith('.svg')) ICONS[`/logos/${f}`] = { type: 'image/svg+xml', bytes: readFileSync(new URL(`../web/logos/${f}`, import.meta.url)) };
 /** The page names its stylesheets and script by their content, so a phone holding an older copy (kept a day) fetches the new one with the new page: a row's badge is never drawn by half of an upgrade. */
 const stamp = (name: string) => createHash('sha256').update(ICONS[`/${name}`]!.bytes).digest('hex').slice(0, 12);
 const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/g, (_, name) => `href="${name}.css?v=${stamp(`${name}.css`)}"`)
@@ -2955,8 +2988,11 @@ const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/
   // home-screen icon are not what the person came for. app.js names both once the first screen has drawn.
   .replace(/<link rel="icon" href="icon\.svg"([^>]*)>/, '<link data-icon="icon.svg" rel="icon"$1>')
   .replace(/<link rel="manifest" href="manifest\.webmanifest"([^>]*)>/, '<link data-manifest="manifest.webmanifest" rel="manifest"$1>'));
-/** The worker's cache is named by the whole build, so a changed page, stylesheet or worker replaces the kept copy at the next visit and never mixes two. */
-const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).digest('hex').slice(0, 16))};\n${APP.worker}`);
+/** The canvas's own build, read from the loader npm run build:board writes: every canvas file it names carries its content's hash, so the loader's
+ *  bytes are the build's identity, and a rebuilt canvas names new files and a new worker cache. Empty when this copy has no canvas built. */
+const BOARD_LOADER = (() => { try { return readFileSync(new URL('../web/board/board.js', import.meta.url)); } catch { return Buffer.alloc(0); } })();
+/** The worker's cache is named by the whole build, so a changed page, stylesheet, worker or canvas replaces the kept copy at the next visit and never mixes two. */
+const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).update(BOARD_LOADER).digest('hex').slice(0, 16))};\n${APP.worker}`);
 const pageTag = `"${createHash('sha256').update(served).digest('hex').slice(0, 32)}"`;
 // Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
 const squeezed: Record<string, Buffer> = {};
@@ -2966,11 +3002,30 @@ const pageAs = (encoding: 'br' | 'gzip') => (squeezed[encoding] ??= encoding ===
 const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-match']?.split(/\s*,\s*/).includes(tag) ?? false;
 /** Added to each design mock page and plan page so the person can point at a part of it; see web/point.js. */
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
+/** The whiteboard's own page (web/board.html), the canvas files it loads (web/board/, built by npm run build:board) and its policy: no host but this one. */
+const BOARD_PAGE = readFileSync(new URL('../web/board.html', import.meta.url));
+const BOARD_PAGE_TAG = `"${createHash('sha256').update(BOARD_PAGE).digest('hex').slice(0, 32)}"`;
+const BOARD_DIR = new URL('../web/board/', import.meta.url);
+const BOARD_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; form-action 'none'; base-uri 'none'";
+const CANVAS_FILE = /^(board\.(js|css)|NOTICES\.txt|chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2|board-[\w-]+\.(js|css))$/;
+/** A canvas file whose name carries its content's hash (the drawing font's own files do, as Excalidraw's build names them): it is never served under another
+ *  name, so a browser keeps it for good and asks nothing for it on a later open. */
+const CANVAS_STAMPED = /^(?:chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2|board-[\w-]+\.(?:js|css))$/;
+const CANVAS_TYPE: Record<string, string> = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
+/** A board a report holds, checked again as the page reads it: the section's board, and the scene the canvas draws from it. */
+function boardAt(key: string, section: number) {
+  const report = loadDecisions(file).find((d) => d.key === key && d.kind === 'report'), board = (report as any)?.sections?.[section]?.board;
+  if (!board) return { why: 'No board there.' } as const;
+  const checked = checkBoard(board);
+  if (!checked.ok) return { why: `This board is not one sign-off can draw: ${checked.problem}.` } as const;
+  if (checked.form !== 'shapes') return { why: 'This board is Mermaid text, which sign-off cannot draw yet.' } as const;
+  return { report: report!, board, ...scene(board) };
+}
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 /** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
 const stampOf = (path: string) => { try { const st = statSync(path); return `${st.ino}:${st.size}:${st.mtimeMs}`; } catch { return ''; } };
 /** The files beside the board that hold what it shows: every answer, comment, ticket, read and handed-over reply changes the board's state. */
-const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'tickets', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery', 'report-actions', 'report-learnings'];
+const SIDECARS = ['answers', 'rounds', 'seen', 'dismissed', 'reopened', 'kinds', 'promoted', 'projects', 'messages', 'annotations', 'reads', 'deeper', 'trail', 'ticket-comments', 'delivery', 'report-actions', 'report-learnings'];
 /** The files a board read is made from that are named without reading the board: the board itself, its sidecars, and the config and token beside it. */
 const stateSources = () => [file, config, tokenFile(file), ...SIDECARS.map((side) => `${file.replace(/\.json$/, '')}.${side}.jsonl`)];
 /** The files a read was built from beyond those, with the stamp each had: a run's proof or a mock replaced on disk is a new read. */
@@ -3074,14 +3129,15 @@ const state = () => {
   const rounds = readRounds(file, warn).map(({ comments: _, ...r }) => r);
   // The board file is read once for the whole state: it can hold thousands of items.
   const { extra } = readItems(file), fed = extra.readonly === true || extra.answers_only === true, items = loadDecisions(file);
-  const tickets = withKeys(withRecords(rollUp(readTickets(file, warn)), file));
+  const heads = new Map<string, Set<string>>();
+  for (const { evidence: e } of items) if (e?.proof_series_id) { const set = heads.get(e.proof_series_id) ?? new Set<string>(); set.add(/^[a-f0-9]{40}$/.test(e.current_head ?? '') ? e.current_head! : 'unknown'); heads.set(e.proof_series_id, set); }
   const lines = items.some((d) => d.type === 'design') ? answerLines(file) : [], kinds = readKinds(file, warn);
   return {
     file,
     mockBase: `/mock/${loopback(bind) ? 'local' : mockPass(tokenOf(file))}/`,
     // Who filed an item stays in the file, except as `by`, the name a card's thread says posted it and took its answer: never a bare session id, which names nobody.
     // A sign-in's start command stays on this host too: the page only learns that a tap makes a new link, and how the last run went.
-    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), ...(lapsed(d) && { expired: true }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null,
+    decisions: items.filter((d) => !fakeEvidence(d)).map(({ filer, start, ...d }) => ({ ...d, ...(d.kind === 'report' && kinds.has(d.key) && { purpose: d.purpose ?? kinds.get(d.key)!.purpose, project: d.project ?? kinds.get(d.key)!.project, kind_by: kinds.get(d.key)!.by }), ...(filer && !SESSION_ID.test(filer) && { by: filer }), ...(plainAsk(d) && guardOf(d) && { guard: guardOf(d) }), ...(d.type === 'design' && answers[d.key]?.answer === 'approve' && { status: 'approved' }), ...(d.type === 'design' && designState(d, answers[d.key], lines)), ...(start && { start: true, run: signinState(d.key) }), ...(lapsed(d) && { expired: true }), evidenceCard: d.evidence ? evidenceCard(d.evidence) : null, ...(d.evidence && { proofHead: d.evidence.proof_series_id && /^[a-f0-9]{40}$/.test(d.evidence.current_head ?? '') && heads.get(d.evidence.proof_series_id)?.size === 1 ? (d.evidence.commit === d.evidence.current_head ? 'Current' : 'History') : 'Unknown' }),
       ...(d.mocks && { mocks: d.mocks.map((m) => ({ ...m, hash: mockHash(m.path) })) }) })),
     readonly: extra.readonly === true,
     answers_only: extra.answers_only === true,
@@ -3108,9 +3164,6 @@ const state = () => {
     promoted: readPromoted(file, warn),
     // `held`: the card has not been answered since, so it is open again and its page says what it was answered before.
     reopened: ((held) => readReopened(file).map((r) => ({ ...r, ...(held.get(r.key)?.at === r.at && held.get(r.key)?.seq === r.seq && { held: true }) })))(reopenedNow(file)),
-    tickets,
-    // The Story, the first view of Tickets, worked out over every ticket: the first view reads this and its rows, never the whole roll-up.
-    story: storyOf(tickets),
     projects: readProjects(file, warn),
     // A report's own three actions, as the person took them, and the rules their rejections left on the owners.
     report_actions: readReportActions(file),
@@ -3120,8 +3173,6 @@ const state = () => {
 /** The board's state as the bytes a poll reads, built once per change of any file it is made from: a phone asks again every 20 seconds, and an
  * unchanged board costs the stats of its files (a 304 with no body) instead of five megabytes of rebuilding and serialising. Any answer, dismiss,
  * comment, ticket or proof that lands changes a file it was built from, so a read never shows a board older than the files it names. */
-/** With a fleet home configured, a task record can change with no board file changing: the state is read again after this many milliseconds. */
-const FLEET_REREAD = 10000;
 let built: { stamps: Map<string, string>; until: number; body: ReturnType<typeof state>; json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }>; views: Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }> } | undefined;
 /** The state as it is now, rebuilt only when a file it was made from has changed, or when a sign-in's link passes its time (no file changes then,
  *  and the state's own `expired` must say so at once); `tag` names the exact bytes for If-None-Match. */
@@ -3133,7 +3184,7 @@ function stateRead() {
   try { body = state(); } finally { stamps = building; building = undefined; }
   const json = Buffer.from(JSON.stringify(body!));
   // The next moment this body is out of date: the soonest sign-in link that has not passed yet. Until then no file can change it.
-  const until = Math.min(fleetHomeOf(file) ? Date.now() + FLEET_REREAD : Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
+  const until = Math.min(Infinity, ...body!.decisions.flatMap((d) => (d.type === 'signin' && d.expires && !d.expired ? [Date.parse(d.expires)] : [])));
   const made = { stamps: stamps!, until, body: body!, json, tag: `"${sha256(json).slice(0, 32)}"`, sent: new Map<string, { bytes: Buffer; encoding?: string }>(), views: new Map<string, { json: Buffer; tag: string; sent: Map<string, { bytes: Buffer; encoding?: string }> }>() };
   // The board was written while it was read, so this body is of the older board: it is answered, but the next read builds again.
   built = stateSources().every((path) => stampOf(path) === before.get(path)) ? made : undefined;
@@ -3141,7 +3192,7 @@ function stateRead() {
 }
 /** What a row leaves out: a proof's media and the writing of a report are what a card links, and they load with the card itself. Everything else a
  * card shows at a glance (its option mocks, a guided page's own steps) stays in the row, so a list drawn from rows is the same list the board draws. */
-const HEAVY = ['evidenceCard'];
+const HEAVY = ['evidenceCard', 'versions'];
 /** A row draws what a report is made of (its parts and where each stands, its sources' links) and never its words: those come with the card. */
 const slimSections = (sections: any[]) => sections.map((s) => ({ ...Object.fromEntries(['id', 'stage', 'heading', 'part'].filter((k) => s[k] !== undefined).map((k) => [k, s[k]])),
   ...(s.items?.length && { items: s.items.filter((it: any) => it.link).map((it: any) => ({ link: it.link, ...(it.source && { source: it.source }) })) }) }));
@@ -3158,7 +3209,7 @@ const rowOf = (d: any) => {
   return card ? { ...row, evidenceCard: { ...card, media: (card.media ?? []).filter((m: any) => m.type?.startsWith('image/')).slice(0, 1) } } : row;
 };
 /** The part of the board one request asks for: the asks waiting on the person, the items a page at a time, one card in full, or the ticket roll-up. */
-type View = { name: 'asks' | 'items' | 'card' | 'tickets' | 'story' | 'lists'; offset: number; limit: number; key: string };
+type View = { name: 'asks' | 'items' | 'card' | 'lists'; offset: number; limit: number; key: string };
 /** The view a request names, or undefined for the whole board; a view or page it cannot answer is refused in plain words. */
 function viewOf(url: string): View | undefined {
   const q = new URL(url, 'http://board').searchParams, name = q.get('view');
@@ -3166,13 +3217,12 @@ function viewOf(url: string): View | undefined {
   const count = (at: string, fallback: number) => { const v = Number(q.get(at)); return q.get(at) === null || !Number.isInteger(v) || v < 0 ? fallback : v; };
   const offset = count('offset', 0), limit = Math.min(count('limit', 20), 200);
   if (name === 'card') return { name, offset: 0, limit: 1, key: q.get('key') ?? '' };
-  if (name === 'asks' || name === 'items' || name === 'tickets' || name === 'story' || name === 'lists') return { name, offset, limit, key: '' };
-  throw new InputError(`unknown view ${name}: use asks, items, card, tickets, story or lists`);
+  if (name === 'asks' || name === 'items' || name === 'lists') return { name, offset, limit, key: '' };
+  throw new InputError(`unknown view ${name}: use asks, items, card or lists`);
 }
 /** The kept read as one view of it: built once per view and unchanged board, so a phone's first screen costs one page of one board. The
  * body keeps the state's own shape, so a page of it is read by the same client as the whole board; the parts a first screen does not show
  * (the ticket roll-up and the activity) come with the page that asks for them. */
-const TICKET_ACTIVITY_LIMIT = 200;
 function viewRead(read: NonNullable<typeof built>, view: View) {
   const id = `${view.name}:${view.offset}:${view.limit}:${view.key}`, kept = read.views.get(id);
   if (kept) return kept;
@@ -3186,7 +3236,7 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
   const today = (at: unknown) => typeof at === 'string' && new Date(at).toDateString() === new Date().toDateString();
   const counts = { asks: items.filter(waiting).length, items: items.length, answered: items.filter((d) => answers[d.key]).length, evidence: kind('evidence'), designs: kind('design'),
     // A report is a guided report's kind and a plan is its own type: both are what the board calls a report.
-    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length, tickets: (s.tickets ?? []).length,
+    reports: items.filter((d) => d.kind === 'report' || d.type === 'plan').length,
     // Cleared is what the person answered and the board counts as answered: a design review Main has not passed yet still sits under Designs.
     cleared_today: items.filter((d) => today((answers[d.key] as any)?.at) && !gone.has(d.key) && !(d.kind === 'design' && !d.promoted)).length,
     proofs_today: items.filter((d) => d.type === 'evidence' && today(d.filed) && !gone.has(d.key) && !['RUN FAIL', 'INCONCLUSIVE'].includes(d.evidenceCard?.result)).length };
@@ -3205,21 +3255,9 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     body = { answers: s.answers, seen: s.seen, seen_at: s.seen_at, opened: s.opened, signin_opened: s.signin_opened, reads: s.reads, discarded: s.discarded, done: s.done,
       dismissed: s.dismissed, promoted: s.promoted, reopened: s.reopened, deeper: s.deeper, delivery: s.delivery, counts, version: s.version,
       decisions: [], page: { view: 'lists', offset: 0, limit: 0, total: 0 } };
-  } else if (view.name === 'story') {
-    // The first view of Tickets: the Story's figures and the ten rows it lists, never the roll-up of every ticket behind them, which is what made it 2.4 MB.
-    const byId = new Map(((s.tickets ?? []) as any[]).map((t) => [t.id, t])), rows = [...s.story.moving, ...s.story.blocked].map((id: string) => byId.get(id));
-    body = { counts, version: s.version, story: s.story, week: readTicketWeek(file), tickets: rows, decisions: [], page: { view: 'story', offset: 0, limit: rows.length, total: (s.tickets ?? []).length } };
-  } else if (view.name === 'tickets') {
-    // The Tickets screen's own read: its roll-up is the largest part of the board and no other screen shows it.
-    body = { ...s, decisions: [], counts, tickets: s.tickets ?? [], ticketActivity: readTicketActivity(file).slice(0, TICKET_ACTIVITY_LIMIT), week: readTicketWeek(file), trail: [], rounds: [], messages: [], annotations: [], comments: [],
-      page: { view: 'tickets', offset: 0, limit: (s.tickets ?? []).length, total: (s.tickets ?? []).length } };
   } else {
     const all = view.name === 'asks' ? items.filter(open) : items, page = all.slice(view.offset, view.offset + view.limit);
-    // A row carries the ticket it links, so its chip says how far that ticket is, without the whole roll-up.
-    const linked = new Set(page.map((d) => d.ticket).filter(Boolean)), shown = new Set(page.map((d) => d.key));
-    // A reply on a ticket is a row of its own on Today, so the board's ticket threads come with the first screen too, with the tickets they name.
-    const threads = ((s.trail ?? []) as any[]).filter((t) => t.kind === 'ticket');
-    for (const t of threads) linked.add(t.key);
+    const shown = new Set(page.map((d) => d.key));
     // The activity a row shows at a glance (an answer's reply, a note left on a mock) comes with the page that shows it, never the whole board's.
     const forRow = (list: any[]) => ((list ?? []) as any[]).filter((x) => shown.has(x.key) || x.kind === 'ticket');
     // The board's own lists (every answer, every dismissal, what was read and restored) come with the page that names their rows: a first screen
@@ -3230,7 +3268,6 @@ function viewRead(read: NonNullable<typeof built>, view: View) {
     const deeper = ofRows(s.deeper), askIds = new Set(deeper.map((a) => a.id));
     body = { ...s, decisions: page.map(rowOf), counts, more: view.offset + view.limit < all.length,
       page: { view: view.name, offset: view.offset, limit: view.limit, total: all.length },
-      tickets: ((s.tickets ?? []) as any[]).filter((t) => linked.has(t.id)),
       answers: byKey(answers), seen: ofKeys(s.seen), seen_at: byKey(s.seen_at), opened: byKey(s.opened), signin_opened: byKey(s.signin_opened),
       reads: Object.fromEntries(Object.entries((s.reads ?? {}) as Record<string, string>).filter(([k]) => shown.has(k.split('/')[0]))),
       discarded: byKey(s.discarded), dismissed: ofKeys(s.dismissed), promoted: ofKeys(s.promoted), reopened: ofRows(s.reopened), deeper,
@@ -3358,26 +3395,37 @@ function checkProof(link: NonNullable<Decision['evidence']>, root: string, recor
     if (bytes.length !== f.bytes || sha256(bytes) !== f.sha256) throw new EvidenceError('A picture or recording changed after the run.');
     return [{ path: f.path, url: `/api/evidence?run=${encodeURIComponent(link.run_id)}&file=${encodeURIComponent(f.path)}`, type }];
   });
-  const result = !Number.isInteger(run.exit) ? 'INCONCLUSIVE' : run.exit !== 0 || run.dirty || !run.files.length ? 'RUN FAIL' : 'RUN PASS';
-  return { status: 'verified' as const, result, commit: run.commit, media };
+  let result = 'UNVERIFIED', reason = '';
+  try { if (link.proof_ref?.issuer === 'done-done' && link.proof_ref.validated === true && link.proof_verdict) {
+    const candidate = resolve(root, link.proof_ref.path);
+    if (candidate.startsWith(resolve(root) + sep)) {
+      const parent = realpathSync(dirname(candidate)), safeRoot = realpathSync(root);
+      if ((parent === safeRoot || parent.startsWith(safeRoot + sep)) && !lstatSync(candidate, { throwIfNoEntry: false })?.isSymbolicLink()) builtFrom(candidate);
+    }
+    const ref = contained(root, link.proof_ref.path, 'The verified result is missing.');
+    builtFrom(ref);
+    if (statSync(ref).size > 1_000_000) throw new EvidenceError('The verified result is too large.');
+    const bytes = readFileSync(ref), record = JSON.parse(bytes.toString('utf8'));
+    if (sha256(bytes) !== link.proof_ref.sha256) throw new EvidenceError('The verified result changed.');
+    const runs = Array.isArray(record.runs) && record.runs.some((r: any) => r.run_id === link.run_id && r.commit === link.commit);
+    const verdicts = record.judge?.verdicts;
+    const pass = run.exit === 0 && !run.dirty && run.files.length > 0 && record.schema === 2 && record.result === 'pass' && record.head === link.commit && record.tree === run.tree && runs && typeof record.judge?.route === 'string' && typeof record.judge?.model === 'string' && ['agent', 'model', 'session-only'].includes(record.judge?.independence) && Array.isArray(record.files) && record.files.length && Array.isArray(verdicts) && verdicts.length && verdicts.every((v: any) => v.verdict === 'pass' && record.files.some((f: any) => f.path === v.path && f.sha256 === v.sha256) && run.files.some((f: any) => f.sha256 === v.sha256));
+    const negative = record.schema === 1 && record.run_id === link.run_id && record.commit === link.commit && record.result === link.proof_verdict && typeof record.reason === 'string' && record.reason.trim();
+    if (link.proof_verdict === 'pass' && pass) result = 'RUN PASS';
+    else if (link.proof_verdict !== 'pass' && negative) { result = link.proof_verdict === 'fail' ? 'RUN FAIL' : 'INCONCLUSIVE'; reason = record.reason; }
+  } } catch { /* Missing or invalid references cannot substantiate a verdict. */ }
+  return { status: result === 'UNVERIFIED' ? 'unverified' as const : 'verified' as const, result, ...(reason && { reason }), commit: run.commit, media, runState: run.exit === null ? 'Running' : run.exit === 0 ? 'Completed' : `Failed (exit ${run.exit})` };
+
 }
-/** A run's card, kept beside the stamp of its record and of each picture: checking one hashes every picture once, and every board read after that
- * pays for the stats. A kept card says what a fresh check would while those files are unchanged; a changed one is checked again from its record. */
-const proofCards = new Map<string, { record: string; media: { path: string; stamp: string }[]; card: ReturnType<typeof checkProof> }>();
 /** A linked run as the board checked it; the reason a check failed is a plain sentence for the card.
  * With no --evidence-root the board looks in done-done's own folder for the app; a run it finds nowhere cannot be checked, so the card shows no result rather than one that blames the run. */
 function evidenceCard(link: NonNullable<Decision['evidence']>) {
   const root = rootOf(link.run_id);
   if (!root) return null;
   try {
-    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.'), record = builtFrom(recordPath);
-    const kept = proofCards.get(link.run_id);
-    if (kept && kept.record === record && kept.media.every((m) => builtFrom(m.path) === m.stamp)) return kept.card;
-    const card = checkProof(link, root, recordPath), media = card.media.flatMap((m) => {
-      try { const path = contained(root, m.path); return [{ path, stamp: stampOf(path) }]; } catch { return []; }
-    });
-    proofCards.set(link.run_id, { record, media, card });
-    return card;
+    const recordPath = contained(root, `.done-done/runs/${link.run_id}.json`, 'The proof for this run is missing.');
+    builtFrom(recordPath);
+    return checkProof(link, root, recordPath);
   } catch (e: any) {
     const reason = e instanceof EvidenceError ? e.message : 'The proof for this run cannot be read.';
     return { status: 'unverified' as const, result: 'UNVERIFIED', reason, commit: '', media: [] };
@@ -3436,7 +3484,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     const decision = loadDecisions(file).find((d) => d.evidence?.run_id === runId);
     if (!decision?.evidence || !path) return [404, { error: 'Evidence is unavailable' }];
     const card = evidenceCard(decision.evidence);
-    if (card?.status !== 'verified' || !card.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
+    if (!card?.media.some((m) => m.path === path)) return [404, { error: 'Evidence is unavailable' }];
     const actual = contained(rootOf(runId), path), type = mediaTypes[extname(path).toLowerCase()];
     return [200, { media: readFileSync(actual), type }];
   }
@@ -3484,7 +3532,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     } catch { return [404, { error: 'Attachment is unavailable' }]; }
   }
   if (req.method === 'GET' && req.url === '/api/board') return [200, { file, pid: process.pid }];
-  const tickets = req.method === 'GET' ? ticketsApi((req.url ?? '').split('?')[0]!) : undefined;
+  const tickets = await ticketsApi(req, (req.url ?? '').split('?')[0]!);
   if (tickets) return tickets;
   if (req.method !== 'POST' || !['/api/answers', '/api/rounds', '/api/messages', '/api/annotations', '/api/dismiss', '/api/reopen', '/api/report-action', '/api/done', '/api/signin', '/api/opened', '/api/leash', '/api/deeper', '/api/reads', '/api/trail', '/api/engagement', '/api/engagement/seen'].includes(req.url ?? '')) return [404, { error: 'Not found' }];
   if (readOnly()) return [403, { error: 'This board is read-only' }];
@@ -3584,7 +3632,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
     // Approve, Refine, Reject and Reopen on a report: the three actions its own block declares, recorded as the fleet side reads them.
     let input: any;
     try { input = JSON.parse(body); } catch { return [400, { error: 'Send one JSON object: {"key","action","note"?,"reason"?"}' }]; }
-    try { await locked(`${file}.lock`, () => reportAction(file, input)); } catch (e) { if (e instanceof InputError) return [409, { error: e.message }]; throw e; }
+    try { await locked(`${file}.lock`, () => reportAction(file, input)); } catch (e) { if (e instanceof InputError) return [409, { error: e.message }]; if (e instanceof TicketError) return ticketFailure(e); throw e; }
     return [200, state()];
   }
   if (req.url === '/api/engagement' || req.url === '/api/engagement/seen') {
@@ -3668,12 +3716,7 @@ async function route(req: IncomingMessage): Promise<[number, unknown]> {
   // Every item that asks something takes an Other answer: the words, saved as the answer `text`, unless an option is named text.
   const other = d.reply || d.options.length ? [REPLY] : [], option = d.options.find((o) => o.value === answer) ?? other.find((o) => o.value === answer);
   if (!option) return [400, { error: `The answer must be one of: ${[...d.options, ...other].map((o) => o.label).join(', ') || 'none, this item is only shown'}` }];
-  const save = () => {
-    const a = appendAnswer(file, d, option, note.trim(), unsent(d), undefined, follow === true);
-    if (a && d.ticket && plainAsk(d)) releaseTicketHold(file, d.ticket);
-    return a;
-  };
-  answered(d.ticket && plainAsk(d) ? await locked(`${file}.lock`, save) : save(), d);
+  answered(appendAnswer(file, d, option, note.trim(), unsent(d), undefined, follow === true), d);
   return [200, state()];
 }
 
@@ -3806,6 +3849,41 @@ const server = createServer(async (req, res) => {
     return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
   }
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
+  // The whiteboard: a board a report holds, opened full screen and read only. Its page, its scene, its picture for the report, and the canvas that draws them.
+  if (req.method === 'GET' && (req.url ?? '').split('?')[0]!.startsWith('/board/')) {
+    const url = new URL(req.url!, 'http://board'), path = url.pathname, name = path.slice('/board/'.length);
+    if (CANVAS_FILE.test(name)) {
+      let bytes: Buffer;
+      try { bytes = readFileSync(new URL(name, BOARD_DIR)); } catch { return res.writeHead(503, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end('The board\u2019s canvas files are not built in this copy. Run npm run build:board.'); }
+      const tag = `"${sha256(bytes).slice(0, 32)}"`, headers = { 'content-type': CANVAS_TYPE[extname(name)]!, 'cache-control': CANVAS_STAMPED.test(name) ? 'private, max-age=31536000, immutable' : 'no-cache', 'x-content-type-options': 'nosniff', etag: tag, vary: 'accept-encoding' };
+      if (unchanged(req, tag)) return res.writeHead(304, headers).end();
+      const sent = COMPRESSIBLE.test(headers['content-type']) ? squeeze(req, bytes) : { bytes };
+      return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
+    }
+    // The picture the report shows where the agent explains the board: the scene the canvas draws, as one SVG, so the two cannot disagree.
+    const pic = /^\/board\/([^/]+)\/(\d+)\/preview\.svg$/.exec(path), board = pic && boardAt(decodeURIComponent(pic[1]!), Number(pic[2]));
+    if (pic) {
+      if (!board || 'why' in board) return res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end(board ? board.why : 'No board there.');
+      const svg = Buffer.from(preview(board.board));
+      const tag = `"${sha256(svg).slice(0, 32)}"`, headers = { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: tag, vary: 'accept-encoding' };
+      if (unchanged(req, tag)) return res.writeHead(304, headers).end();
+      const sent = squeeze(req, svg);
+      return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
+    }
+    const at = /^\/board\/([^/]+)\/(\d+)$/.exec(path), found = at && boardAt(decodeURIComponent(at[1]!), Number(at[2]));
+    if (!found || 'why' in found) return res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end(found ? found.why : 'No board there.');
+    const pageHeaders = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': BOARD_CSP, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: BOARD_PAGE_TAG };
+    if (unchanged(req, BOARD_PAGE_TAG)) return res.writeHead(304, pageHeaders).end();
+    return res.writeHead(200, pageHeaders).end(BOARD_PAGE);
+  }
+  if (req.method === 'GET' && (req.url ?? '').split('?')[0]!.startsWith('/api/board/')) {
+    // The scene the page draws: every box and line already measured by the board's own geometry, and each step's frame. A later open asks again and is told 304.
+    const at = /^\/api\/board\/([^/]+)\/(\d+)$/.exec(new URL(req.url!, 'http://board').pathname), found = at && boardAt(decodeURIComponent(at[1]!), Number(at[2]));
+    if (!found || 'why' in found) return res.writeHead(404, { 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ error: found ? found.why : 'No board there.' }));
+    const body = Buffer.from(JSON.stringify({ title: found.title, steps: found.steps, elements: found.elements })), tag = `"${sha256(body).slice(0, 32)}"`, headers = { 'content-type': 'application/json', 'cache-control': 'no-cache', etag: tag };
+    if (unchanged(req, tag)) return res.writeHead(304, headers).end();
+    return res.writeHead(200, headers).end(body);
+  }
   if (req.method === 'GET' && req.url === '/') {
     // The three files the first screen needs are named by the answer that carries the shell, so a phone starts reading them with the page itself
     // instead of after its two round trips. The stylesheet the later screens use is left out on purpose: it is asked for after the first paint.

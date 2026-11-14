@@ -1,7 +1,7 @@
 {
   "contract": 1,
   "kind": "report",
-  "schema": 5,
+  "schema": 6,
   "key": "FILL: short-id",
   "title": "FILL: the answer in one line",
   "purpose": "FILL: what this report is for: research, plan, decision, audit, incident, status or other",

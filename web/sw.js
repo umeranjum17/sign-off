@@ -1,6 +1,9 @@
 // The board's service worker: the page and its files load with no network, and the last state it read is read back, marked, until the board answers again.
 // Writes and answers are never cached or queued: a send with no network fails on the page as it does now. BUILD is put above this file by src/cli.ts.
 const SHELL = `shell-${BUILD}`, DATA = 'state', STATE = '/api/decisions', SAVED = 'x-sign-off-saved', OFFLINE = 'x-sign-off-offline';
+// The whiteboard's canvas files are named for their content and never change under their name, so one copy is kept for good; the board page, the
+// script it names and the scene it draws are asked for again on each open, and their kept copy is what draws when the board cannot be reached.
+const BOARD = `board-${BUILD}`, CANVAS = /^\/board\/(?:chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2|board-[\w-]+\.(?:js|css))$/;
 const FILES = /^\/(?:tokens\.css|ui\.css|app\.css|app\.js|app-more\.js|pwa\.js|inter\.woff2|icon\.svg|apple-touch-icon\.png|icon-(?:192|512|maskable-512)\.png)$/;
 
 self.addEventListener('install', (e) => e.waitUntil((async () => {
@@ -16,9 +19,23 @@ self.addEventListener('install', (e) => e.waitUntil((async () => {
 })()));
 
 self.addEventListener('activate', (e) => e.waitUntil((async () => {
-  for (const name of await caches.keys()) if (name.startsWith('shell-') && name !== SHELL) await caches.delete(name);
+  // A new build keeps none of the old one: its shell and its board are dropped together, so a rebuilt canvas is fetched fresh and no stale file draws.
+  for (const name of await caches.keys()) if ((name.startsWith('shell-') || name.startsWith('board-')) && name !== SHELL && name !== BOARD) await caches.delete(name);
   await self.clients.claim();
 })()));
+
+/** A board's own files: the canvas as it was kept, then the page, its script and its scene from the board when it answers, else from the last copy. */
+async function board(request) {
+  const url = new URL(request.url), key = url.pathname + url.search, store = await caches.open(BOARD), kept = await store.match(key);
+  if (kept && CANVAS.test(url.pathname)) return kept;
+  try {
+    const res = await fetch(request);
+    if (res.ok) store.put(key, res.clone()).catch(() => {});
+    return res;
+  } catch {
+    return kept ?? Response.error();
+  }
+}
 
 /** The state, from the board when it answers; the last good copy, marked, when it cannot be reached. A part of the board answers a part of it; the copy is the
  * last answer, whichever part it was (a whole board answers every part of it). A refused token empties the copy: it is not for this person any more. */
@@ -52,6 +69,7 @@ self.addEventListener('fetch', (e) => {
   const { request } = e, url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (request.mode === 'navigate' && url.pathname === '/' && !url.search) return e.respondWith(page(request));
+  if (url.pathname.startsWith('/board/') || url.pathname.startsWith('/api/board/')) return e.respondWith(board(request));
   // The board's state, whatever part of it a page asks for: kept as the last good copy, and read back offline for whatever part comes asking.
   if (url.pathname === STATE) return e.respondWith(state(request));
   if (FILES.test(url.pathname)) e.respondWith(caches.match(request, { cacheName: SHELL }).then((kept) => kept ?? fetch(request).then((res) => {

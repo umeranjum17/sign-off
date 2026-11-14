@@ -1,13 +1,11 @@
 // The shared empty state, driven and measured in a headless Chromium of its own over the DevTools protocol at exact device metrics (390x844 or 1280x800, 2x), one theme and
-// width per run (so a run's steps.json holds one claim). Two throwaway boards: a bare one (no cards, no tickets) and feel-board.sh's with tickets written through the real CLI.
-// States: Tickets with none (empty), while the read is held (loading), when it fails (error, then Try again lands on empty), the Activity card closed and open, Activity with no
-// events (the card on a phone, the dialog on a desk), a ticket with no Activity or cards, a project filter that matches nothing, a desk's lists with nothing in them, Decide,
-// Evidence, Reports, Designs and Answered with nothing, and Evidence while its pages are held and when they fail. Then the populated Tickets screen, untouched.
+// width per run (so a run's steps.json holds one claim). One throwaway board with no cards.
+// States: Decide, Evidence, Reports, Designs and Answered with nothing, and Evidence while its pages are held and when they fail. The Tickets screens' own loading, error and
+// incomplete states are proven by the tickets-adapter journey, against the ticket adapter.
 // Held, failed and blanked reads go through the DevTools Fetch domain on the real board's own requests; nothing else about the page is faked.
 // Each frame is measured in the browser: a visible state with a mark, a title and its words, the mark a 40px circle, one next step of 44px or more where there is one, nothing
 // wider than the screen, no exclamation mark, no internal word, and no console error or failed request apart from the one read the state holds.
 // Usage: node .agents/skills/done-done-verify-sign-off/empty-states-shots.mjs <output> [light|dark] [390|1280]
-// Then, to compare the populated Tickets screen with the base build: SIGN_OFF_REPO=<another built checkout> TICKETS_SIDE=before runs the same script against it.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -62,35 +60,18 @@ const MEASURE = `(async () => {
 })()`;
 
 let ws, fault = null, held = [];
-// A sealed run's judge reads at most ten captures, the measure text among them: EMPTY_CITE=1 keeps the five the sealed claim names (its records go to <out>.records).
-const cited = new Set(['tickets-loading', 'tickets-error', 'tickets-none', 'tickets-populated', 'tickets-activity-empty']);
+// A sealed run's judge reads at most ten captures, the measure text among them: EMPTY_CITE=1 keeps the seven the sealed claim names (its records go to <out>.records).
+const cited = new Set(['waiting-none', 'evidence-none', 'reports-none', 'designs-none', 'answered-none', 'evidence-loading', 'evidence-error']);
 const errors = [], failed = [], report = [], problems = [], shots = [], facts = {};
 const b64 = (s) => Buffer.from(s).toString('base64');
 try {
-  // The bare board: nothing posted, no ticket. The rich one: feel-board.sh's cards and tickets written through the real CLI.
+  // The bare board: nothing posted.
   mkdirSync(bare, { recursive: true });
   const serve = (folder) => { const board = join(folder, 'board.json'); const child = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0', '--evidence-root', folder], { env, stdio: ['ignore', 'pipe', 'pipe'] });
     return new Promise((ok, no) => { let log = ''; const on = (d) => { log += d; const m = /http:\/\/127\.0\.0\.1:\d+\//.exec(log); if (m) ok({ url: m[0], board, child }); }; child.stdout.on('data', on); child.stderr.on('data', on); child.on('exit', () => no(new Error(log))); }); };
   writeFileSync(join(bare, 'config.yaml'), 'board: board.json\nname: Umer\n');
   writeFileSync(join(bare, 'board.json'), JSON.stringify({ schema: 2, items: [] }) + '\n');
   const bareServer = await serve(bare);
-  mkdirSync(rich, { recursive: true });
-  const richUrl = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), rich], { cwd: repo }).trim().split('\n').pop();
-  const board = join(rich, 'board.json'), T = (id, title, ...flags) => cli('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, ...flags);
-  // The fleet's duplicate and its contradictory release, as the writes now meet them.
-  T('mig-a', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--project', 'Juggernaut', '--priority', 'P0', '--progress', '30', '--stage', 'building', '--asked', 'yes');
-  const twin = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-b', '--description', 'Summary line.', '--title', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--project', 'Juggernaut', '--progress', '70', '--stage', 'review']);
-  const later = run(process.execPath, [join(repo, 'dist/cli.js'), 'ticket', board, '--id', 'mig-a', '--release', 'later']);
-  facts.twin = { status: twin.status, said: (twin.stdout + twin.stderr).trim() }; facts.later = { status: later.status, said: (later.stdout + later.stderr).trim() };
-  T('mig-a', 'Juggernaut migration runbook and scratch dry run (prepare only, do not run)', '--release', 'v1.4');
-  for (const [id, title, p, project, progress, flags] of [['bill-1', 'The billing page shows when the plan renews', 'P1', 'billing', '40', []], ['bill-2', 'Refunds in two taps from the invoice', 'P2', 'billing', '0', ['--hold', 'yes', '--hold-reason', 'waiting on the billing copy']],
-    ['docs-1', 'A changelog page that lists each release', 'P3', 'docs', '100', []], ['old-1', 'Archive the 2025 invoice export', 'P3', 'docs', '0', []]]) T(id, title, '--priority', p, '--project', project, '--progress', progress, '--asked', 'yes', ...flags);
-  // old-1 was last written long ago and 205 newer tickets came after it: the feed keeps the newest 200 events, so it holds none of old-1's.
-  const lines = readFileSync(`${board.replace(/\.json$/, '')}.tickets.jsonl`, 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((t) => (t.id === 'old-1' ? { ...t, at: '2025-01-02T09:00:00.000Z' } : t));
-  const filler = Array.from({ length: 205 }, (_, i) => ({ id: `fill-${i}`, title: `Tidy the changelog entry ${i + 1}`, progress: 100, project: 'docs', priority: 'P3', asked: true, at: new Date(Date.parse('2026-10-20T10:00:00Z') + i * 60000).toISOString() }));
-  writeFileSync(`${board.replace(/\.json$/, '')}.tickets.jsonl`, [...lines.slice(0, 1), ...lines.slice(1).map((t) => t), ...filler].map((t) => JSON.stringify(t)).join('\n') + '\n');
-  facts.cli = cli('ticket', board).split('\n').filter((l) => /^\s+- id|title:|release:|stage:|progress:/.test(l)).slice(0, 24).join('\n');
-
   let port; for (let i = 0; i < 100 && !port; i++) { await wait(100); const f = join(prof, 'DevToolsActivePort'); if (existsSync(f)) port = readFileSync(f, 'utf8').split('\n')[0]; }
   assert.ok(port, 'Chromium opened its DevTools port');
   const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' })).json();
@@ -118,7 +99,7 @@ try {
     else { for (const type of ['mousePressed', 'mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }); } };
   await cdp('Page.enable'); await cdp('Runtime.enable'); await cdp('Network.enable');
   await cdp('Network.setBypassServiceWorker', { bypass: true });
-  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*view=tickets*' }, { urlPattern: '*view=items*' }] });
+  await cdp('Fetch.enable', { patterns: [{ urlPattern: '*view=items*' }] });
   await cdp('Emulation.setDeviceMetricsOverride', metrics); await cdp('Emulation.setTouchEmulationEnabled', phone ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
   await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
   const png = async (file) => writeFileSync(file, Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
@@ -139,17 +120,7 @@ try {
   };
   const only = (state, kind, text) => `[...document.querySelectorAll('.es-${kind}')].some((e) => e.innerText.includes(${JSON.stringify(text)}))`;
 
-  if (side === 'after') {
-  // 1-3. Tickets with nothing: held (loading), failed (error), then Try again lands on empty.
-  await go(bareServer.url + '#tickets', { match: /view=tickets/, kind: 'hold' });
-  await until(only('', 'loading', 'Loading tickets'), 'loading');
-  const m1 = await capture('tickets-loading', true); assert.ok(m1.states.some((s) => s.kind === 'loading'));
-  await go(bareServer.url + '#tickets', { match: /view=tickets/, kind: 'fail' });
-  await until(only('', 'error', 'Couldn’t load tickets'), 'error');
-  await capture('tickets-error', true);
-  fault = null; await tap('.es-act'); await until(only('', 'empty', 'No tickets yet'), 'retry lands on empty');
-  facts.retry = 'Try again read the tickets again and the screen settled on its empty state';
-  await capture('tickets-none');
+  {
   // 4. Decide, Evidence, Reports, Designs and Answered on the bare board: each its own words.
   for (const [hash, text] of [['waiting', 'Nothing is waiting on you'], ['evidence', 'No evidence updates'], ['reports', 'Nothing to read'], ['designs', 'No designs yet'], ['answered', 'Nothing answered yet']]) {
     await go(bareServer.url + '#' + hash);
@@ -165,59 +136,13 @@ try {
   await capture('evidence-error', true);
   fault = null; await tap('.es-act'); await until(only('', 'empty', 'No evidence updates'), 'evidence retry lands on empty');
   }
-  // 5. The populated Tickets screen, then Activity: closed, open, and with no events; a ticket with no Activity or cards; a project that matches nothing; a desk's empty lists.
-  await go(richUrl + '#tickets');
-  await until(`!!document.querySelector('.tk-hero')`, 'Tickets drawn');
-  await capture('tickets-populated');
-  if (phone && side === 'before') {
-    await until(`!!document.querySelector('.tk-activity')`, 'Activity card');
-  } else if (side === 'before') {} else if (phone) {
-    await until(`!!document.querySelector('.tk-activity')`, 'Activity card');
-    await js(`document.querySelector('.tk-activity').scrollIntoView({ block: 'center' })`);
-    await tap('.tk-activity > summary'); await until(`document.querySelector('.tk-activity').open`, 'opened');
-    await capture('tickets-activity-open');
-  } else {
-    await go(richUrl + '#activity'); await until(`!!document.querySelector('.tk-day .tk-ev')`, 'Activity tab');
-    await capture('tickets-activity-open');
-  }
-  if (side === 'after') {
-  const noEvents = { match: /view=tickets/, kind: 'reshape', fn: (b) => ({ ...b, ticketActivity: [] }) };
-  await go(richUrl + (phone ? '#tickets' : '#activity'), noEvents);
-  await until(phone ? `!!document.querySelector('.tk-hero')` : `!!document.querySelector('.tk-seg')`, 'Tickets drawn');
-  await until(only('', 'empty', 'No activity yet'), 'Activity empty');
-  if (phone) await js(`document.querySelector('.tk-activity').scrollIntoView({ block: 'center' })`);
-  await capture('tickets-activity-empty');
-  await go(richUrl + '#ticket/old-1');
-  await until(`!!document.querySelector('.tk-sheet, .tk-pane') && document.body.innerText.includes('No activity yet')`, 'old ticket page');
-  await js(`(() => { const s = document.querySelector('.tk-sheet, .tk-pane'); s.scrollTo(0, 1e6); })()`);
-  await capture('ticket-no-activity', true);
-  // A project picked, then gone from the board: the lists have nothing, the filter is named and one step clears it.
-  await go(richUrl + '#tickets');
-  await until(`!!document.querySelector('.tk-hero')`, 'Tickets drawn');
-  await tap('.tk-rb'); await until(`!!document.querySelector('.tk-pick')`, 'filter sheet');
-  await js(`[...document.querySelectorAll('.tk-pick')].find((b) => b.textContent.includes('billing')).click()`);
-  await until(`!!document.querySelector('.tk-fpill')`, 'project picked');
-  fault = { match: /view=tickets/, kind: 'reshape', fn: (b) => ({ ...b, tickets: b.tickets.filter((t) => t.project !== 'billing'), ticketActivity: b.ticketActivity.filter((e) => !/^bill/.test(e.ticket)) }) };
-  await js(`readTickets(true)`);
-  await until(only('', 'empty', 'No tickets match'), 'no match');
-  await capture('tickets-nomatch');
-  fault = null; await tap('.es-act'); await until(`!document.querySelector('.es-empty') || !document.body.innerText.includes('No tickets match')`, 'cleared');
-  // A desk's lists with nothing in them: one ticket on the board, so In progress and On hold are empty.
-  if (!phone) {
-    await go(richUrl + '#tickets', { match: /view=tickets/, kind: 'reshape', fn: (b) => ({ ...b, tickets: b.tickets.filter((t) => t.id === 'old-1') }) });
-    await until(only('', 'empty', 'Nothing in progress'), 'desk lists empty');
-    await capture('tickets-lists-empty');
-  }
-  }
   console.log(report.join('\n'));
   writeFileSync(join(rec, `${name('facts')}.json`), JSON.stringify(facts, null, 2) + '\n');
   writeFileSync(join(rec, `measure.${side}.${theme}.${width}w.txt`), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'Two throwaway boards: a bare one with no cards and no tickets, and feel-board.sh\'s with tickets written through sign-off-axi ticket (a Juggernaut migration ticket, billing and docs tickets, 205 newer ones after an old one).',
-    steps: [`Open Tickets on the bare board at ${metrics.width}x${metrics.height} (2x), ${theme}, with its read held, then failed, and ${phone ? 'tap' : 'click'} Try again.`,
-      'Open Decide, Evidence, Reports, Designs and Answered on the bare board, and Evidence with its pages held and failed.',
-      `Open Tickets on the full board; ${phone ? 'open the Activity card, then see it with no events' : 'open Activity, then see it with no events'}; open the oldest ticket; pick a project that then leaves the board${phone ? '' : '; see a desk whose lists are empty'}.`],
-    result: `${theme}, ${metrics.width}px: every list, feed and card with nothing in it shows one empty state (a quiet mark, what goes here, one next step where there is one), a held read shows a skeleton and a failed read says what failed with Try again, the Activity card shows its title, count and newest event, and the CLI refuses a second open ticket for the same work and a release word like later.` }, null, 2) + '\n');
+    start: 'A throwaway board with no cards.',
+    steps: [`Open Decide, Evidence, Reports, Designs and Answered on the empty board at ${metrics.width}x${metrics.height} (2x), ${theme}, and Evidence with its pages held and failed, then ${phone ? 'tap' : 'click'} Try again.`],
+    result: `${theme}, ${metrics.width}px: every list, feed and card with nothing in it shows one empty state (a quiet mark, what goes here, one next step where there is one), a held read shows a skeleton and a failed read says what failed with Try again.` }, null, 2) + '\n');
   if (side === 'after') assert.deepEqual(problems, [], 'every capture measures clean');
   bareServer.child.kill();
 } finally {

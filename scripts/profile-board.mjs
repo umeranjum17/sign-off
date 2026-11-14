@@ -13,8 +13,11 @@ if (!lighthouse || !existsSync(lighthouse)) throw new Error('Set LIGHTHOUSE_CLI 
 if (existsSync(join(out, 'board'))) throw new Error('Use a new evidence folder to preserve previous measurements');
 const boardDir = join(out, 'board'), tmp = join(out, 'tmp'), board = join(boardDir, 'board.json');
 mkdirSync(boardDir, { recursive: true });
+// The tickets live behind the ticket adapter; the repo's stand-in adapter keeps them in its own folder, which the served board reads through SIGN_OFF_TICKETS_ADAPTER.
+const standin = join(out, 'standin');
+mkdirSync(standin, { recursive: true });
 mkdirSync(tmp, { recursive: true });
-const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH}`, TMPDIR: tmp };
+const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH}`, TMPDIR: tmp, SIGN_OFF_TICKETS_ADAPTER: resolve(repo, 'test/support/ticket-adapter-standin.mjs'), TICKET_STANDIN_DIR: standin };
 const isolated = { ...env, HOME: boardDir, XDG_CONFIG_HOME: join(boardDir, '.config'), XDG_DATA_HOME: join(boardDir, '.local/share'), XDG_STATE_HOME: join(boardDir, '.local/state'), XDG_CACHE_HOME: join(boardDir, '.cache') };
 const run = (cmd, args, options = {}) => {
   const r = spawnSync(cmd, args, { cwd: repo, env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
@@ -34,12 +37,14 @@ try {
   const now = Date.now();
   b.items = Array.from({ length: 500 }, (_, i) => ({ ...samples[i % 4], key: `perf-${i}`, title: `${samples[i % 4].title} · ${i + 1}`, filed: new Date(now - i * 1000).toISOString(), ticket: `T-${i + 1}`, project: projects[i % 4], priority: `P${i % 4}` }));
   writeFileSync(board, JSON.stringify(b));
-  const tickets = Array.from({ length: 3000 }, (_, i) => ({ id: `T-${i + 1}`, title: `Deliver Umer’s project milestone ${i + 1}`, progress: (i % 11) * 10, asked: i % 3 !== 0, project: projects[i % 4], priority: `P${i % 4}`, at: new Date(now).toISOString(), ...(i % 10 ? { parent: `T-${Math.floor(i / 10) * 10 + 1}` } : {}) }));
-  writeFileSync(board.replace('.json', '.tickets.jsonl'), tickets.map((t) => JSON.stringify(t)).join('\n') + '\n');
+  const stamp = new Date(now).toISOString().replace(/\.\d+Z$/, 'Z');
+  const tickets = Array.from({ length: 3000 }, (_, i) => ({ id: `T-${i + 1}`, rev: `r-${i + 1}`, title: `Deliver Umer’s project milestone ${i + 1}`, body: '', kind: 'kind-a', status: `stage-${(i % 3) + 1}`, assignee: null, labels: [], parent: i % 10 ? `T-${Math.floor(i / 10) * 10 + 1}` : null, links: [], created_at: stamp, updated_at: stamp, extra: {} }));
+  writeFileSync(join(standin, 'store.json'), JSON.stringify({ counter: 3000, tickets, events: {}, ops: {} }));
   const response = await fetch(`${base}api/decisions`, { headers: { 'accept-encoding': 'identity' } });
   if (!response.ok) throw new Error(`Board API: HTTP ${response.status}`);
   const state = await response.json();
-  if (state.decisions.length !== 500 || state.tickets.length !== 3000) throw new Error('Fixture counts differ from the profiling contract');
+  const listed = await (await fetch(`${base}api/tickets`)).json();
+  if (state.decisions.length !== 500 || listed.tickets.length !== 3000) throw new Error('Fixture counts differ from the profiling contract');
   const summary = { commit, version, fixture: { cards: 500, tickets: 3000, roots: 300, note: 'Synthetic repeated CLI-authored cards; shared media; not a copy of the live board.' }, payloadBytes: Buffer.byteLength(JSON.stringify(state)), fields: Object.fromEntries(Object.entries(state).map(([k, v]) => [k, Buffer.byteLength(JSON.stringify(v))])), screens: {} };
   for (const [name, hash] of [['today', ''], ['decide', '#waiting'], ['evidence', '#evidence'], ['reports', '#reports'], ['tickets', '#tickets']]) {
     // Relative TMPDIR avoids Chrome's Unix socket path limit while staying under OUT/tmp.

@@ -22,7 +22,7 @@ const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const chromium = ['/usr/lib/chromium/chromium', '/usr/bin/chromium', '/usr/bin/google-chrome'].find(existsSync);
 const board = join(dir, 'board.json');
 
-// The board: the prototype's four asks (a P0 fix plan on a ticket 26% done, the Mac screen recording grant, a P1 repeated cause, yesterday's yes or no),
+// The board: the prototype's four asks (a P0 fix plan on a ticket, the Mac screen recording grant, a P1 repeated cause, yesterday's yes or no),
 // two asks answered today, and two projects with their own icons (an ask filed by a project's tool takes its tile; one with no icon shows its initials).
 function seed() {
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
@@ -35,7 +35,6 @@ function seed() {
   ask('screen-on', 'takeone', 'Have you turned on Screen Recording for Node.js?', 'TakeOne cannot record the Mac until it is on.', ['--outcome', 'yes=TakeOne records the Mac again.', '--outcome', 'no=TakeOne waits.', '--recommend', 'yes', '--recommend-reason', 'It is one switch.', '--default', 'no']);
   ask('cache-lock', 'learn-from-mistakes', 'Fix the shared cache lock that keeps coming back?', 'Two incidents over one day, both a build waiting on the same cache lock.', ['--priority', 'P1', '--outcome', 'yes=A fix task is filed for the lock.', '--outcome', 'no=It is left as it is.', '--recommend', 'yes', '--recommend-reason', 'It keeps coming back.', '--default', 'no']);
   ask('mac-screen', 'takeone', 'Allow Node.js screen recording on the Mac?', 'Its answer resumes TakeOne\'s Mac recording.', ['--option', 'allow=Allow', '--option', 'wait=Not yet', '--outcome', 'allow=TakeOne Mac recording resumes', '--outcome', 'wait=Mac recording stays parked', '--recommend', 'allow', '--recommend-reason', 'One switch; only you can grant it.', '--default', 'wait']);
-  so('ticket', board, '--id', 'T-41', '--description', 'Summary line.', '--title', 'Add-ons approval audit fixes', '--progress', '26');
   ask('fix-plan', 'firstmate-addons', 'Approve the fix plan from the add-ons approval audit?', 'Eighteen of the approved screens match; the plan fixes the rest in three passes.', ['--priority', 'P0', '--ticket', 'T-41', '--option', 'approve=Approve', '--option', 'hold=Hold it', '--outcome', 'approve=The three passes start today.', '--outcome', 'hold=Nothing changes until you look again.', '--recommend', 'approve', '--recommend-reason', 'The plan only touches the screens that differ.', '--default', 'hold']);
   so('project', board, '--name', 'takeone', '--icon', 'icons/takeone.svg');
   so('project', board, '--name', 'firstmate-addons', '--icon', 'icons/addons.svg');
@@ -176,20 +175,9 @@ try {
       }
     }
   }
-  // A finished ticket fills its row's bar and reads 100%: the P0 ask's ticket goes to 100 and Decide is read again, on a phone in light.
-  if (side === 'after') {
-    so('ticket', board, '--id', 'T-41', '--progress', '100');
-    await cdp('Emulation.setDeviceMetricsOverride', sizes[0][1]);
-    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: 'light' }] });
-    await go(`${url}#waiting`);
-    const done = await run(`(() => { const r = document.querySelector('.dl-row[data-key="fix-plan"]'), i = r?.querySelector('.ui-bar i'); return r && [r.querySelector('.pct')?.textContent, i && Math.round(i.getBoundingClientRect().width) === Math.round(i.parentElement.getBoundingClientRect().width)].join('|'); })()`);
-    await shot(join(dest, 'decide-ticket-done.light.390w.png'));
-    report.push(`decide-ticket-done.light.390w: the P0 ask's ticket at 100%: ${done}`);
-    if (done !== '100%|true') problems.push(`decide-ticket-done.light.390w: expected a full bar at 100%, got ${done}`);
-  }
   writeFileSync(join(dest, 'measure.txt'), report.join('\n') + '\n');
   if (side === 'after') writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A throwaway board with four asks waiting (a P0 fix plan on a ticket 26% done, the Mac screen recording grant, a P1 yes or no, an older yes or no), two answered today, and two projects with their own icons.',
+    start: 'A throwaway board with four asks waiting (a P0 fix plan on a ticket, the Mac screen recording grant, a P1 yes or no, an older yes or no), two answered today, and two projects with their own icons.',
     steps: ['Open Decide on a phone (390x844, 2x) in light and in dark over the DevTools protocol with exact device metrics, and tap By priority.',
       'Tap the Mac screen recording ask: its sheet rises over the list; tap Allow; open the P0 fix plan; open an answered ask.',
       'At 1280x800 open Decide beside an ask with an answer picked.',

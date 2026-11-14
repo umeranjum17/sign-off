@@ -87,7 +87,7 @@ When several agents need you, questions get spread across terminals. sign-off co
   </picture>
 </p>
 
-<p align="center"><b>Keep the task together.</b><br>Epics, tickets, and tasks roll up progress. Open their linked cards and Activity.</p>
+<p align="center"><b>Keep the task together.</b><br>Tickets and epics come from your own ticket system through one adapter. Open their linked cards and history.</p>
 
 Every card has Previous and Next through its list. Feedback keeps its delivery trail. Discard asks for a reason and offers Undo; Archived keeps cards available to restore. The board installs as an app and reads its last update offline.
 

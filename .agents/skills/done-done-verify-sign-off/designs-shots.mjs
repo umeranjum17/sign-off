@@ -12,6 +12,7 @@
 // Usage: node .agents/skills/done-done-verify-sign-off/designs-shots.mjs <output> [light|dark|light,dark] [390|1280|1440]
 // DESIGNS_PROTO=<the approved prototype's index.html (v3)> also captures the prototype at the same size and theme and saves each pair (vs-proto/): on a desk its Designs,
 // on a phone its Reports list and an open report (Designs is not in the phone's dock; it follows Reports' look), and its Designs address (Today, lit in the dock) beside the board's dock on Designs.
+// DESIGNS_DAYS_BACK=<n> files every design n days earlier, so a capture taken the same day as another run's is not byte for byte the same picture.
 // SIGN_OFF_REPO names another built checkout to drive, such as the base for a before (DESIGNS_SIDE=before names its files and keeps its measurements unasserted).
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
@@ -35,7 +36,9 @@ if (theme.includes(',')) {
 }
 const dir = mkdtempSync(join(tmpdir(), 'so-designs-')), board = join(dir, 'board.json');
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
-  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify' };
+  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'), SIGN_OFF_FILER: 'verify',
+  // The cards name tickets, which live behind the ticket adapter: the stand-in (an empty one here) answers the board's ticket reads.
+  SIGN_OFF_TICKETS_ADAPTER: join(repo, 'test/support/ticket-adapter-standin.mjs'), TICKET_STANDIN_DIR: dir };
 const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, env, ...options }); assert.equal(r.status, 0, r.stdout + r.stderr); return r.stdout; };
 const cli = (...args) => sh(process.execPath, [join(repo, 'dist/cli.js'), ...args]);
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -161,7 +164,7 @@ try {
   // The board: three designs under Designs, newest last, as an agent posts them.
   mkdirSync(join(dir, 'design'));
   writeFileSync(join(dir, 'config.yaml'), 'board: board.json\nname: Umer\n');
-  const media = join(repo, 'docs/media'), day = (n) => new Date(Date.now() - n * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
+  const media = join(repo, 'docs/media'), day = (n) => new Date(Date.now() - (n + Number(process.env.DESIGNS_DAYS_BACK ?? 0)) * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
   for (const f of ['phone-today', 'phone-today-dark', 'phone-decide', 'phone-decide-dark', 'phone-signin', 'phone-signin-dark', 'phone-reports', 'phone-reports-dark', 'desk-today', 'desk-today-dark'])
     copyFileSync(join(media, `${f}.webp`), join(dir, 'design', `${f}.webp`));
   const post = (msg) => { writeFileSync(join(dir, `${msg.key}.json`), JSON.stringify({ contract: 1, kind: 'design', schema: 1, filer: 'design-agent', status: 'in_review', ...msg })); cli('post', board, '--kind', 'design', '--from', join(dir, `${msg.key}.json`)); };
@@ -182,7 +185,6 @@ try {
   const b = JSON.parse(readFileSync(board, 'utf8'));
   for (const d of b.items) if (d.key === 'today-desk') d.ticket = 'today-desk';
   writeFileSync(board, JSON.stringify(b, null, 2) + '\n');
-  cli('ticket', board, '--id', 'today-desk', '--description', 'Summary line.', '--title', 'Today on a desk', '--progress', '100');
   // Three proofs filed, so the sidebar's Evidence count is the board's own.
   for (const [f, title] of [['phone-decide', 'The ask fits a phone'], ['phone-signin', 'A sign-in waits on Today'], ['phone-reports', 'Reports reads well on a phone']])
     cli('post', board, '--type', 'evidence', '--title', title, '--about', 'Umer checks the screen.', '--media', join(dir, 'design', `${f}.webp`));

@@ -31,7 +31,7 @@ Guided plan 3 / report 4 and 5 add **Simplify this**. Inspect version-1 action/t
 | `reopen` | take an answer back to ask again: `reopen <key>` puts an answered card back in Decide (a design review back under Designs) and keeps the person's answer in its thread; refused for an open card, an unknown key and a card no longer on the board |
 | `promote` | Main only: put a design review it passed in Decide (`--undo` takes it back to Designs); a lead's design never counts as an ask without it |
 | `feedback` | tell the person how far what they sent on a card got: `--delivered`, `--read`, or `--reply <text>` / `--acted` with `--link` to the new version, each with `--at <epoch seconds>` to record a step that happened earlier; the board shows Sent, Delivered, Read, Replied |
-| `ticket` | list tickets, show one with its cards, or write one (`--id`, `--title`, `--progress`, `--parent`, `--priority`, `--project`, `--hold`, `--asked`) |
+| `ticket` | list tickets, show one with its cards, or write one through the ticket adapter (`--id`, `--create`, `--rev`, `--set`, `--unset`, `--text`, `--history`, `--fields`) |
 | `project` | list projects, or set or clear a project's own icon (`--name`, `--icon`, `--clear-icon`) |
 | `doctor` | check the setup; each failure names its fix |
 | `notify` | check device notifications, or send a test notice |
@@ -96,49 +96,37 @@ or sends a test notice. Detail is in
 
 ## Tickets
 
-A ticket is one piece of work: an id, a title, how far along it is (0 to 100) and,
-optionally, the ticket it sits under, its priority, its project, whether it is on
-hold and whether you asked for it. An epic is a ticket with tickets under it, and
-those may have sub-tasks; a ticket with tickets under it is as far along as they
-are on average. It stands alone: no card needs one, and a board with none works as before. A card names its ticket with `--ticket <id>` on
+Tickets live in the system behind the ticket adapter: one executable, named by `SIGN_OFF_TICKETS_ADAPTER`, that the board calls for every read and write ([ticket-adapter.md](ticket-adapter.md)). The board keeps no ticket and no copy of one. A card names its ticket with `--ticket <id>` on
 `raise` and `post` (every `--type` and `--kind`), or `"ticket"` in a message:
 
 ```sh
-sign-off-axi ticket --id T-9 --title "The new settings page" --description "Settings in one place." --priority P1 --project Settings --asked yes
-sign-off-axi ticket --id T-29 --title "Ship the new settings page" --description "Ship the page. # Ask - the owner wants it # Why - users look for it # Done when - it opens from the profile" --progress 40 --parent T-9
-sign-off-axi ticket --id T-31 --title "Publish to npm" --description "Publish the package." --parent T-29 --hold yes
-sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 \
-  --title "Ship the settings page on Friday?" ...
-sign-off-axi post --type evidence --ticket T-29 --title "Settings on a phone" ...
-sign-off-axi ticket --id T-29 --progress 80
-sign-off-axi ticket --id T-29          # the ticket and its cards, newest first
+sign-off-axi ticket --fields                                   # the fields, words and operations the backend has
+sign-off-axi ticket --create --set title="Ship the new settings page" --set extra.estimate=3
+sign-off-axi ticket --id T-29                                  # the ticket, its extra keys and its cards
+sign-off-axi ticket --id T-29 --rev <rev> --set title="New words" --unset estimate   # a patch, with the rev you read
+sign-off-axi ticket --id T-29 --history
+sign-off-axi ticket --id T-29 --text "Needs a screenshot."
+sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 --title "Ship the settings page on Friday?" ...
 ```
 
-The card then shows a **Ticket** row (on an ask, **Its ask**), the title and progress, that opens the
-ticket: the tickets under it, its cards (asks, designs, proof, reports and plans),
-newest first, and their Activity. A card whose ticket is not on the board shows no row.
-The board's **Tickets** screen has two tabs, All tickets and Activity. All tickets lists the tickets that sit under none: how many are done, then In progress, On hold and To do, with a filter by who asked (From you or Fleet upkeep) and by project. Activity is the timeline of what happened to them, newest first by day, each entry tagged like the cards and opening to its full title, before and after, who made it, its ticket and pull requests. See [file-formats.md](file-formats.md#tickets)
-for its Activity feed and hold-release behavior.
+A stale `--rev` is refused as a `conflict` with the current rev; `--op-id <key>` makes a repeated write safe. The card shows a **Ticket** row (on an ask, **Its ask**) with the id, that opens the ticket: its fields, More fields, the tickets under it, its cards and its history. The board's **Tickets** screen has three tabs, Tickets, Epics and Activity; see [file-formats.md](file-formats.md#tickets). On Tickets, **Group by** shows the list by the status words the backend lists or by the epic each ticket sits under, with the tickets under none last; an epic's page carries **New ticket in this epic**; and Activity names who made or moved each ticket, with a pick to read one person's events.
 
-### Reading tickets over HTTP
+### Reading and writing tickets over HTTP
 
-A running board serves its tickets to other tools, read only, as JSON. Beyond `127.0.0.1` a request
-needs the board's access token like every other route (a cookie from the link, see `open`); one
-without it gets the same `401` as the rest.
+A running board passes its ticket calls to the adapter. Beyond `127.0.0.1` a request needs the board's access token like every other route.
 
 | Request | Answers |
 |---|---|
-| `GET /api/tickets` | `{"tickets": [...]}`: every ticket, in the order each was first written |
-| `GET /api/tickets/<name>` | `{"ticket": {...}}`: that ticket and the cards that name it. The name may be its id, its key in any case, a unique start of at least 8 of a `jg-`/`fm-` id's hex (either prefix), an id folded into the open ticket that tracks the same work, or a Juggernaut backlog slug; `404` with `No ticket named <name> on this board` otherwise |
+| `GET /api/ticket-fields` | the adapter's `describe` |
+| `GET /api/tickets` | `{"tickets": [...]}`, every ticket as the adapter sent it |
+| `GET /api/tickets/<id>` | `{"ticket": {...}, "cards": [...]}` |
+| `GET /api/tickets/<id>/history` | `{"events": [...]}` |
+| `GET /api/ticket-activity` | the events of the tickets that changed last |
+| `POST /api/tickets` | `{"ticket": {...}, "op_id": "..."}` makes a ticket |
+| `POST /api/tickets/<id>` | `{"rev", "set"?, "unset"?, "op_id"}` edits one |
+| `POST /api/tickets/<id>/comment` | `{"text", "op_id"}` |
 
-Each ticket carries the fields of its line in the file: `id`, `title`, `progress` (rolled up: an
-epic is as far along as the tickets under it, on average), `at`, and, when set, `parent`,
-`priority`, `project`, `hold`, `asked`, `release`, `state`, `prs`, `stage` and `last_event_at`.
-In the list, `cards` is the keys of the cards that name the ticket. On one ticket, `cards` is the
-cards themselves, newest first, each with `key`, `kind` (`ask`, `design`, `proof`, `report` or
-`plan`), `status` (the answer, `waiting`, `in review` or `shown`), `title` and `filed`. It is the
-same JSON as `sign-off-axi ticket --json` and `ticket --id <id> --json`, without the board's file path.
-There is no write over HTTP: use `sign-off-axi ticket --id ...`.
+A failure is `{"error": {"code", "message", "retryable", "detail"?}}` as the adapter said it, with a status that follows the code (404 `not_found`, 409 `conflict`, 422 `invalid`, 501 `unsupported`, 503 with no adapter named, 504 `timeout`, 502 otherwise).
 
 ## Priority and project icons
 

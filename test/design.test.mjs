@@ -22,13 +22,17 @@ const bin = join(scratch, 'bin');
 mkdirSync(bin);
 mkdirSync(join(scratch, 'home'));
 symlinkSync(process.execPath, join(bin, 'node'));
-const env = { ...process.env, PATH: bin, HOME: join(scratch, 'home') };
+// The tickets live behind the ticket adapter: the stand-in keeps them in its own folder, and `madeTicket` makes one there and returns its id.
+const standin = join(scratch, 'standin');
+mkdirSync(standin);
+const env = { ...process.env, PATH: bin, HOME: join(scratch, 'home'), SIGN_OFF_TICKETS_ADAPTER: join(import.meta.dirname, 'support/ticket-adapter-standin.mjs'), TICKET_STANDIN_DIR: standin };
 // No filer leaks in from the agent running the tests.
 delete env.SIGN_OFF_FILER;
 delete env.CLAUDE_CODE_SESSION_ID;
 // Hints read as npm ran the tests, never as npx would.
 delete env.npm_command;
 delete env.npm_config_package;
+const madeTicket = (file, title) => JSON.parse(run('ticket', file, '--create', '--set', `title=${title}`, '--json').out).ticket.id;
 const run = (...args) => {
   try {
     return { out: execFileSync(process.execPath, [cli, ...asked(args)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], env }), code: 0 };
@@ -1681,6 +1685,18 @@ test('a report names the part in view as its reader scrolls it, and the page kee
     await evaluate(`document.fonts.ready.then(() => document.querySelector('[data-part="this"]').scrollIntoView({ block: 'center' }))`);
     await until(async () => (await evaluate(`document.querySelector('.ra-ont').textContent`)) !== 'Two steps');
     assert.deepEqual(await evaluate('globalThis.__errors'), []);
+    // A changed report is reread by the board's poll while the person is reading it.
+    await evaluate(`document.querySelector('.gd-scroll').style.scrollBehavior = ''; document.querySelector('.gd-scroll').scrollTo({ top: 700, behavior: 'instant' });
+      globalThis.__positions = []; const s = document.querySelector('.gd-scroll'), box = s.getBoundingClientRect(), part = [...s.querySelectorAll('[data-part]')].find((p) => { const r = p.getBoundingClientRect(); return r.bottom > box.top && r.top < box.bottom; }); globalThis.__anchor = { part: part.dataset.part, offset: part.getBoundingClientRect().top - box.top }; new MutationObserver(() => { const s = document.querySelector('.gd-scroll'), p = [...s.querySelectorAll('[data-part]')].find((p) => p.dataset.part === __anchor.part); globalThis.__positions.push(p.getBoundingClientRect().top - s.getBoundingClientRect().top); }).observe(document.querySelector('#reader'), { childList: true });`);
+    const before = await evaluate(`document.querySelector('.gd-scroll').scrollTop`);
+    const saved = JSON.parse(readFileSync(file));
+    saved.items.find((item) => item.key === report.key).about = 'An updated report for the reader.';
+    writeFileSync(file, JSON.stringify(saved));
+    await until(() => evaluate(`document.querySelector('#reader').textContent.includes('An updated report for the reader.')`));
+    assert.ok(before > 0);
+    const positions = await evaluate('globalThis.__positions');
+    assert.equal(positions.length, 1);
+    assert.ok(Math.abs(positions[0] - (await evaluate('globalThis.__anchor.offset'))) < 1, 'redraw keeps the same report part at the same viewport position');
   } finally { close(); proc.kill(); }
 });
 
@@ -2454,7 +2470,7 @@ test('report kinds and their workflows: post names what a report is for and hold
   // report init --purpose writes the kind's parts to fill, each a section naming its part; posted as it is, it is refused for its FILL lines.
   assert.equal(run('report', 'init', join(dir, 'tmpl'), '--purpose', 'plan').code, 0);
   const tmpl = JSON.parse(readFileSync(join(dir, 'tmpl', 'report.json'), 'utf8'));
-  assert.deepEqual([tmpl.schema, tmpl.purpose, tmpl.sections.map((x) => x.part).join(',')], [5, 'plan', 'goal,current,design,slices,tests,risks,rollout,estimate,owner-calls']);
+  assert.deepEqual([tmpl.schema, tmpl.purpose, tmpl.sections.map((x) => x.part).join(',')], [6, 'plan', 'goal,current,design,slices,tests,risks,rollout,estimate,owner-calls']);
   assert.match(run('post', file, '--kind', 'report', '--from', join(dir, 'tmpl', 'report.json')).out, /still has FILL: lines/);
   // A full plan: every part, the design with its diagram, each slice sized, each tested.
   const sec = (part, heading, more = {}) => ({ id: part, part, stage: 'found', heading, body: `${heading}, in a line.`, ...more });
@@ -2463,7 +2479,6 @@ test('report kinds and their workflows: post names what a report is for and hold
     sec('tests', 'Tests and proof', { items: [{ title: 'Move the page', text: 'A browser test opens it from the profile.' }] }), sec('risks', 'Risks and rollback', { items: [{ title: 'Old links break', text: 'Mitigation: the old address redirects for 30 days.' }] }), sec('rollout', 'Rollout'), sec('estimate', 'Time'), sec('owner-calls', 'Your calls')] };
   writeFileSync(join(dir, 'muxr.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
   assert.equal(run('project', file, '--name', 'Muxr', '--icon', 'muxr.svg').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Move settings', '--project', 'Muxr').code, 0);
   plan.group = plan.project = 'Muxr'; plan.ticket = 'T-29';
   assert.equal(post('plan', plan).code, 0);
   assert.equal(post('research', { ...base, key: 'k-research', filed: at(2) }).code, 0);
@@ -3658,7 +3673,7 @@ test('Evidence: an update with no run is never waiting on you, and is listed und
   proc.kill();
 });
 
-test('Evidence: with no --evidence-root a linked run is found in done-done\'s own folder for its app, so a passed run says Passed, and a run found nowhere is listed as not run rather than claimed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: linked runs need a matching verified receipt, and missing or changed results stay unverified', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'store'), file = join(dir, 'board.json'), home = join(dir, 'home'), app = join(home, '.done-done', 'evidence', 'sign-off');
   const shot = readFileSync(new URL('../fixtures/evidence/product-small.png', import.meta.url)), commit = 'c0ffee'.padEnd(40, '0'), runId = '20261011T120000Z-a1b2c3d4';
   mkdirSync(join(app, '.done-done', 'runs'), { recursive: true });
@@ -3667,7 +3682,17 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   writeFileSync(join(app, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit: 0,
     files: [{ path: `${runId}/after.png`, sha256: createHash('sha256').update(shot).digest('hex'), bytes: shot.length }] }));
   const link = (run_id) => ({ run_id, commit, outcome: 'You can read every card on a phone.', repro: 'repro: npm test', proof: 'done-done-verify-sign-off: npm test, phone, 390, passed', evidence: 'after.png' });
+  const hash = createHash('sha256').update(shot).digest('hex');
+  const receipt = JSON.stringify({ schema: 2, result: 'pass', head: commit, tree: 'a'.repeat(40), runs: [{ run_id: runId, commit }], files: [{ path: 'after.png', sha256: hash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'after.png', sha256: hash, verdict: 'pass' }] } });
+  writeFileSync(join(app, 'receipt.json'), receipt);
+  const ref = { path: 'receipt.json', sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true };
+  const failedId = 'failed-run';
+  writeFileSync(join(app, '.done-done', 'runs', `${failedId}.json`), JSON.stringify({ schema: 1, run_id: failedId, commit, tree: 'a'.repeat(40), dirty: false, exit: 1, files: [{ path: `${runId}/after.png`, sha256: hash, bytes: shot.length }] }));
+  const negative = JSON.stringify({ schema: 1, run_id: failedId, commit, result: 'fail', reason: 'The screen did not load.' });
+  writeFileSync(join(app, 'negative.json'), negative);
   writeFileSync(file, JSON.stringify({ schema: 2, items: [
+    { key: 'failed', type: 'evidence', number: 4, title: 'Failed proof', filed: new Date().toISOString(), evidence: { ...link(failedId), proof_verdict: 'fail', proof_ref: { path: 'negative.json', sha256: createHash('sha256').update(negative).digest('hex'), issuer: 'done-done', validated: true } } },
+    { key: 'passed', type: 'evidence', number: 3, title: 'Verified run', filed: new Date().toISOString(), evidence: { ...link(runId), proof_verdict: 'pass', proof_ref: ref, proof_series_id: 'series', current_head: commit, release_state: { state: 'unreleased' } } },
     { key: 'found', type: 'evidence', number: 1, title: 'Run in the store', filed: new Date().toISOString(), evidence: link(runId) },
     { key: 'lost', type: 'evidence', number: 2, title: 'Run nowhere', filed: new Date().toISOString(), evidence: link('20261011T130000Z-b2c3d4e5') },
   ] }));
@@ -3675,16 +3700,29 @@ test('Evidence: with no --evidence-root a linked run is found in done-done\'s ow
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1];
   const api = await (await fetch(`${url}api/decisions`)).json();
-  assert.deepEqual(api.decisions.map((d) => [d.key, d.evidenceCard?.result ?? null]), [['found', 'RUN PASS'], ['lost', null]]);
+  assert.deepEqual(api.decisions.map((d) => [d.key, d.evidenceCard?.result ?? null]), [['failed', 'RUN FAIL'], ['passed', 'RUN PASS'], ['found', 'UNVERIFIED'], ['lost', null]]);
   // The run's own capture is served from the folder the record was found in.
-  assert.equal((await fetch(`${url}${api.decisions[0].evidenceCard.media[0].url.slice(1)}`)).status, 200);
+  assert.equal((await fetch(`${url}${api.decisions[1].evidenceCard.media[0].url.slice(1)}`)).status, 200);
   const { evaluate, close } = await browse(join(dir, 'b'), 390);
   await evaluate(`location.href = ${JSON.stringify(`${url}#evidence`)}`);
   const result = (key) => evaluate(`(() => { const a = document.querySelector("#item-${key}"); return a ? [a.querySelector(".ev-ok")?.className ?? "", a.getAttribute("aria-label").split(", ")[1]] : null; })()`);
-  await until(async () => (await result('found'))?.[0] === 'ev-ok held');
-  assert.deepEqual(await result('found'), ['ev-ok held', 'Holds up']);
+  await until(async () => (await result('found')) !== null);
+  assert.deepEqual(await result('found'), ['', 'Unverified']);
+  assert.deepEqual(await result('passed'), ['ev-ok held', 'Holds up']);
+  assert.deepEqual(await result('failed'), ['ev-ok not', 'Failed']);
+  await evaluate('document.querySelector("#item-passed").click()');
+  assert.match(await evaluate('document.querySelector(".ev-open").textContent'), /Current/);
+  assert.match(await evaluate('document.querySelector(".ev-open").textContent'), /Not released/);
+  writeFileSync(join(app, 'receipt.json'), receipt + ' ');
+  const changed = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(changed.decisions.find((d) => d.key === 'passed').evidenceCard.result, 'UNVERIFIED');
+  const conflicting = JSON.parse(readFileSync(file, 'utf8'));
+  conflicting.items.push({ ...conflicting.items.find((d) => d.key === 'passed'), key: 'conflict', number: 5, evidence: { ...conflicting.items.find((d) => d.key === 'passed').evidence, current_head: 'b'.repeat(40) } });
+  writeFileSync(file, JSON.stringify(conflicting));
+  const ambiguous = await (await fetch(`${url}api/decisions`)).json();
+  assert.equal(ambiguous.decisions.find((d) => d.key === 'passed').proofHead, 'Unknown');
   // A run found nowhere is claimed as nothing: its update is on Evidence, saying nothing checked it.
-  assert.deepEqual(await result('lost'), ['', 'Not checked']);
+  assert.deepEqual(await result('lost'), ['', 'Unverified']);
   close();
   proc.kill();
 });
@@ -3758,8 +3796,8 @@ test('Today on a phone: the floating tab bar with its pill on Today, Up next wit
   // On Evidence the same proof is a row of its claim with done-done's check at its tile's corner, with no frame left empty.
   await evaluate('location.hash = "#evidence"');
   await until(async () => await evaluate('!!document.getElementById("item-u3")'));
-  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className]; })()'),
-    [true, 0, 'It works.', 'ev-ok held']);
+  assert.deepEqual(await evaluate('(() => { const c = document.getElementById("item-u3"); return [c.classList.contains("ui-row"), c.querySelectorAll("img:not(.ui-icon img)").length, c.querySelector(".t").textContent, c.querySelector(".ev-ok")?.className ?? ""]; })()'),
+    [true, 0, 'It works.', '']);
   // With no designs filed, Designs still opens from Decide's Designs; the dock keeps its six and lights Decide, and the pill slides there.
   await evaluate('location.hash = "#waiting"');
   await until(async () => !!(await evaluate('document.querySelector(".dl-seg button[aria-pressed=false]")')));
@@ -3919,7 +3957,7 @@ test('a long answer at 390 px sits under its long title, which keeps most of the
   proc.kill();
 });
 
-test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is not listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('Evidence: a row per proof ever filed, in one list, newest first, each with its project, done-done\'s check and its time; Held up today over the day\'s proofs; a project filter; a failed run is listed; the row opens the proof, which shows its project and time, the whole shot, done-done\'s word, its change, its Activity and its verdict; at 1440 Today sets its tiles under Up next and Evidence is a list beside the selected update; at 390 rows of 68px, a sheet 48px down and nothing squashed', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'updates'), file = join(dir, '.sign-off', 'decisions.json');
   mkdirSync(dir);
   run('init', dir);
@@ -3938,16 +3976,17 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   mkdirSync(join(dir, '.done-done', 'runs'), { recursive: true });
   for (const [runId, exit, sha] of [[runs[0], 0, hash], [runs[1], 0, hash], [runs[2], 1, hash], [runs[3], 0, 'b'.repeat(64)]]) writeFileSync(join(dir, '.done-done', 'runs', `${runId}.json`), JSON.stringify({ schema: 1, run_id: runId, commit, tree: 'a'.repeat(40), dirty: false, exit,
     files: [{ path: 'wide.png', sha256: sha, bytes: wideBytes.length }] }));
+  const verified = (id, proof) => { const receipt = JSON.stringify({ schema: 2, head: commit, tree: 'a'.repeat(40), result: 'pass', runs: [{ run_id: id, commit }], files: [{ path: 'wide.png', sha256: hash }], judge: { route: 'test', model: 'test', independence: 'agent', verdicts: [{ path: 'wide.png', sha256: hash, verdict: 'pass' }] } }); const path = `${id}.receipt.json`; writeFileSync(join(dir, path), receipt); return { ...link(id, proof), proof_verdict: 'pass', proof_ref: { path, sha256: createHash('sha256').update(receipt).digest('hex'), issuer: 'done-done', validated: true } }; };
   Object.assign(doc.items[0], { evidence: link(runs[2]) });
-  Object.assign(doc.items[1], { evidence: link(runs[1], 'npm test, phone, passed') });
-  Object.assign(doc.items[2], { title: 'sign-off board verify: pass', about: outcome, evidence: link(runs[1], 'verify-Sign-Off: npm test, phone, 390, passed') });
+  Object.assign(doc.items[1], { evidence: verified(runs[1], 'npm test, phone, passed') });
+  Object.assign(doc.items[2], { title: 'sign-off board verify: pass', about: outcome, evidence: verified(runs[1], 'verify-Sign-Off: npm test, phone, 390, passed') });
   // A link that is not a full URL stays text: the update it is on still opens.
   doc.items[1].link = 'http://%';
   mkdirSync(join(dir, '.sign-off', 'evidence', '4'), { recursive: true });
   writeFileSync(join(dir, '.sign-off', 'evidence', '4', '1.png'), wideBytes);
   const pr = 'https://github.com/umeranjum17/sign-off/pull/12';
   doc.items.push({ key: 'update-4', type: 'evidence', number: 4, title: 'sign-off board verify: pass', about: outcome, filed: new Date().toISOString(), link: pr,
-    media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: link(runs[0]) });
+    media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }], evidence: verified(runs[0]) });
   // A plain update with its own capture and no linked run is not proof, but it is still evidence and never an ask.
   doc.items.push({ key: 'update-5', type: 'evidence', number: 5, title: 'Sign-in, plain update', about: 'Umer checks the plain update.', filed: new Date(Date.now() + 1000).toISOString(),
     link: 'https://github.com/umeranjum17/sign-off/pull/13', media: [{ path: 'evidence/4/1.png', sha256: hash, bytes: wideBytes.length }] });
@@ -3969,13 +4008,13 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   assert.equal(await evaluate('document.querySelector(".ar-line")'), null);
   const clock = (at) => at.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const at = (i) => new Date(doc.items[i - 1].filed), when = (i) => (at(i).toDateString() === new Date().toDateString() ? clock(at(i)) : at(i).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
-  // Evidence lists every proof in one list, newest first, however old: the plain update (5), the passed ones (4, 3, 2), the unchecked one (6) and last week's (7); only the failed run (1) is left off.
+  // Evidence lists every proof, including the failed run; the first six appear before See all.
   // Both proof-prefix forms name one project, a capture with no run takes its linked repository, and a proof with neither names none.
   assert.deepEqual(await evaluate(cards), [['item-update-5', 'Sign-in, plain update', '', `Not checked · sign-off · ${when(5)}`, 0], ['item-update-4', outcome, 'ev-ok held', `Holds up · sign-off · ${when(4)}`, 0],
-    ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Could not check · sign-off · ${when(6)}`, 0], ['item-update-7', 'Sign-in, last week', '', `Not checked · ${when(7)}`, 0]]);
+    ['item-update-3', outcome, 'ev-ok held', `Holds up · sign-off · ${when(3)}`, 0], ['item-update-2', outcome, 'ev-ok held', `Holds up · ${when(2)}`, 0], ['item-update-6', outcome, '', `Unverified · sign-off · ${when(6)}`, 0], ['item-update-1', outcome, '', `Unverified · sign-off · ${when(1)}`, 0]]);
   // One head over the list, Latest proof; no project or day headings break it.
   assert.deepEqual(await evaluate('[...document.querySelectorAll("#board h2, #board h3")].map((h) => h.firstChild.textContent)'), ['Latest proof']);
-  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '6');
+  assert.equal(await evaluate('document.querySelector(\'#nav a[href="#evidence"] .n\').textContent'), '7');
   // The head: the title with the project filter, Newest and By priority, and Held up today over the proofs filed today, one square each, ink where the check passed.
   const today = doc.items.filter((d) => new Date(d.filed).toDateString() === new Date().toDateString()), held = today.filter((d) => ['update-2', 'update-3', 'update-4'].includes(d.key)).length;
   assert.deepEqual(await evaluate('[document.querySelector(":is(.ev-top, .ui-dhead) h1").textContent, !!document.querySelector(":is(.ev-top, .ui-dhead) .ev-fb"), [...document.querySelectorAll(".ev-seg button")].map((b) => b.textContent + " " + b.getAttribute("aria-pressed")), document.querySelector(".ev-held").innerText.replace(/\\s+/g, " ").trim(), document.querySelectorAll(".ev-dots i").length, document.querySelectorAll(".ev-dots i.held").length]'),
@@ -3985,10 +4024,10 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
     const opts = [...document.querySelectorAll("#sheet .ev-pick button")].map((b) => [b.querySelector(".pn").textContent, b.querySelector(".n").textContent]);
     [...document.querySelectorAll("#sheet .ev-pick button")].find((b) => b.querySelector(".pn").textContent === ${JSON.stringify(name)}).click(); await new Promise((r) => setTimeout(r, 200));
     return [opts, document.querySelector(".ev-pill > span[dir]")?.textContent ?? "", !!document.querySelector(".ev-held"), [...document.querySelectorAll(".ev-card")].map((a) => a.id)]; })()`);
-  assert.deepEqual(await pick('No project'), [[['sign-off', '4'], ['No project', '2']], 'No project', false, ['item-update-2', 'item-update-7']]);
+  assert.deepEqual(await pick('No project'), [[['sign-off', '5'], ['No project', '2']], 'No project', false, ['item-update-2', 'item-update-7']]);
   await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
-  assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6']]);
+  assert.deepEqual((await pick('sign-off')).slice(1), ['sign-off', false, ['item-update-5', 'item-update-4', 'item-update-3', 'item-update-6', 'item-update-1']]);
   await evaluate('document.querySelector(".ev-pill .ev-unpick").click()');
   await until(async () => (await evaluate('document.querySelectorAll(".ev-card").length')) === 6);
   // Today's Proofs today counts each update filed today, the failed run too, and opens Evidence; on a desk its tiles sit under Up next in the left column.
@@ -4023,7 +4062,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await until(async () => (await evaluate('!!document.querySelector(".t-tiles")')));
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".t-tiles .ui-stat")].map((t) => t.getAttribute("aria-label")).join() + "|" + !!document.querySelector(".t-up.clear")'), `Cleared today: 0 of 0,${filedToday}|true`);
   // A failed or unchecked update still opens on Evidence with done-done's word, the reason a run could not be checked, and the verdicts, Pass last.
-  for (const [k, result, why] of [['update-1', 'Failed', ''], ['update-6', 'Could not check', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
+  for (const [k, result, why] of [['update-1', 'Unverified', ''], ['update-6', 'Unverified', 'A picture or recording changed after the run. Ask the agent to run the check again.']]) {
     await evaluate(`location.hash = "#evidence/${k}"`);
     await until(async () => (await evaluate('!!document.querySelector(".split-detail .ev-title")')));
     assert.deepEqual(await evaluate('[document.querySelector(".ev-props .ev-word").textContent, document.querySelector(".ev-why")?.textContent ?? "", [...document.querySelectorAll(".ev-verdict .choices button")].map((b) => b.textContent)]'),
@@ -4053,7 +4092,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // The selection follows the click and the list stays beside the update.
   assert.deepEqual(await evaluate('[...document.querySelectorAll(".ev-card[aria-current]")].map((a) => a.id)'), ['item-update-4']);
   const props = '[...document.querySelectorAll(".ev-props .ui-pr")].map((p) => [p.querySelector(".k").textContent, p.querySelector(".v").textContent])';
-  assert.deepEqual(await evaluate(props), [['done-done', 'Holds up'], ['Pull request', '#12']]);
+  assert.deepEqual(await evaluate(props), [['Proof head', 'Unknown'], ['Release', 'Unknown'], ['Run', 'Completed'], ['done-done', 'Holds up'], ['Pull request', '#12']]);
   assert.deepEqual(await evaluate('[document.querySelector(".split-detail .split-bar .pt").textContent, document.querySelector(".ev-props a.ui-pr").getAttribute("href")]'), [`sign-off · ${clock(at(4))}`, pr]);
   assert.deepEqual(await evaluate('[document.querySelector(".ev-title").textContent, document.querySelectorAll(".ev-hero img").length, document.querySelectorAll(".ev-verdict .choices button").length]'),
     [outcome, 1, 3]);
@@ -4143,7 +4182,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   await evaluate('document.querySelector(".ev-open .ev-go").click()');
   await until(async () => (await evaluate('!!document.querySelector(".ev-item") && document.querySelectorAll(".ev-hero img").length === 2')));
   // A proof with no project says so in its head, and a link that is not a full URL is no Pull request row.
-  assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['done-done', 'Holds up']], 48]);
+  assert.deepEqual(await evaluate(`[document.querySelector(".ev-shd .pt").textContent, ${props}, Math.round(document.getElementById("reader").getBoundingClientRect().top)]`), [`No project · ${clock(at(2))}`, [['Proof head', 'Unknown'], ['Release', 'Unknown'], ['Run', 'Completed'], ['done-done', 'Holds up']], 48]);
   assert.equal(await evaluate(verdictRow), 1);
   assert.deepEqual(await evaluate(SQUASH), []);
   assert.ok(await evaluate('document.documentElement.scrollWidth <= innerWidth'));
@@ -4166,7 +4205,7 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   // Discarded from its sheet, the proof goes under Archived; at the list's scroll end the last row, Select or clear all and Archived all end above the dock, which rises over the home bar.
   await iphone.evaluate('document.querySelector(".ev-verdict > .dis").click()');
   await iphone.evaluate('document.querySelector("#dc-sheet [data-reason=not-relevant]").click()');
-  await until(async () => (await iphone.evaluate('document.querySelector("main .ar-line")?.textContent')) === 'Archived · 1' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 5);
+  await until(async () => (await iphone.evaluate('document.querySelector("main .ar-line")?.textContent')) === 'Archived · 1' && (await iphone.evaluate('document.getElementById("reader").hidden && document.querySelectorAll(".ev-card").length')) === 6);
   const end = await iphone.evaluate(`(() => { scrollTo(0, document.documentElement.scrollHeight); const bottom = (s) => Math.round(document.querySelector(s).getBoundingClientRect().bottom), dock = document.querySelector(".tabs").getBoundingClientRect();
     return { dockTop: Math.round(dock.top), dockBottom: Math.round(dock.bottom), lastRow: bottom(".ev-list > li:last-child"), more: bottom(".ev-more"), archived: bottom("main .ar-line") }; })()`);
   assert.equal(end.dockBottom, 844 - 24 - 34, JSON.stringify(end));
@@ -4175,22 +4214,53 @@ test('Evidence: a row per proof ever filed, in one list, newest first, each with
   proc.kill();
 });
 
-test('a lock left by a sign-off-axi that stopped mid-write: raise names it, doctor prints its fix, the fix clears it', () => {
-  const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock');
+test('a lock left by a sign-off-axi that stopped mid-write: the next raise clears it, a live owner keeps it, doctor still names one nobody cleared', async () => {
+  const dir = join(scratch, 'crashed'), sod = join(dir, '.sign-off'), lock = join(sod, 'decisions.json.lock'), file = join(sod, 'decisions.json');
   run('init', dir);
   writeFileSync(join(sod, 'config.yaml'), 'board: decisions.json\nport: 0\n');
   assert.match(run('doctor', dir).out, /locks,none left behind/);
-  // What a crash leaves: the lock with the pid of a process that is gone.
-  writeFileSync(lock, `${spawnSync(process.execPath, ['-e', '']).pid}\n`);
-  const busy = run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?');
-  assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
-  assert.match(busy.out, /a sign-off-axi that stopped mid-write left decisions\.json\.lock behind\n[^]*Run `rm /);
+  const gone = () => spawnSync(process.execPath, ['-e', '']).pid;
+  // What a crash leaves: the lock with the pid of a process that is gone. Doctor names it and prints the fix, which clears it.
+  writeFileSync(lock, `${gone()}\n`);
   const broken = run('doctor', dir);
   assert.equal(broken.code, 1);
   const fix = /locks: decisions\.json\.lock left by a sign-off-axi that stopped mid-write, so every raise, post and open waits on it\. Run `([^`]+)`/.exec(broken.out)[1];
   execFileSync('/bin/sh', ['-c', fix]);
   assert.equal(run('doctor', dir).code, 0);
-  assert.match(run('raise', join(sod, 'decisions.json'), '--title', 'Ship it?').out, /ship-it,raised,/);
+  // Dead owner: the raise clears the lock itself, at once, and leaves neither the lock nor its guard behind.
+  writeFileSync(lock, `${gone()}\n`);
+  const began = Date.now(), raised = run('raise', file, '--title', 'Ship it?');
+  assert.equal(raised.code, 0, raised.out);
+  assert.match(raised.out, /ship-it,raised,/);
+  assert.ok(Date.now() - began < 2_500, `a dead owner's lock is not waited out: ${Date.now() - began} ms`);
+  assert.deepEqual([existsSync(lock), existsSync(`${lock}.reclaim`)], [false, false]);
+  // Live owner: the same lock naming a running process is kept, the raise fails BUSY after its wait, and the owner's pid is still in it.
+  const owner = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { stdio: 'ignore' });
+  try {
+    writeFileSync(lock, `${owner.pid}\n`);
+    const busy = run('raise', file, '--title', 'Ship it too?');
+    assert.deepEqual([busy.code, /code: BUSY/.test(busy.out)], [1, true]);
+    assert.match(busy.out, /another raise is still writing the board/);
+    assert.equal(readFileSync(lock, 'utf8'), `${owner.pid}\n`);
+    assert.equal(run('list', file).out.includes('ship-it-too'), false);
+  } finally { owner.kill(); }
+  // No pid in it yet (a writer between creating the file and writing its pid): not provably dead, so it is waited on and then named, never removed.
+  writeFileSync(lock, '');
+  const unwritten = run('raise', file, '--title', 'Ship it three?');
+  assert.deepEqual([unwritten.code, /code: BUSY/.test(unwritten.out)], [1, true]);
+  assert.match(unwritten.out, /a sign-off-axi that stopped mid-write left decisions\.json\.lock behind\n[^]*Run `rm /);
+  assert.equal(existsSync(lock), true);
+  rmSync(lock);
+  // Concurrent writers on a dead owner's lock: every raise lands exactly once, one at a time, and the lock is gone at the end.
+  writeFileSync(lock, `${gone()}\n`);
+  const titles = Array.from({ length: 8 }, (_, i) => `Race ${String.fromCharCode(97 + i)}?`);
+  const done = await Promise.all(titles.map((title) => new Promise((ok) => {
+    execFile(process.execPath, [cli, ...asked(['raise', file, '--title', title])], { encoding: 'utf8', env }, (e, out) => ok({ code: e ? e.code : 0, out }));
+  })));
+  assert.deepEqual(done.map((d) => d.code), titles.map(() => 0), done.map((d) => d.out).join('\n'));
+  const listed = run('list', file).out;
+  for (const title of ['Ship it?', ...titles]) assert.equal(listed.split(`,${title}\n`).length - 1, 1, `${title} is on the board once`);
+  assert.deepEqual([existsSync(lock), existsSync(`${lock}.reclaim`)], [false, false]);
 });
 
 test('two serves of one board started at once: one runs, the other is refused', async () => {
@@ -4758,7 +4828,7 @@ test('the board paints its first screen from one page of asks, and never asks fo
     // The whole board is never asked for, before or after the paint: not once, on any screen this journey opens.
     const asked = async () => (await reads()).filter(([path]) => path === '/api/decisions' || path === '/api/state');
     assert.deepEqual(await asked(), [], 'no read of the whole board');
-    assert.ok(!(await reads()).some(([path]) => !/^\/api\/decisions\?view=(asks|items|lists|card|tickets)\b/.test(path)), 'every read is a part of the board');
+    assert.ok(!(await reads()).some(([path]) => !/^\/api\/decisions\?view=(asks|items|lists|card)\b/.test(path)), 'every read is a part of the board');
     // The board fills in from pages: the Evidence screen lists proofs, and each row still says what done-done says of it.
     await evaluate('location.hash = "#evidence"');
     await until(() => evaluate('document.querySelectorAll("#board .ev-card").length > 0'));
@@ -4769,12 +4839,9 @@ test('the board paints its first screen from one page of asks, and never asks fo
     await click(box);
     await until(() => evaluate('!!document.querySelector("#board .ev-open .ev-go")'));
     await until(async () => (await reads()).some(([path]) => path.startsWith('/api/decisions?view=card&key=')));
-    // The Tickets screen opens on the Story, which reads its own figures and rows; the whole roll-up, which no page carries, comes with All tickets.
+    // The Tickets screen asks the ticket adapter for its own list; it reads no part of the board and never the whole of it.
     await evaluate('location.hash = "#tickets"');
-    await until(() => evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=story"))'));
-    assert.equal(await evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=tickets"))'), false, 'the Story never reads the whole roll-up');
-    await evaluate('location.hash = "#tickets/all"');
-    await until(() => evaluate('(performance.getEntriesByType("resource") ?? []).some((e) => e.name.includes("view=tickets"))'));
+    await until(() => evaluate("performance.getEntriesByType('resource').some((e) => e.name.endsWith('/api/tickets'))"));
     assert.deepEqual(await asked(), [], 'still no read of the whole board');
     console.log(`first screen: ${first[0][1]} B of a ${whole} B board; reads: ${(await reads()).map(([p, b]) => `${p} ${b}B`).join(', ')}`);
   } finally { close(); proc.kill(); }
@@ -4814,430 +4881,6 @@ test('installable app: a valid manifest, a service worker that keeps the page an
   } finally { await close(); proc.kill(); }
 });
 
-test('a card names its ticket: --ticket on every post, a Ticket row that opens the ticket, the ticket lists its cards newest first, each card shows its Activity, and the Tickets tab lists the tickets', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const dir = join(scratch, 'ticket'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  mkdirSync(join(dir, 'design'), { recursive: true });
-  for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
-  writeFileSync(join(dir, 'shot.png'), png);
-  writeFileSync(join(dir, 'settings.svg'), readFileSync(new URL('../docs/logo.svg', import.meta.url)));
-  assert.equal(run('project', file, '--name', 'Settings', '--icon', 'settings.svg').code, 0);
-  // A ticket stands alone: a new one needs a title, a later write changes only what it gives, and a bad value is refused before anything is written.
-  assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '20').code, 2);
-  assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
-  // A new ticket with no summary is refused and writes nothing; --backfill gives an old one without words its title.
-  const noSummary = run('ticket', file, '--id', 'T-8', '--title', 'No words yet');
-  assert.equal(noSummary.code, 2); assert.match(noSummary.out, /needs --description/); assert.equal(existsSync(join(dir, 'board.tickets.jsonl')), false);
-  writeFileSync(join(dir, 'board.tickets.jsonl'), JSON.stringify({ id: 'T-old', title: 'An old ticket', progress: 10, at: new Date().toISOString() }) + '\n');
-  assert.match(run('ticket', file, '--backfill').out, /backfilled: 1/);
-  assert.equal(JSON.parse(run('ticket', file, '--id', 'T-old', '--json').out).ticket.description, 'An old ticket');
-  assert.match(run('ticket', file, '--backfill').out, /backfilled: 0/);
-  rmSync(join(dir, 'board.tickets.jsonl'));
-  assert.equal(run('ticket', file, '--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--progress', '45').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '20', '--parent', 'T-9').code, 0);
-  assert.match(run('ticket', file, '--id', 'T-29', '--progress', '60').out, /status: updated/);
-  for (const bad of [['--progress', '101'], ['--progress', '4.5'], ['--parent', 'T-29'], ['--title', ' '], ['--id', 'bad id']]) assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
-  // A ticket may carry a priority, a project, whether it is on hold and whether the user asked for it; an empty value takes one off, and a bad one is refused.
-  assert.equal(run('ticket', file, '--id', 'T-9', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-31', '--description', 'Summary line.', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--stage', 'building', '--last-event-at', String(Math.floor(Date.now() / 1000) - 18 * 3600)).code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-32', '--description', 'Summary line.', '--title', 'Choose the rollout date', '--progress', '25', '--state', 'on hold', '--hold-reason', 'waiting on the rollout date', '--asked', 'yes').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-31', '--priority', '').code, 0);
-  // Sync fields round-trip through the public CLI, preserve old flags and clear independently.
-  const getTicket = () => JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
-  const prs = ['https://github.com/example/app/pull/1', 'https://github.com/example/app/pull/2'];
-  assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'queued', '--pr', prs.join(','), '--pr', prs[0]).code, 0);
-  assert.deepEqual([getTicket().release, getTicket().state, getTicket().prs], ['0.6.1', 'queued', prs]);
-  assert.match(run('ticket', file, '--id', 'T-29', '--release', '0.6.1').out, /status: unchanged/);
-  for (const bad of [['--state', 'unknown'], ['--pr', 'javascript:alert(1)'], ['--pr', '/pull/1'], ['--release', 'x'.repeat(41)]]) {
-    const before = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
-    assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2);
-    assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), before);
-  }
-  assert.equal(run('ticket', file, '--id', 'T-29', '--release', '', '--state', '', '--pr', '').code, 0);
-  assert.deepEqual([getTicket().release, getTicket().state, getTicket().prs], [undefined, undefined, undefined]);
-  // Stage and last event are sync facts, independent of the percentage and legacy state.
-  assert.equal(run('ticket', file, '--stage', 'review').code, 2);
-  assert.equal(run('ticket', file, '--last-event-at', '1792820000').code, 2);
-  for (const stage of ['queued', 'building', 'review', 'merging', 'done']) {
-    assert.equal(run('ticket', file, '--id', 'T-29', '--stage', stage, '--last-event-at', '1792820000').code, 0);
-    assert.deepEqual([getTicket().stage, getTicket().last_event_at, getTicket().progress], [stage, 1792820000, 60]);
-  }
-  assert.equal(run('ticket', file, '--id', 'T-29', '--last-event-at', '2026-10-24T06:53:20Z').code, 0);
-  assert.equal(getTicket().last_event_at, 1792824800);
-  assert.match(run('ticket', file, '--id', 'T-29', '--stage', 'done').out, /status: unchanged/);
-  for (const bad of [['--stage', 'started'], ['--last-event-at', 'yesterday'], ['--last-event-at', '-1'], ['--last-event-at', 'Infinity'], ['--last-event-at', '2026-02-30T00:00:00Z'], ['--last-event-at', '2026-10-24T00:00:00+04:00'], ['--last-event-at', '99999999999999999'], ['--comment', '{}', '--stage', 'done']]) {
-    const before = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
-    assert.equal(run('ticket', file, '--id', 'T-29', ...bad).code, 2, bad.join(' '));
-    assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), before);
-  }
-  assert.equal(run('ticket', file, '--id', 'T-29', '--stage', '', '--last-event-at', '').code, 0);
-  assert.deepEqual([getTicket().stage, getTicket().last_event_at], [undefined, undefined]);
-  const lines = readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8');
-  for (const bad of [['--priority', 'P7'], ['--hold', 'maybe'], ['--asked', '1'], ['--project', 'x'.repeat(41)]]) assert.equal(run('ticket', file, '--id', 'T-31', ...bad).code, 2, bad.join(' '));
-  assert.equal(readFileSync(join(dir, 'board.tickets.jsonl'), 'utf8'), lines);
-  // The roll-up: T-9 is as far along as the one ticket under it (60%), though its own line says 45; the file keeps what was written.
-  const tickets = Object.fromEntries(JSON.parse(run('ticket', file, '--json').out).tickets.map((t) => [t.id, t]));
-  assert.deepEqual([tickets['T-9'].progress, tickets['T-9'].priority, tickets['T-9'].project, tickets['T-9'].asked, tickets['T-31'].hold, tickets['T-31'].priority], [60, 'P1', 'Settings', true, true, undefined]);
-  assert.equal(lines.trim().split('\n').map((l) => JSON.parse(l)).filter((t) => t.id === 'T-9').at(-1).progress, 45);
-  // Every way a card gets in takes --ticket, or "ticket" in its message or --from item: flags, an evidence update, contract messages, a feed file and a sign-in.
-  const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name)), session = '5f0c2b7e-9a41-4c3e-8d2a-6b7f1e0c9d34';
-  const report = JSON.parse(readFileSync(join(fx, 'report.v4/valid-minimal.json'), 'utf8'));
-  const posts = [
-    ['raise', file, '--ticket', 'T-29', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?', '--filer', session],
-    ['raise', file, '--ticket', 'T-32', '--key', 'ask-hold-release', '--title', 'Can the rollout proceed now?'],
-    ['raise', file, '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
-    ['raise', file, '--ticket', 'T-404', '--key', 'ask-unknown', '--title', 'Move the theme switch to the top?'],
-    ['post', file, '--type', 'evidence', '--ticket', 'T-29', '--title', 'Settings on a phone', '--about', 'Umer changes the theme in one tap.', '--media', join(dir, 'shot.png')],
-    ['post', file, '--kind', 'design', '--from', fileOf('design.json', { ...JSON.parse(readFileSync(join(fx, 'design.v1/valid-basic.json'), 'utf8')), filed: now }), '--ticket', 'T-29'],
-    ['post', file, '--kind', 'report', '--from', fileOf('report.json', { ...report, filed: now, ticket: 'T-29' })],
-    ['post', file, '--kind', 'plan', '--from', join(fx, 'plan.v3/valid-full.json'), '--ticket', 'T-29'],
-    ['post', file, '--from', fileOf('feed.json', { schema: 2, items: [{ contract: 1, kind: 'ask', schema: 1, key: 'from-linked', title: 'Turn on the settings search?', why: 'Umer asked for it twice this week.', recommend_value: 'yes', recommend_reason: 'It is small.', default_if_silent: 'no',
-      options: [{ value: 'yes', label: 'Yes', outcome: 'Search ships with the page.' }, { value: 'no', label: 'No', outcome: 'It waits.' }] }] }), '--ticket', 'T-29'],
-    ['post', file, '--type', 'signin', '--ticket', 'T-29', '--key', 'npm', '--service', 'npm', '--link', 'https://example.com/login', '--unlocks', 'Publishing the release', '--waits', 'Release agent'],
-  ];
-  for (const args of posts) assert.equal(run(...args).code, 0, args.join(' '));
-  const stored = Object.fromEntries(JSON.parse(readFileSync(file, 'utf8')).items.map((i) => [i.key, i.ticket]));
-  assert.deepEqual(stored, { 'ask-linked': 'T-29', 'ask-hold-release': 'T-32', 'ask-plain': undefined, 'ask-unknown': 'T-404', 'update-1': 'T-29', 'chat-journeys': 'T-29', 'digest-ran': 'T-29', 'faster-sign-in': 'T-29', 'from-linked': 'T-29', npm: 'T-29' });
-  // The captain's own words sit on an ask card as its body, longer than its short title: the board keeps them as written.
-  const askBody = 'Make the settings page ship on Friday, but only if the theme switch is done.\n\nIf it slips, say so on Thursday and move the date. Do not drop the theme switch to make the day.';
-  const filed = JSON.parse(readFileSync(file, 'utf8'));
-  for (const i of filed.items) if (['ask-linked', 'from-linked', 'chat-journeys'].includes(i.key)) i.body = askBody;
-  writeFileSync(file, JSON.stringify(filed));
-  // A bad id, a message naming another ticket than --ticket, and a --replace feed with --ticket are refused, and nothing is written.
-  const before = readFileSync(file, 'utf8');
-  for (const args of [['raise', file, '--ticket', 'T 29', '--key', 'bad-ticket', '--title', 'Ship the settings help page now?'],
-    ['post', file, '--kind', 'report', '--from', fileOf('other.json', { ...report, key: 'other', filed: now, ticket: 'T-1' }), '--ticket', 'T-29'],
-    ['post', file, '--from', join(dir, 'feed.json'), '--replace', '--ticket', 'T-29'], ['validate', fileOf('broken.json', { ...report, ticket: 5 })]]) assert.equal(run(...args).code, 2, args.join(' '));
-  assert.equal(readFileSync(file, 'utf8'), before);
-  // The CLI shows the ticket with its cards, newest first; the card naming no ticket and the one naming a ticket not on the board are not among them.
-  const shown = JSON.parse(run('ticket', file, '--id', 'T-29', '--json').out).ticket;
-  assert.deepEqual([shown.title, shown.progress, shown.parent, shown.cards.length], ['Ship the new settings page', 60, 'T-9', 7]);
-  const times = shown.cards.map((c) => Date.parse(c.filed));
-  assert.deepEqual(times, [...times].sort((x, y) => y - x));
-  assert.deepEqual(Object.fromEntries(shown.cards.map((c) => [c.key, `${c.kind} ${c.status}`])), { npm: 'ask waiting', 'from-linked': 'ask waiting', 'faster-sign-in': 'plan waiting', 'digest-ran': 'report shown', 'chat-journeys': 'design in review', 'update-1': 'proof shown', 'ask-linked': 'ask waiting' });
-  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
-  procs.push(proc);
-  const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const askReleaseBefore = Math.floor(Date.now() / 1000);
-  assert.equal((await post(url, 'api/answers', { key: 'ask-hold-release', answer: 'yes' })).status, 200);
-  const askReleased = JSON.parse(run('ticket', file, '--id', 'T-32', '--json').out).ticket;
-  assert.deepEqual([askReleased.hold, askReleased.state], [false, 'in progress']);
-  assert.ok(askReleased.last_event_at >= askReleaseBefore && askReleased.last_event_at <= Math.floor(Date.now() / 1000), JSON.stringify(askReleased));
-  const askActivity = await (await fetch(`${url}api/state?view=tickets`)).json();
-  assert.ok(Array.isArray(askActivity.ticketActivity) && askActivity.ticketActivity.some((e) => e.ticket === 'T-32' && e.kind === 'release' && e.text === 'Hold released'), JSON.stringify(askActivity));
-  const { evaluate, send, close } = await browse(dir, 390, 844, true);
-  try {
-    // Each linked card's screen shows one Ticket row of its panel (on an ask, Its ask), the ticket's title and progress, opening its page; a card with no ticket, or one not on the board, shows none.
-    const row = `(() => { const top = document.querySelector('#reader:not([hidden])') ?? document; const r = [...top.querySelectorAll('.ui-props a.ui-pr[href^="#ticket/"]')];
-      return r.length + '|' + r.map((x) => x.getAttribute('href') + ' ' + x.getAttribute('aria-label').replace(/^.*?: (.*), (\\d+)% done$/i, '$1 $2%')).join(); })()`;
-    for (const [hash, seen] of [['#decide/ask-linked', 1], ['#decide/ask-plain', 0], ['#decide/ask-unknown', 0], ['#decide/npm', 1], ['#decide/from-linked', 1], ['#evidence/update-1', 1], ['#designs/chat-journeys', 1], ['#reports/digest-ran', 1], ['#waiting/faster-sign-in', 1]]) {
-      await evaluate(`location.href = ${JSON.stringify(url + hash)}`);
-      await until(async () => (await evaluate(`document.querySelector('#board h1, #reader:not([hidden]) h1') !== null && location.hash === ${JSON.stringify(hash)}`)) === true && (await evaluate(row)) === (seen ? '1|#ticket/T-29 Ship the new settings page 60%' : '0|'));
-      assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true, hash);
-    }
-    // A proof's sheet shows its ticket as the Its ask row of its panel, as the prototype names it: the title, a bar once work on it has begun (full at 100%) and the percent, opening the ticket's page.
-    await evaluate(`location.href = ${JSON.stringify(`${url}#evidence/update-1`)}`);
-    await until(async () => (await evaluate('(() => { const r = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].filter((a) => a.getAttribute("href").startsWith("#ticket/")); return r.length + "|" + r.map((x) => x.getAttribute("href") + " " + x.innerText.replace(/\\s+/g, " ").trim() + " " + !!x.querySelector(".ui-bar")).join(); })()')) === '1|#ticket/T-29 Its ask Ship the new settings page 60% true');
-    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-    // On Evidence the proof's row shows done-done's word, not a bar (the opened row's panel and the proof's sheet carry it); a finished ticket shows a full bar at 100%, and one not begun shows no bar: its row shows the project and time, and its panel reads Not started.
-    const bars = `(() => { const row = document.querySelector("#item-update-1 .l2"), sheet = [...document.querySelectorAll("#reader:not([hidden]) .ev-props a.ui-pr")].find((a) => a.getAttribute("href").startsWith("#ticket/"));
-      return JSON.stringify([row?.querySelector(".ui-bar i")?.style.width ?? "none", row?.querySelector(".pct")?.textContent ?? "", sheet?.querySelector(".ui-bar i")?.style.width ?? "none", sheet?.querySelector(".n").textContent]); })()`;
-    for (const [progress, want] of [[100, ['none', '', '100%', '100%']], [0, ['none', '', 'none', 'Not started']], [60, ['none', '', '60%', '60%']]]) {
-      assert.equal(run('ticket', file, '--id', 'T-29', '--progress', String(progress)).code, 0);
-      await evaluate('refresh()');
-      await until(async () => (await evaluate(bars)) === JSON.stringify(want));
-    }
-    // The row opens the ticket over Tickets: its project (its epic's) and where it stands, its title, what it sits under, then its seven cards newest first, each opening where it lives; Close returns to the card.
-    await evaluate(`location.href = ${JSON.stringify(`${url}#decide/ask-linked`)}`);
-    await until(() => evaluate('!!document.querySelector(".decide .ui-props a[href^=\'#ticket/\']")'));
-    await evaluate('document.querySelector(".decide .ui-props a[href^=\'#ticket/\']").click()');
-    await until(async () => (await evaluate('location.hash')) === '#ticket/T-29' && (await evaluate('document.querySelectorAll(".tk-sheet .tk-in li").length')) === 7);
-    const page = JSON.parse(await evaluate(`JSON.stringify({ head: document.querySelector('.tk-sheet .tk-shd .ui-lab > span:last-child').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
-      props: [...document.querySelectorAll('.tk-sheet > .ui-props > .ui-pr')].map((p) => p.innerText.replace(/\\s+/g, ' ').trim()).filter((p) => !p.startsWith('Last update')),
-      rows: [...document.querySelectorAll('.tk-sheet .tk-in a')].map((a) => [a.querySelector('.t').textContent.replace(/^Update \\d+ · /, ''), a.getAttribute('href')]),
-      tab: document.querySelector('#tabs a[aria-current]')?.getAttribute('href'), wide: document.documentElement.scrollWidth > 390 })`));
-    assert.deepEqual({ ...page, rows: page.rows.map(([t]) => t) }, { head: 'Settings · In progress', title: 'Ship the new settings page', props: ['Progress 60%', 'Part of The new settings page', 'Assignee No assignee'], rows: shown.cards.map((c) => c.title), tab: '#tickets', wide: false });
-    assert.deepEqual(['Ship the settings page on Friday?', 'Settings on a phone', 'Approve the chat app journeys?', 'The weekly digest ran'].map((t) => Object.fromEntries(page.rows)[t]), ['#decide/ask-linked', '#evidence/update-1', '#designs/chat-journeys', '#reports/digest-ran']);
-    assert.equal(run('ticket', file, '--id', 'T-29', '--release', '0.6.1', '--state', 'on hold', '--hold-reason', 'waiting on the store review', '--pr', prs[0], '--pr', prs[1]).code, 0);
-    await evaluate('refresh()');
-    await until(() => evaluate('document.querySelector(".tk-sheet .tk-release")?.textContent === "0.6.1"'));
-    assert.equal(await evaluate('document.querySelector(".tk-sheet .tk-shd").textContent.includes("On hold")'), true);
-    assert.deepEqual(JSON.parse(await evaluate('JSON.stringify([...document.querySelectorAll(".tk-sheet .tk-in a[target]")].map(a => a.href))')), prs);
-    for (const [value, word] of [['queued', 'To do'], ['in progress', 'In progress'], ['done', 'Done']]) {
-      assert.equal(run('ticket', file, '--id', 'T-29', '--state', value).code, 0);
-      await evaluate('refresh()');
-      await until(() => evaluate(`document.querySelector('.tk-sheet .tk-shd').textContent.includes(${JSON.stringify(word)})`));
-    }
-    assert.equal(run('ticket', file, '--id', 'T-29', '--release', '', '--state', '', '--pr', '').code, 0);
-    await evaluate('refresh()');
-    await until(() => evaluate('!document.querySelector(".tk-sheet .tk-release")'));
-    await evaluate('document.querySelector(".tk-sheet .tk-shd .x").click()');
-    await until(async () => (await evaluate('location.hash')) === '#decide/ask-linked');
-    // The ticket above it lists the ticket under it, and no card names it.
-    await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-9`)}`);
-    await until(async () => (await evaluate('[...document.querySelectorAll(".tk-sheet a.tk-row")].map((a) => a.getAttribute("href")).join()')) === '#ticket/T-29');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet > .ui-dl, .tk-sheet > .es b")].map((p) => p.textContent).join(" | ")'), 'Description | Assigned | Tickets in this epic · 0 of 1 done | Linked | No cards yet');
-    // A ticket's tiles wear its type's own glyph, never the project's picture or its initials.
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-sheet .tk-shd .ui-icon, .tk-sheet .tk-in .tk-row .ui-icon")].every((t) => /\\btk-tile t-/.test(t.className)) && !document.querySelector(".tk-sheet .mono") && !document.querySelector(".tk-sheet .ui-icon img")'), true);
-    // The Tickets tab lists the tickets under no other, all of them unless the filter's Who asked says From you (T-9 and T-32, which the user asked for) or Fleet upkeep (T-31, on hold). T-29 sits under T-9, so it is not listed on its own.
-    const tab = `JSON.stringify({ seg: [...document.querySelectorAll('.tk-seg button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? ' on' : '')), hero: document.querySelector('.tk-hero').innerText.replace(/\\s+/g, ' ').trim(),
-      lists: [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((x) => x.getAttribute('aria-label') + ' ' + [...x.querySelectorAll('a.tk-row')].map((a) => a.getAttribute('href')).join()) })`;
-    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets/all`)}`);
-    await until(() => evaluate('!!document.querySelector(".tk-hero")'));
-    assert.equal(await evaluate('[...document.querySelectorAll("main .tk-row .ui-icon")].every((t) => /\\btk-tile t-/.test(t.className)) && !document.querySelector("main .tk-row .mono") && !document.querySelector("main .tk-row .ui-icon img")'), true);
-    assert.deepEqual(JSON.parse(await evaluate(tab)), { seg: ['Story', 'Epics', 'All tickets on', 'Activity'], hero: 'All tickets 4 tickets · 0 done · 4 open', lists: ['In progress #ticket/T-9,#ticket/T-32', 'On hold #ticket/T-31'] });
-    const who = (word) => evaluate(`document.querySelector('.tk-rb').click(), [...document.querySelectorAll('#tk-filter .tk-pick')].find((b) => b.textContent.startsWith(${JSON.stringify(word)})).click()`);
-    await who('Fleet upkeep');
-    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
-    await who('From you');
-    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'In progress #ticket/T-9,#ticket/T-32');
-    await who('Everyone');
-    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'In progress #ticket/T-9,#ticket/T-32,On hold #ticket/T-31');
-    await who('Fleet upkeep');
-    await until(async () => JSON.parse(await evaluate(tab)).lists.join() === 'On hold #ticket/T-31');
-    assert.equal(run('ticket', file, '--id', 'new-arrival', '--description', 'Summary line.', '--title', 'A newly synced ticket').code, 0);
-    // No manual refresh: the open Tickets page finds this standalone ticket on its next 20-second poll.
-    await until(async () => JSON.parse(await evaluate(tab)).lists.includes('To do #ticket/new-arrival'));
-    // Activity is collapsed by default on a phone; open it before checking its entries.
-    await evaluate('document.querySelector(".tk-activity > summary").click()');
-    await until(() => evaluate('document.querySelector(".tk-activity").open'));
-    const feed = await evaluate('JSON.stringify([...document.querySelectorAll(".tk-activity .tk-ev")].map((b) => b.getAttribute("aria-label")))');
-    assert.match(feed, /Ticket created/); assert.match(feed, /Stage moved to done/); assert.match(feed, /Progress changed to 60%/); assert.match(feed, /Ticket merged/); assert.match(feed, /Put on hold/);
-    const oldEvent = Math.floor(Date.now() / 1000) - 18 * 3600;
-    const reply = JSON.stringify({ id: 'hold-reply', at: oldEvent, text: 'What should I choose?', picked: oldEvent, replies: [{ at: oldEvent, text: 'Squad Lead' }] });
-    assert.equal(run('ticket', file, '--id', 'T-31', '--comment', reply).code, 0);
-    const inspectRelease = `(async () => { const fresh = await fetch('/api/decisions?view=tickets').then((r) => r.json()), feed = document.querySelector('.tk-activity'); return { ticket: fresh.tickets.find((t) => t.id === 'T-31'), client: state.tickets.find((t) => t.id === 'T-31'), rows: [...document.querySelectorAll('.tk-row')].map((a) => (a.closest('section[aria-label]')?.getAttribute('aria-label') ?? '') + ' ' + a.getAttribute('href')), activityOpen: feed?.open, activityText: [...(feed?.querySelectorAll('.tk-ev') ?? [])].map((b) => b.getAttribute('aria-label')).join(' | ') }; })()`;
-    // The next poll must clear the held row and paint its release event without a reload or manual refresh.
-    await until(async () => { const r = await evaluate(inspectRelease); return !r.ticket.hold && !r.client.hold && r.rows.includes('To do #ticket/T-31') && r.activityOpen && r.activityText.includes('Hold released'); });
-    const releaseCheck = await evaluate(inspectRelease);
-    const released = releaseCheck;
-    assert.equal(released.ticket.hold, false, JSON.stringify(releaseCheck));
-    assert.equal(released.ticket.state, 'queued', JSON.stringify(releaseCheck));
-    assert.equal(released.client.hold, false, JSON.stringify(releaseCheck));
-    assert.ok(released.rows.includes('To do #ticket/T-31'), JSON.stringify(releaseCheck));
-    assert.ok(!released.rows.includes('On hold #ticket/T-31'), JSON.stringify(releaseCheck));
-    await until(() => evaluate('document.querySelector(".tk-activity").open && !!document.querySelector(".tk-activity .tk-ev[aria-label*=\\"Hold released\\"]")'));
-    for (let i = 0; i < 51; i++) assert.equal(run('ticket', file, '--id', `feed-cap-${i}`, '--description', 'Summary line.', '--title', `Feed cap ${i}`).code, 0);
-    await evaluate('refresh()');
-    await until(() => evaluate('document.querySelectorAll(".tk-activity .tk-ev").length === 50'));
-    // A row of the phone's card opens the same view as a sheet over the board; Escape closes it and the focus is back on that row.
-    await evaluate('document.querySelector(".tk-activity .tk-ev").click()');
-    await until(() => evaluate('!!document.querySelector("dialog.tk-evs[open]")'));
-    for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 });
-    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]") && document.activeElement === document.querySelector(".tk-activity .tk-ev")'));
-    await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-    await evaluate(`location.href = ${JSON.stringify(`${url}#ticket/T-31`)}`);
-    await until(() => evaluate('!!document.querySelector(".tk-sheet") && !document.querySelector(".tk-sheet .tk-stuck")'));
-    assert.equal(await evaluate('document.querySelector(".tk-sheet .tk-shd").innerText.includes("On hold")'), false);
-    assert.match(await evaluate('document.querySelector(".tk-sheet .ui-act").innerText'), /Hold released/);
-    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-    // A card's Activity: nothing while its posting is all there is; then each answer with its note, the change, its agent taking it and a new round, oldest first.
-    // The agent posted under a session id, which names nobody, so it reads Agent. The ticket's page shows those steps under the card's name.
-    const thread = (hash) => `(async () => { location.hash = ${JSON.stringify(hash)}; await new Promise((ok) => setTimeout(ok, 50)); const top = document.querySelector('#reader:not([hidden])') ?? document;
-      return [...top.querySelectorAll('.ui-act li')].map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent].filter(Boolean).join(' ')).join(' | '); })()`;
-    assert.equal(await evaluate(thread('#decide/ask-linked')), '');
-    for (const [answer, note] of [['no', 'Not this week.'], ['yes', 'After the Friday stand-up.']]) assert.equal((await post(url, 'api/answers', { key: 'ask-linked', answer, note })).status, 200);
-    assert.equal(run('wait', file, '--filer', session, '--key', 'ask-linked', '--timeout', '5').code, 0);
-    assert.equal((await post(url, 'api/rounds', { key: 'ask-linked', note: 'Show it on a phone first.' })).status, 200);
-    await evaluate('window.old = true, location.reload()');
-    await until(() => evaluate('!window.old'));
-    const steps = ['Your answer: No “Not this week.”', 'Changed to: Yes “After the Friday stand-up.”', 'Delivered to Agent', 'Agent read it', 'You asked for a new round “Show it on a phone first.”'];
-    await until(async () => (await evaluate(thread('#decide/ask-linked'))) === ['Posted by Agent', ...steps].join(' | '));
-    // The ticket shows its cards' steps newest first, each naming its card.
-    const tkThread = `(async () => { location.hash = '#ticket/T-29'; await new Promise((ok) => setTimeout(ok, 50));
-      return [...document.querySelectorAll('.ui-act li')].filter((li) => li.querySelector('.on')).map((li) => [li.querySelector('b').textContent, li.querySelector('.th-n')?.textContent, li.querySelector('.on').textContent].filter(Boolean).join(' ')).join(' | '); })()`;
-    assert.equal(await evaluate(tkThread), [...steps].reverse().map((x) => `${x} Ship the settings page on Friday?`).join(' | '));
-    assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
-    // The Activity tab: every row carries the cards' tags and opens an expanded view, by tap and by key; Escape puts the focus back on the row; the ticket opens from the view.
-    assert.equal(run('ticket', file, '--id', 'T-29', '--progress', '75', '--pr', prs.join(','), '--asked', 'yes', '--filer', 'firstmate-crew').code, 0);
-    await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
-    await evaluate(`location.hash = '#tickets/all'`);
-    await until(() => evaluate('document.querySelectorAll(".tk-seg button").length === 4'));
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-seg button")].map((b) => b.textContent + (b.getAttribute("aria-pressed") === "true" ? " on" : "")).join()'), 'Story,Epics,All tickets on,Activity');
-    await evaluate('document.querySelector(".tk-seg button:last-child").click()');
-    await evaluate('refresh()');
-    const evRow = (text) => `[...document.querySelectorAll('.tk-day .tk-ev')].find((b) => b.getAttribute('aria-label').includes(${JSON.stringify(text)}))`;
-    await until(() => evaluate(`location.hash === '#activity' && !!${evRow('Progress changed to 75%')}`));
-    // Tags as on the In progress cards: the project's icon and name, the priority chip, the stage chip.
-    const tagged = JSON.parse(await evaluate(`JSON.stringify({ days: document.querySelectorAll('.tk-day h2').length > 0, chips: [...document.querySelectorAll('.tk-ev .ui-pc')].map((c) => c.textContent),
-      meta: ${evRow('The new settings page P1, ')}.querySelector('.meta').textContent, icon: !!${evRow('The new settings page P1, ')}.querySelector('.ui-icon img'), button: ${evRow('The new settings page P1, ')}.tagName,
-      bare: [...document.querySelectorAll('.tk-ev')].filter((r) => !r.querySelector('.ui-pc.p0, .ui-pc.p1, .ui-pc.p2, .ui-pc.p3') && r.getAttribute('aria-label').includes('The new settings page')).length })`));
-    assert.deepEqual([tagged.days, tagged.meta, tagged.icon, tagged.button, tagged.bare], [true, 'Settings · Created', true, 'BUTTON', 0]);
-    assert.ok(tagged.chips.includes('P1') && tagged.chips.includes('building'), tagged.chips.join());
-    const open = () => until(() => evaluate('!!document.querySelector("dialog.tk-evs[open]")'));
-    const key = (name, code, vk, text) => send('Input.dispatchKeyEvent', { type: 'keyDown', key: name, code, windowsVirtualKeyCode: vk, ...(text && { text }) }).then(() => send('Input.dispatchKeyEvent', { type: 'keyUp', key: name, code, windowsVirtualKeyCode: vk }));
-    const sheet = `JSON.stringify((() => { const d = document.querySelector('dialog.tk-evs[open]'); return { title: d.querySelector('h2').textContent, text: d.querySelector('.ui-props').innerText.replace(/\\s+/g, ' '), ticket: d.querySelector('a[href^="#ticket/"]').getAttribute('href'),
-      prs: [...d.querySelectorAll('.tk-in a')].map((a) => a.href), time: d.querySelector('time').textContent }; })())`;
-    // Tap.
-    await evaluate(`${evRow('Progress changed to 75%')}.click()`);
-    await open();
-    const seen = JSON.parse(await evaluate(sheet));
-    assert.equal(seen.title, 'Ship the new settings page');
-    assert.match(seen.text, /Progress 60% → to 75%/); assert.match(seen.text, /Made by worker/); assert.doesNotMatch(seen.text, /firstmate/);
-    // T-29 changed many times within a minute: one row for the burst, and the view names every change and the captain's own words with their date.
-    assert.equal(await evaluate(`[...document.querySelectorAll('.tk-day .tk-ev')].filter((b) => b.getAttribute('aria-label').startsWith('Ship the new settings page')).length`), 1);
-    const burstView = JSON.parse(await evaluate(`JSON.stringify({ changes: [...document.querySelectorAll('dialog.tk-evs[open] .tk-chg li')].map((li) => li.textContent), ask: document.querySelector('dialog.tk-evs[open] .tk-ask')?.innerText.replace(/\\s+/g, ' ') })`));
-    assert.ok(burstView.changes.length >= 3 && burstView.changes.some((c) => /Ticket created/.test(c)) && burstView.changes.some((c) => /Progress changed to 60%/.test(c)) && /Progress changed to 75% \(60% → 75%\)/.test(burstView.changes.at(-1)), burstView.changes.join(' | '));
-    assert.match(burstView.ask, /\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/); assert.equal(burstView.ask.replace(/ \d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/, ''), askBody.replace(/\s+/g, ' '));
-    assert.equal(await evaluate(`document.documentElement.scrollWidth <= innerWidth`), true);
-    assert.equal(seen.ticket, '#ticket/T-29'); assert.deepEqual(seen.prs, prs); assert.match(seen.time, /^\d{1,2} \w{3} \d{4}, \d{2}:\d{2}:\d{2}$/);
-    // Escape closes it and the focus is back on the row that opened it.
-    await key('Escape', 'Escape', 27);
-    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
-    assert.equal(await evaluate(`document.activeElement === ${evRow('Progress changed to 75%')}`), true);
-    // Keys: Enter and Space on the focused row open it too.
-    for (const [name, code, vk, text] of [['Enter', 'Enter', 13, '\r'], [' ', 'Space', 32, ' ']]) {
-      await evaluate(`${evRow('Progress changed to 75%')}.focus()`);
-      await key(name, code, vk, text);
-      await open();
-      assert.equal(JSON.parse(await evaluate(sheet)).title, 'Ship the new settings page');
-      await key('Escape', 'Escape', 27);
-      await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
-      assert.equal(await evaluate(`document.activeElement === ${evRow('Progress changed to 75%')}`), true);
-    }
-    // An event written before a writer was named shows no Made by, and a ticket the captain did not ask for shows no words.
-    await evaluate(`${evRow('A newly synced ticket')}.click()`);
-    await open();
-    assert.doesNotMatch(JSON.parse(await evaluate(sheet)).text, /Made by/);
-    assert.equal(await evaluate(`document.querySelector('dialog.tk-evs[open] .tk-ask, dialog.tk-evs[open] .tk-chg')`), null);
-    await key('Escape', 'Escape', 27);
-    await until(() => evaluate('!document.querySelector("dialog.tk-evs[open]")'));
-    // The ticket opens from the view; a modified click stays on the board.
-    await evaluate(`${evRow('Progress changed to 75%')}.click()`);
-    await open();
-    assert.equal(await evaluate(`(() => { const link = document.querySelector('dialog.tk-evs[open] a[href^="#ticket/"]');
-      for (const key of ['ctrlKey', 'metaKey', 'shiftKey', 'altKey']) { const event = new MouseEvent('click', { bubbles: true, cancelable: true, [key]: true });
-        link.addEventListener('click', (e) => e.preventDefault(), { once: true }); link.dispatchEvent(event);
-        if (!document.querySelector('dialog.tk-evs[open]')) return false; }
-      return true; })()`), true);
-    await evaluate(`document.querySelector('dialog.tk-evs[open] a[href^="#ticket/"]').click()`);
-    await until(() => evaluate(`location.hash === '#ticket/T-29' && !!document.querySelector('.tk-pane') && !document.querySelector('dialog.tk-evs[open]')`));
-    // Filters narrow the timeline; one that matches nothing says so and clears.
-    await evaluate(`location.hash = '#activity'`);
-    await until(() => evaluate('!!document.querySelector(".tk-sel")'));
-    const pick = (i, v) => evaluate(`(() => { const s = document.querySelectorAll('.tk-sel')[${i}]; s.value = ${JSON.stringify(v)}; s.dispatchEvent(new Event('change')); })()`);
-    await pick(1, 'P1');
-    assert.equal(await evaluate('[...document.querySelectorAll(".tk-ev")].every((b) => b.querySelector(".ui-pc.p1"))'), true);
-    assert.match(await evaluate('document.querySelector(".tk-count").textContent'), /^\d+ of \d+ events$/);
-    await pick(1, '');
-    await evaluate(`(() => { const s = document.querySelectorAll('.tk-sel')[0]; s.add(new Option('Nowhere', 'Nowhere')); s.value = 'Nowhere'; s.dispatchEvent(new Event('change')); })()`);
-    await until(() => evaluate('document.querySelector(".es")?.textContent.includes("No activity matches")'));
-    await evaluate('[...document.querySelectorAll(".es button")].find((b) => b.textContent === "Clear filters").click()');
-    await until(() => evaluate('document.querySelectorAll(".tk-ev").length > 0'));
-  } finally { close(); }
-  proc.kill();
-});
-
-test('a ticket says who works on it: the tool\'s mark, the model and the lead on its row and in a block on its page, Live for a running worker, a finished task without one, and Unassigned with no Juggernaut home', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const dir = join(scratch, 'assignee'), file = join(dir, 'board.json'), home = join(dir, 'fleet'), state = join(home, 'state');
-  mkdirSync(state, { recursive: true });
-  assert.equal(run('raise', file, '--title', 'Ship the page on Friday?', '--why', 'The page is ready.', '--outcome', 'yes=It ships.', '--outcome', 'no=It waits.', '--recommend', 'yes', '--recommend-reason', 'Every check passed.', '--default', 'no', '--ask-ref', 'assignee-test').code, 0);
-  // Three tickets: a running Claude Code worker, a Pi task that finished, and one no task record names.
-  for (const [id, title, progress] of [['A-1', 'Build the page', '40'], ['A-2', 'Publish it', '70'], ['A-3', 'Write the notes', '10']]) assert.equal(run('ticket', file, '--id', id, '--description', 'Summary line.', '--title', title, '--progress', progress).code, 0);
-  writeFileSync(join(state, 'A-1.meta'), 'window=default:w1:p1\nendpoint_task_id=A-1\ntitle=Build the page\nproject=~/fleet/projects/web-app\nharness=claude\nmodel=claude-opus-5-5\n');
-  writeFileSync(join(state, 'A-1.status'), 'working [at=1]: building\n');
-  writeFileSync(join(state, 'A-2.meta'), 'window=default:w1:p2\nproject=~/fleet/projects/notes\nharness=pi\nmodel=ollama-cloud/deepseek-v4.1-flash\n');
-  writeFileSync(join(state, 'A-2.status'), 'done [at=2]: shipped\n');
-  const open = async (withHome, width, mobile) => {
-    const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env: { ...env, ...(withHome && { SIGN_OFF_FLEET_HOME: home }) }, stdio: ['ignore', 'pipe', 'ignore'] });
-    procs.push(proc);
-    const url = /url: "(\S+)"/.exec(await served(proc))[1], page = await browse(dir, width, 900, mobile);
-    return { url, proc, ...page };
-  };
-  const line = (id) => `(() => { const r = [...document.querySelectorAll('a.tk-row')].find((a) => a.getAttribute('href') === '#ticket/${id}'); const w = r?.querySelector('.tk-as');
-    return w && JSON.stringify({ text: w.innerText.replace(/\\s+/g, ' ').trim(), cls: w.className, logo: w.querySelector('.tk-logo:nth-of-type(2)')?.getAttribute('aria-label') ?? null, vendor: w.querySelector('.tk-logo')?.getAttribute('aria-label') ?? null, vmask: w.querySelector('.tk-logo') ? getComputedStyle(w.querySelector('.tk-logo')).maskImage || getComputedStyle(w.querySelector('.tk-logo')).webkitMaskImage : null, live: !!w.querySelector('.tk-live'),
-      mask: w.querySelector('.tk-logo:nth-of-type(2)') ? getComputedStyle(w.querySelector('.tk-logo:nth-of-type(2)')).maskImage || getComputedStyle(w.querySelector('.tk-logo:nth-of-type(2)')).webkitMaskImage : null }); })()`;
-  const block = (id) => `(async () => { location.hash = '#ticket/${id}'; await new Promise((ok) => setTimeout(ok, 80)); const b = document.querySelector('.tk-assigned'); return b && JSON.stringify([...b.querySelectorAll('.ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim())); })()`;
-  for (const [width, mobile] of [[390, true], [1280, false]]) {
-    const { url, proc, evaluate, close } = await open(true, width, mobile);
-    try {
-      await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
-      await until(async () => !!(await evaluate(line('A-1'))));
-      const a1 = JSON.parse(await evaluate(line('A-1'))), a2 = JSON.parse(await evaluate(line('A-2'))), a3 = JSON.parse(await evaluate(line('A-3')));
-      // A row wears one mark, the model's own (the tool's mark is in the ticket's Assigned block), and says who owns it as lead · model.
-      assert.deepEqual([a1.vendor, /logos\/anthropic\.svg/.test(a1.vmask), a2.vendor, /logos\/deepseek\.svg/.test(a2.vmask), a1.logo, a2.logo], ['Opus 5.5', true, 'DeepSeek V4.1 Flash', true, null, null]);
-      assert.deepEqual([a1.text, a1.live], ['web-app · Opus 5.5 Live', true]);
-      // A finished task names its model but shows no Live.
-      assert.deepEqual([a2.text, a2.live], ['notes · DeepSeek V4.1 Flash', false]);
-      // No record: a quiet word, no mark and no empty box.
-      assert.deepEqual([a3.text, a3.cls, a3.logo], ['No assignee', 'tk-as missing', null]);
-      // The page of a ticket: one labelled block with the lead, worker, model, tool and whether the worker is live.
-      await until(async () => !!(await evaluate(block('A-1'))));
-      assert.deepEqual(JSON.parse(await evaluate(block('A-1'))), ['Assignee web-app · Opus 5.5 Live', 'Lead web-app', 'Worker Build the page', 'Model Opus 5.5', 'Tool Claude Code', 'Worker live Live']);
-      assert.deepEqual(JSON.parse(await evaluate(block('A-2'))), ['Assignee notes · DeepSeek V4.1 Flash', 'Lead notes', 'Worker None running', 'Model DeepSeek V4.1 Flash', 'Tool Pi', 'Worker live Not running']);
-      assert.deepEqual(JSON.parse(await evaluate(block('A-3'))), ['Assignee No assignee']);
-      assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
-      // The row keeps its project icon or kind icon: no monogram tile came with the line.
-      assert.equal(await evaluate('!document.querySelector(".tk-row .mono")'), true);
-    } finally { await close(); await new Promise((ok) => (proc.exitCode !== null ? ok() : (proc.once('exit', ok), proc.kill()))); }
-  }
-  // With no home named the same board reads every ticket as unassigned, and nothing breaks.
-  const { url, proc, evaluate, close } = await open(false, 390, true);
-  try {
-    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets`)}`);
-    await until(async () => !!(await evaluate(line('A-1'))));
-    // A-1 and A-2 are moving with no record, so they read as the defect; A-3 has not started and reads quietly.
-    assert.deepEqual([JSON.parse(await evaluate(line('A-1'))).text, JSON.parse(await evaluate(line('A-2'))).text, JSON.parse(await evaluate(line('A-3'))).text], ['No assignee', 'No assignee', 'No assignee']);
-    assert.equal(await evaluate('document.querySelectorAll(".tk-logo").length'), 0);
-  } finally { await close(); proc.kill(); }
-});
-
-test('Tickets on a phone: with one section expanded, See all on each other section expands it, and a list that moves under the finger before the tap lands does not open a ticket', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
-  const dir = join(scratch, 'see-all'), file = join(dir, 'board.json');
-  mkdirSync(dir, { recursive: true });
-  writeFileSync(file, JSON.stringify({ schema: 2, items: [] }));
-  for (const [list, n, flags] of [['mv', 7, ['--progress', '30']], ['hold', 8, ['--hold', 'yes', '--hold-reason', 'waiting on the store review']], ['todo', 6, []], ['done', 7, ['--progress', '100']]])
-    for (let i = 0; i < n; i++) assert.equal(run('ticket', file, '--id', `${list}${i}`, '--description', 'Summary line.', '--title', `${list} ticket ${i}`, '--asked', 'yes', ...flags).code, 0);
-  const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
-  procs.push(proc);
-  const url = /url: "(\S+)"/.exec(await served(proc))[1];
-  const { evaluate, tap, send, close } = await browse(dir, 390, 844, true);
-  try {
-    const names = ['In progress', 'On hold', 'To do', 'Done'];
-    const see = (name) => `main section[aria-label="${name}"] .ui-sec .see`;
-    const where = (name) => evaluate(`(() => { const e = document.querySelector(${JSON.stringify(see(name))}); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
-    const lists = () => evaluate(`JSON.stringify({ hash: location.hash, rows: Object.fromEntries([...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')].map((s) => [s.getAttribute('aria-label'), s.querySelectorAll('a.tk-row').length])) })`).then((v) => JSON.parse(v));
-    await evaluate(`location.href = ${JSON.stringify(`${url}#tickets/all`)}`);
-    const fresh = async () => { await until(async () => (await evaluate('!!document.querySelector("main section[aria-label] .see")')) === true); await evaluate('window.old = true, location.reload()'); await until(async () => (await evaluate('!window.old && document.querySelectorAll("main section[aria-label] .see").length')) === 4); };
-    const sizes = { 'In progress': 7, 'On hold': 8, 'To do': 6, Done: 7 };
-    await until(() => evaluate('!!document.querySelector(".tk-activity > summary") && document.querySelectorAll("main section[aria-label]:not(.tk-activity)").length === 4'));
-    const activity = await evaluate(`(() => { const feed = document.querySelector('.tk-activity'), lists = [...document.querySelectorAll('main section[aria-label]:not(.tk-activity)')]; return JSON.stringify({ collapsed: !feed.open, listsVisible: lists.length === 4 && lists.every((s) => s.getBoundingClientRect().height > 0), summary: feed.querySelector('summary > span:first-child')?.textContent.trim() }); })()`);
-    assert.deepEqual(JSON.parse(activity), { collapsed: true, listsVisible: true, summary: 'Activity' });
-    await evaluate('document.querySelector(".tk-activity > summary").click()');
-    await until(() => evaluate('document.querySelector(".tk-activity").open'));
-    assert.equal(await evaluate('document.querySelectorAll(".tk-activity .tk-ev").length > 0'), true);
-    assert.equal(await evaluate('document.querySelector(".tk-activity .tk-feed").scrollHeight > document.querySelector(".tk-activity .tk-feed").clientHeight'), true);
-    assert.equal(await evaluate('[...document.querySelectorAll("main section[aria-label]:not(.tk-activity)")].every((s) => s.getBoundingClientRect().height > 0)'), true);
-    // Each section expanded in turn, then See all on every other one: it expands, and no ticket opens.
-    for (const open of names) for (const other of names.filter((n) => n !== open)) {
-      await fresh();
-      await tap(await where(open));
-      await until(async () => (await lists()).rows[open] === sizes[open]);
-      await tap(await where(other));
-      await until(async () => (await lists()).rows[other] === sizes[other]);
-      const now = await lists();
-      assert.equal(now.hash, '#tickets/all', `${open} expanded, See all on ${other} opened ${now.hash}`);
-      assert.deepEqual(now.rows, { 'In progress': 3, 'On hold': 3, 'To do': 3, Done: 3, ...{ [open]: sizes[open], [other]: sizes[other] } });
-    }
-    // The list moves under the finger between touchstart and the tap (the board redraws, the page settles): the tap still does what its See all does.
-    for (const shift of [-30, 30, 60, 120]) {
-      await fresh();
-      await tap(await where('On hold'));
-      await until(async () => (await lists()).rows['On hold'] === 8);
-      const [x, y] = await where('To do');
-      await send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-      await evaluate(`document.querySelector('main').style.paddingTop = 'calc(' + getComputedStyle(document.querySelector('main')).paddingTop + ' + ${shift}px)'`);
-      await send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await until(async () => (await lists()).rows['To do'] === 6);
-      assert.equal((await lists()).hash, '#tickets/all', `a ${shift}px shift opened a ticket`);
-    }
-    // A tap on a row still opens its ticket.
-    await fresh();
-    await tap(await evaluate(`(() => { const e = document.querySelector('main a.tk-row'); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`));
-    await until(async () => /^#ticket\//.test(await evaluate('location.hash')));
-  } finally { close(); }
-  proc.kill();
-});
-
 test('the feedback trail: what the person sends on a card goes Sent, Delivered, Read, then Replied with the agent\'s words and link, on the card, in its Activity, as a badge in the lists and in Today until opened', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'trail'), file = join(dir, 'board.json');
   mkdirSync(dir);
@@ -5272,21 +4915,23 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
   assert.match(run('feedback', 'beta', file, '--reply', 'Kept it to ten teams until the import fix lands.', '--link', 'https://github.com/example/settings/pull/245', '--filer', 'settings-agent').out, /shows: Replied/);
   assert.deepEqual((await trail('beta')).reply, { at: (await trail('beta')).reply.at, text: 'Kept it to ten teams until the import fix lands.', link: 'https://github.com/example/settings/pull/245' });
   // A comment the person made on a ticket in the fleet dashboard arrives in the dashboard's own thread record, again as it moves: delivered, then picked up and answered.
-  assert.equal(run('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export').code, 0);
+  const tk = madeTicket(file, 'Ship the CSV export');
   const sec = Math.floor(Date.now() / 1000), said = { id: '3f9a1c2e7b6d4a10', at: sec - 600, text: 'Is the export in this release?', to: 'release-agent', error: null, picked: null, replies: [] };
-  for (const [args, why] of [[['--id', 'T-2', '--comment', JSON.stringify(said)], /no ticket T-2/], [['--id', 'T-1', '--comment', '{'], /one JSON object/], [['--id', 'T-1', '--comment', JSON.stringify({ ...said, at: 'now' })], /at must be/],
-    [['--id', 'T-1', '--title', 'x', '--comment', JSON.stringify(said)], /on its own/]]) { const r = run('ticket', file, ...args); assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' ')); }
-  assert.match(run('ticket', file, '--id', 'T-1', '--comment', JSON.stringify(said)).out, /shows: Delivered/);
-  assert.match(run('ticket', file, '--id', 'T-1', '--comment', JSON.stringify({ ...said, picked: sec - 500, replies: [{ at: sec - 60, text: 'Yes, it ships Friday with the release.', by: 'release-agent' }] })).out, /shows: Replied/);
+  for (const [args, why] of [[['--id', tk, '--comment', '{'], /one JSON object/], [['--id', tk, '--comment', JSON.stringify({ ...said, at: 'now' })], /at must be/],
+    [['--id', tk, '--set', 'title=x', '--comment', JSON.stringify(said)], /on its own/]]) { const r = run('ticket', file, ...args); assert.notEqual(r.code, 0, args.join(' ')); assert.match(r.out, why, args.join(' ')); }
+  assert.match(run('ticket', file, '--id', tk, '--comment', JSON.stringify(said)).out, /shows: Delivered/);
+  assert.match(run('ticket', file, '--id', tk, '--comment', JSON.stringify({ ...said, picked: sec - 500, replies: [{ at: sec - 60, text: 'Yes, it ships Friday with the release.', by: 'release-agent' }] })).out, /shows: Replied/);
   assert.deepEqual(Object.fromEntries(Object.entries((await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket')).map(([k, v]) => [k, typeof v === 'string' && /^\d{4}-/.test(v) ? 'time' : v])),
-    { id: '3f9a1c2e7b6d4a10', key: 'T-1', kind: 'ticket', said: 'Is the export in this release?', at: 'time', delivered: 'time', read: 'time', reply: { at: (await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket').reply.at, text: 'Yes, it ships Friday with the release.' } });
+    { id: '3f9a1c2e7b6d4a10', key: tk, kind: 'ticket', said: 'Is the export in this release?', at: 'time', delivered: 'time', read: 'time', reply: { at: (await (await fetch(`${url}api/decisions`)).json()).trail.find((t) => t.kind === 'ticket').reply.at, text: 'Yes, it ships Friday with the release.' } });
   const { evaluate, send, close } = await browse(join(dir, 'b'), 390, 844, true);
   try {
     // Today: the reply above Waiting on you, its words as the row's second line.
     await evaluate(`location.href = ${JSON.stringify(url)}`);
     await until(() => evaluate('!!document.querySelector(".t-replies")'));
-    assert.equal(await evaluate('[...document.querySelectorAll(".t-replies .ui-row")].map((r) => r.querySelector(".t").textContent + " / " + r.querySelector(".meta").textContent.replace(/^\\d\\d:\\d\\d · /, "")).join(" | ")'),
-      'Open the beta to every team? / Kept it to ten teams until the import fix lands. | Ship the CSV export / Yes, it ships Friday with the release.');
+    // The ticket's title is read from the adapter once the board has drawn, so the row first says its id.
+    const replies = () => evaluate('[...document.querySelectorAll(".t-replies .ui-row")].map((r) => r.querySelector(".t").textContent + " / " + r.querySelector(".meta").textContent.replace(/^\\d\\d:\\d\\d · /, "")).join(" | ")');
+    await until(async () => (await replies()).includes('Ship the CSV export'));
+    assert.equal(await replies(), 'Open the beta to every team? / Kept it to ten teams until the import fix lands. | Ship the CSV export / Yes, it ships Friday with the release.');
     // Decide: each answered row carries its badge, four marks and the step's word; the reply not opened yet is ink.
     await evaluate('location.hash = "#waiting"');
     await until(async () => (await evaluate('document.querySelectorAll(".ui-tb").length')) === 3);
@@ -5323,7 +4968,7 @@ test('the feedback trail: what the person sends on a card goes Sent, Delivered, 
     assert.equal(await evaluate('document.documentElement.scrollWidth <= 390'), true);
     // Opened, the reply is seen: it leaves Today, and its badge is no longer ink. The ticket shows the comment with its track and the lead's reply, and opening it is seeing that reply.
     await until(async () => !!(await trail('beta')).seen);
-    await evaluate('location.hash = "#ticket/T-1"');
+    await evaluate(`location.hash = "#ticket/${tk}"`);
     await until(() => evaluate('!!document.querySelector(".tk-said .ui-trail")'));
     assert.equal(await evaluate('[document.querySelector(".tk-said .tr-you p").textContent, [...document.querySelectorAll(".tk-said .ui-trail li.on b")].map((b) => b.textContent).join(" "), document.querySelector(".tk-said .tr-said p").innerText.trim()].join(" | ")'),
       'Is the export in this release? | Sent Delivered Read Replied | Yes, it ships Friday with the release.');
@@ -5512,16 +5157,14 @@ const focusColours = `(() => { const el = document.activeElement; if (!el || el 
   if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) out.push([s.outlineColor, 'outline']); if (s.boxShadow !== 'none') out.push([s.boxShadow, 'shadow']);
   return out.map(([v, p]) => v + '|' + el.tagName.toLowerCase() + [...el.classList].slice(0, 2).map((c) => '.' + c).join('') + ':focus-visible ' + p); })()`;
 
-test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence and Tickets, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
+test('the new look draws only the approved prototype\'s colours: Today, Decide, Designs, Reports, Evidence, their sheets and keyboard focus, at 390 and 1280, light and dark', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'palette'), file = join(dir, 'board.json'), fx = new URL('../fixtures/contract/', import.meta.url).pathname, now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   mkdirSync(join(dir, 'design'), { recursive: true });
   for (const f of readdirSync(join(fx, 'design.v1/design'))) writeFileSync(join(dir, 'design', f), readFileSync(join(fx, 'design.v1/design', f)));
   writeFileSync(join(dir, 'shot.png'), png);
   const fileOf = (name, m) => (writeFileSync(join(dir, name), JSON.stringify(m)), join(dir, name));
   // A board with every kind of card on it: asks with and without a priority, a pick-one, a plan, a guided report, a design on a ticket, a proof and a sign-in,
-  // an epic with a ticket under it, a ticket on hold and a system one, so each screen draws its chips, bars, dots and rows.
-  for (const args of [['--id', 'T-9', '--description', 'Summary line.', '--title', 'The new settings page', '--priority', 'P1', '--project', 'Settings', '--asked', 'yes'], ['--id', 'T-29', '--description', 'Summary line.', '--title', 'Ship the new settings page', '--progress', '60', '--parent', 'T-9', '--priority', 'P0', '--stage', 'review', '--last-event-at', '1790000000'],
-    ['--id', 'T-31', '--description', 'Summary line.', '--title', 'Write the release notes', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the store review', '--asked', 'yes', '--stage', 'building', '--last-event-at', '1790000000'], ['--id', 'T-40', '--description', 'Summary line.', '--title', 'Rotate the nightly logs', '--priority', 'P3', '--progress', '100']]) assert.equal(run('ticket', file, ...args).code, 0, args.join(' '));
+  // so each screen draws its chips, bars, dots and rows. The tickets themselves live behind the ticket adapter and have their own journey.
   for (const args of [
     ['raise', file, '--ticket', 'T-29', '--priority', 'P0', '--key', 'ask-linked', '--title', 'Ship the settings page on Friday?'],
     ['raise', file, '--priority', 'P1', '--key', 'ask-plain', '--title', 'Keep the old settings link for a week?'],
@@ -5543,10 +5186,10 @@ test('the new look draws only the approved prototype\'s colours: Today, Decide, 
   // Each state: its address and what is tapped on it, on a phone and on a desk; a report tapped in its list opens its own screen (a sheet on a phone, beside the list on a desk).
   const states = {
     390: [['#', ''], ['#', '.t-more-line'], ['#find', ''], ['#answered', ''], ['#waiting', ''], ['#decide/release-day', '.decide [role="radio"], .decide input[type="radio"]'], ['#decide/npm', ''],
-      ['#reports', ''], ['#reports', '.rp-fb'], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], ['#tickets', ''], ['#ticket/T-29', ''],
+      ['#reports', ''], ['#reports', '.rp-fb'], [`#reports/${keys.report}`, ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#decide/ask-linked', ''], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#evidence', '.ev-more'], [`#evidence/${keys.evidence}`, ''], 
       // Last, an answer and the toast it raises: a yes/no in light, the pick-one in dark.
       [(theme) => (theme === 'light' ? '#decide/ask-plain' : '#decide/release-day'), ['.decide .pick-option', '.decide-bar .answer']]],
-    1280: [['#', ''], ['#find', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', ''], ['#tickets', ''], ['#ticket/T-29', '']],
+    1280: [['#', ''], ['#find', ''], ['#waiting', ''], ['#decide/ask-linked', ''], ['#reports', ''], ['#reports', `.rp-list a[data-row][href="#reports/${keys.report}"]`], ['#designs', ''], [`#designs/${keys.design}`, ''], ['#evidence', '']],
   };
   const off = [];
   for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
@@ -5756,7 +5399,6 @@ test('the inbox: one list of every kind with new replies first, then Decide, the
   const dir = join(scratch, 'inbox'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
   for (const [key, title] of [['open', 'Keep the weekly digest?'], ['asked', 'Ship the settings page Friday?'], ['built', 'Open the beta to every team?'], ['taken', 'Turn on the CSV export?'], ['old', 'Send the digest on Mondays?']]) assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', 'inbox-agent').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-1', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings', '--progress', '40').code, 0);
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
   procs.push(proc);
   const url = /url: "(\S+)"/.exec(await served(proc))[1], state = async () => (await fetch(`${url}api/decisions`)).json();
@@ -5920,11 +5562,11 @@ test('the inbox rail: a row counts the replies not opened and says when the agen
 test('the inbox has #fleet: the agents talking to each other, muted by its own control with a banner saying mentions still land, a mention of a ticket or card that reads its title and opens it, and a search that finds what an agent said', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-fleet'), file = join(dir, 'board.json'), feed = join(dir, 'feed.jsonl'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
+  const tk = madeTicket(file, 'Move the ticket owner');
   assert.equal(run('raise', file, '--key', 'notes', '--title', 'Ship the release notes this week?', '--filer', 'addons-lead').code, 0);
-  assert.equal(run('ticket', file, '--id', 'T-9', '--description', 'Summary line.', '--title', 'Move the ticket owner', '--project', 'Settings').code, 0);
   const sec = Math.floor(Date.now() / 1000);
   writeFileSync(feed, [
-    { ts: sec - 300, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'sign-off', kind: 'status', text: 'It is parked on #tickets/T-9 until the owner move ships.' },
+    { ts: sec - 300, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'sign-off', kind: 'status', text: `It is parked on #tickets/${tk} until the owner move ships.` },
     { ts: sec - 240, home: 'Main', channel: 'task:addons', from: 'signoff-worker', to: 'addons-lead', kind: 'status', text: 'Nothing is unowned on the board now.' },
     { ts: sec - 180, home: 'Main', channel: 'task:addons', from: 'addons-lead', to: 'signoff-worker', kind: 'steer', text: 'Then #waiting/notes needs the chip before that ships.' },
   ].map((r) => JSON.stringify(r)).join('\n') + '\n');
@@ -5945,10 +5587,13 @@ test('the inbox has #fleet: the agents talking to each other, muted by its own c
     assert.deepEqual(ents.map(([t, h]) => [t.includes('#fleet') ? '#fleet' : t.includes('Agents') ? 'Agents' : t, h]), [['#fleet', '#inbox/fleet'], ['Agents', '#channels'], ['Done0', null]]);
     await evaluate('document.querySelector(".ib-fleet").click()');
     await until(() => evaluate('document.querySelectorAll(".ib-msg").length >= 3'));
-    // The agents' own words, the ticket and the card as chips that read a title and open what they name.
-    const chips = await evaluate('JSON.stringify([...document.querySelectorAll(".ib-mention")].map((a) => [a.querySelector("span").textContent, a.querySelector("small").textContent.trim(), a.getAttribute("href")]))').then(JSON.parse);
-    assert.deepEqual(chips, [['Move the ticket owner', '· ticket', '#ticket/T-9'], ['Ship the release notes this week?', '· decision', '#inbox/notes']]);
-    assert.equal(await evaluate('document.body.innerText.includes("T-9")'), false);
+    // The agents' own words, the ticket and the card as chips that read a title and open what they name. The words draw as soon as the channel is read, and a ticket's mention
+    // becomes its chip when the ticket system answers, which a slow adapter delays, so the page is read once both chips are on it.
+    const chipsOf = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-mention")].map((a) => [a.querySelector("span").textContent, a.querySelector("small").textContent.trim(), a.getAttribute("href")]))').then(JSON.parse);
+    await until(async () => (await chipsOf()).length === 2);
+    const chips = await chipsOf();
+    assert.deepEqual(chips, [['Move the ticket owner', '· ticket', `#ticket/${tk}`], ['Ship the release notes this week?', '· decision', '#inbox/notes']]);
+    assert.equal(await evaluate('document.body.innerText.includes("'+tk+'")'), false);
     // Muting is this channel's own control, kept for the next visit, and it says what it does not do.
     assert.equal(await evaluate('document.querySelector(".ib-mute").getAttribute("aria-pressed")'), 'false');
     await evaluate('document.querySelector(".ib-mute").click()');
@@ -5973,9 +5618,9 @@ test('the inbox has #fleet: the agents talking to each other, muted by its own c
 test('the inbox groups threads by agent and topic: an agent\'s cards on one ticket share one thread named by the ticket, another agent or a card with no ticket is its own, and both unread counts, the filters and a card\'s own address still work', { skip: !chrome && !process.env.CI && 'no Chrome on the PATH' }, async () => {
   const dir = join(scratch, 'inbox-groups'), file = join(dir, 'board.json'), pause = () => new Promise((ok) => setTimeout(ok, 1100));
   mkdirSync(dir);
-  assert.equal(run('ticket', file, '--id', 'T-7', '--description', 'Summary line.', '--title', 'Ship the CSV export', '--project', 'Settings').code, 0);
+  const tk = madeTicket(file, 'Ship the CSV export');
   // Two cards of one agent on T-7, one card of another agent on T-7, and one lone ask of the first agent.
-  for (const [key, title, filer, ticket] of [['plan', 'Which columns does the export have?', 'csv-agent', 'T-7'], ['proof', 'Is the export tested?', 'csv-agent', 'T-7'], ['other', 'Who reviews the export?', 'review-agent', 'T-7'], ['lone', 'Rename the export button?', 'csv-agent', '']]) {
+  for (const [key, title, filer, ticket] of [['plan', 'Which columns does the export have?', 'csv-agent', tk], ['proof', 'Is the export tested?', 'csv-agent', tk], ['other', 'Who reviews the export?', 'review-agent', tk], ['lone', 'Rename the export button?', 'csv-agent', '']]) {
     assert.equal(run('raise', file, '--key', key, '--title', title, '--filer', filer, ...(ticket ? ['--ticket', ticket] : [])).code, 0);
   }
   const proc = spawn(process.execPath, [cli, 'serve', file, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'ignore'] });
@@ -5993,8 +5638,8 @@ test('the inbox groups threads by agent and topic: an agent\'s cards on one tick
   try {
     const rows = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-row")].map((r) => [r.querySelector(".ib-ag").textContent, r.querySelector(".t").textContent, r.querySelector(".ib-n")?.textContent ?? "", r.querySelector(".ib-nr")?.textContent ?? ""]).sort())').then(JSON.parse);
     await evaluate(`location.href = ${JSON.stringify(`${url}#inbox`)}`);
-    await until(async () => (await rows()).length === 3);
-    // csv-agent's two cards on T-7 are one thread named by the ticket, with both unsent-reads counted; the other agent's card on the same ticket and the lone ask are their own.
+    await until(async () => (await rows()).length === 3 && (await rows()).filter((r) => r[1] === 'Ship the CSV export').length === 2);
+    // csv-agent's two cards on one ticket are one thread named by the ticket, with both unsent-reads counted; the other agent's card on the same ticket and the lone ask are their own.
     assert.deepEqual(await rows(), [['csv-agent · 2 items', 'Ship the CSV export', '', 'Not read'], ['csv-agent', 'Rename the export button?', '', 'Not read'], ['review-agent', 'Ship the CSV export', '1', '']]);
     assert.equal(await evaluate('document.querySelector(".ib-flt:last-of-type b").textContent'), '2');
     // The thread holds both cards, each as an inline card, and both comments as bubbles on the right (everything here happened in one second, so each card's first words come before what was sent).

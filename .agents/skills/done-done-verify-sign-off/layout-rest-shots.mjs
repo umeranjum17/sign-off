@@ -19,14 +19,12 @@ for (const [side, repo] of [['before', process.env.SIGN_OFF_REPO], ['after', '.'
   assert.equal(seeded.status, 0, `the ${side} board seeded: ${seeded.stderr}`);
   so('stop', board);
   // A ticket with a sub-task and a linked ask, so the sheet shows its key chip and its Linked tile.
-  so('ticket', board, '--id', 'T-7', '--title', 'Settings page polish across phone and desk layouts', '--description', 'Polish the settings page for phone and desk.', '--progress', '40');
-  so('ticket', board, '--id', 'T-8', '--title', 'Sub task for the settings polish', '--description', 'The sub task of the settings polish.', '--progress', '100', '--parent', 'T-7');
   const b = JSON.parse(readFileSync(board, 'utf8'));
   for (const d of b.items) if (d.key === 'ship') Object.assign(d, { ticket: 'T-7', priority: 'P1' });
   writeFileSync(board, JSON.stringify(b, null, 2));
   const key = (f) => b.items.find(f)?.key;
   // head: what the lint reads as the header on a phone (sheet) and on a desk (pane).
-  const routes = [['proof', `#evidence/${key((d) => d.type === 'evidence')}`], ['ticket', '#ticket/T-7'], ['report', `#reports/${key((d) => d.type === 'report')}`], ['designs', '#designs'], ['design', '#designs/look'], ['today', '']];
+  const routes = [['proof', `#evidence/${key((d) => d.type === 'evidence')}`], ['report', `#reports/${key((d) => d.type === 'report')}`], ['designs', '#designs'], ['design', '#designs/look'], ['today', '']];
   const server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, cwd: dir, stdio: ['ignore', 'pipe', 'ignore'] });
   const prof = join(dir, 'chrome'), chrome = spawn(chromium, ['--headless=new', '--no-sandbox', '--disable-gpu', '--hide-scrollbars', `--user-data-dir=${prof}`, '--remote-debugging-port=0', 'about:blank'], { env, stdio: 'ignore' });
   try {
@@ -48,11 +46,6 @@ for (const [side, repo] of [['before', process.env.SIGN_OFF_REPO], ['after', '.'
       const file = `${side}.${name}.${width}.${theme}.png`;
       found[file] = (await evaluate(lint('body', heads))) ?? ['lint did not run'];
       writeFileSync(join(out, file), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
-      // The Linked row sits under the fold on a phone: a second frame, scrolled to it, shows the ask's own mark (never linted, its header is scrolled away).
-      if (name === 'ticket' && (await evaluate(`(() => { const t = document.querySelector('.tk-sheet .tk-in, .tk-pane .tk-in'); if (!t) return false; t.scrollIntoView({ block: 'center' }); return true; })()`))) {
-        await wait(300);
-        writeFileSync(join(out, `${side}.ticket-linked.${width}.${theme}.png`), Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
-      }
     }
     ws.close();
   } finally { chrome.kill(); server.kill(); await wait(300); rmSync(dir, { recursive: true, force: true }); }

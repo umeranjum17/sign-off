@@ -1,0 +1,411 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 6,
+  "filer": "agent-41",
+  "filed": "2026-11-13T09:00:00Z",
+  "key": "invalid-arrows-label-covers-shape",
+  "title": "Whiteboard: Task lifecycle: 14 states, 24 moves",
+  "project": "sign-off",
+  "purpose": "other",
+  "about": "One board draws the whole line, so the person reads every state and move in one place.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Draw the state machine on a whiteboard I can read."
+    }
+  ],
+  "visual": {
+    "type": "tiles",
+    "heading": "One board, every state",
+    "rows": [
+      {
+        "label": "States",
+        "text": "14 on the board"
+      },
+      {
+        "label": "Moves",
+        "text": "24 between them"
+      }
+    ]
+  },
+  "actions": {
+    "role": "addons lead",
+    "first_pull_request": "2026-11-20",
+    "recommended": "approve"
+  },
+  "sections": [
+    {
+      "id": "design",
+      "stage": "recommend",
+      "heading": "The line, drawn",
+      "body": "Each shape is one state; each line is a move between two of them.",
+      "board": {
+        "title": "Task lifecycle: 14 states, 24 moves",
+        "shapes": [
+          {
+            "id": "working",
+            "label": "working",
+            "at": [
+              2,
+              2
+            ],
+            "tone": "start",
+            "note": "The worker is working on it."
+          },
+          {
+            "id": "parked",
+            "label": "parked",
+            "at": [
+              2,
+              3
+            ],
+            "note": "The worker waits for a decision."
+          },
+          {
+            "id": "blocked",
+            "label": "blocked",
+            "at": [
+              0,
+              3
+            ],
+            "note": "The worker is stuck and needs help."
+          },
+          {
+            "id": "paused",
+            "label": "paused",
+            "at": [
+              1,
+              3
+            ],
+            "note": "The worker waits on purpose for something outside."
+          },
+          {
+            "id": "failed",
+            "label": "failed",
+            "at": [
+              1,
+              0
+            ],
+            "note": "The work failed."
+          },
+          {
+            "id": "unknown",
+            "label": "unknown",
+            "at": [
+              2,
+              1
+            ],
+            "note": "No record says what this worker does now."
+          },
+          {
+            "id": "ready-to-land",
+            "label": "ready-to-land",
+            "at": [
+              1,
+              1
+            ],
+            "note": "Finished; waits in the landing queue, #N"
+          },
+          {
+            "id": "landed",
+            "label": "landed",
+            "at": [
+              0,
+              1
+            ],
+            "note": "On the trunk; cleanup runs"
+          },
+          {
+            "id": "cleaned",
+            "label": "cleaned",
+            "at": [
+              0,
+              0
+            ],
+            "tone": "end",
+            "note": "On the trunk and cleaned up."
+          },
+          {
+            "id": "rework",
+            "label": "rework",
+            "at": [
+              1,
+              2
+            ],
+            "note": "The lander named a conflict, or the suite found a red the commit caused and reverted it; the worker fixes it"
+          },
+          {
+            "id": "done",
+            "label": "done",
+            "at": [
+              4,
+              1
+            ],
+            "tone": "end",
+            "note": "The worker finished a task that needs no landing."
+          },
+          {
+            "id": "stale",
+            "label": "stale",
+            "at": [
+              3,
+              2
+            ],
+            "note": "The work is already merged but its backlog row is still open."
+          },
+          {
+            "id": "finished-elsewhere",
+            "label": "finished-elsewhere",
+            "at": [
+              3,
+              1
+            ],
+            "note": "The worker finished and the work is merged, but its backlog row is still open."
+          },
+          {
+            "id": "abandoned",
+            "label": "abandoned",
+            "at": [
+              3,
+              3
+            ],
+            "note": "The pull request was closed without a merge; the owner decides if the work is still wanted."
+          }
+        ],
+        "arrows": [
+          {
+            "id": "m1",
+            "from": "working",
+            "to": "parked",
+            "label": "park",
+            "note": "the worker appends needs-decision"
+          },
+          {
+            "id": "m2",
+            "from": "working",
+            "to": "blocked",
+            "label": "block",
+            "note": "the worker appends blocked"
+          },
+          {
+            "id": "m3",
+            "from": "working",
+            "to": "paused",
+            "label": "pause",
+            "note": "the worker appends paused"
+          },
+          {
+            "id": "m4",
+            "from": "working",
+            "to": "done",
+            "label": "finish",
+            "note": "the worker appends done and the task is not a local-trunk lane"
+          },
+          {
+            "id": "m5",
+            "from": "working",
+            "to": "failed",
+            "label": "merged while its row open",
+            "note": "the worker appends failed or its run fails"
+          },
+          {
+            "id": "m6",
+            "from": "working",
+            "to": "unknown",
+            "label": "lose",
+            "note": "no record names a current state"
+          },
+          {
+            "id": "m7",
+            "from": "working",
+            "to": "stale",
+            "label": "merge missed",
+            "note": "the work merged or landed while the row stayed open"
+          },
+          {
+            "id": "m8",
+            "from": "working",
+            "to": "finished-elsewhere",
+            "label": "finish-unnoticed",
+            "note": "the worker reported done and the work merged while the row stayed open"
+          },
+          {
+            "id": "m9",
+            "from": "working",
+            "to": "abandoned",
+            "label": "close",
+            "note": "the pull request closed unmerged while the row stayed open"
+          },
+          {
+            "id": "m10",
+            "from": "parked",
+            "to": "working",
+            "label": "resume",
+            "note": "the decision is answered"
+          },
+          {
+            "id": "m11",
+            "from": "blocked",
+            "to": "working",
+            "label": "resume",
+            "note": "the blocker is cleared"
+          },
+          {
+            "id": "m12",
+            "from": "paused",
+            "to": "working",
+            "label": "resume",
+            "note": "the wait ends"
+          },
+          {
+            "id": "m13",
+            "from": "failed",
+            "to": "working",
+            "label": "relaunch",
+            "note": "the owner starts the worker again"
+          },
+          {
+            "id": "m14",
+            "from": "unknown",
+            "to": "working",
+            "label": "relaunch",
+            "note": "the owner starts the worker again"
+          },
+          {
+            "id": "m15",
+            "from": "stale",
+            "to": "done",
+            "label": "close",
+            "note": "the owner closes the row"
+          },
+          {
+            "id": "m16",
+            "from": "finished-elsewhere",
+            "to": "done",
+            "label": "close",
+            "note": "the owner closes the row"
+          },
+          {
+            "id": "m17",
+            "from": "abandoned",
+            "to": "done",
+            "label": "close",
+            "note": "the owner decides the work is not wanted"
+          },
+          {
+            "id": "m18",
+            "from": "abandoned",
+            "to": "working",
+            "label": "relaunch",
+            "note": "the owner decides the work is still wanted"
+          },
+          {
+            "id": "m19",
+            "from": "working",
+            "to": "ready-to-land",
+            "label": "report-done",
+            "note": "the worker appends done on a local-trunk lane"
+          },
+          {
+            "id": "m20",
+            "from": "ready-to-land",
+            "to": "landed",
+            "label": "land",
+            "note": "the lander rebases the one commit and lands it, one lane at a time"
+          },
+          {
+            "id": "m21",
+            "from": "ready-to-land",
+            "to": "rework",
+            "label": "conflict",
+            "note": "the lander names a conflict or a failing check; a moved trunk is no edge, the lander rebases"
+          },
+          {
+            "id": "m22",
+            "from": "landed",
+            "to": "rework",
+            "label": "verify-red",
+            "note": "the whole suite found a red this commit caused and the commit was reverted"
+          },
+          {
+            "id": "m23",
+            "from": "landed",
+            "to": "cleaned",
+            "label": "clean-up",
+            "note": "cleanup runs unforced"
+          },
+          {
+            "id": "m24",
+            "from": "rework",
+            "to": "ready-to-land",
+            "label": "report-done",
+            "note": "the worker fixes the refusal and appends done for the new head"
+          }
+        ],
+        "zones": [
+          {
+            "id": "waits",
+            "label": "Three ways to wait",
+            "around": [
+              "parked",
+              "paused",
+              "blocked"
+            ]
+          },
+          {
+            "id": "open-rows",
+            "label": "Rows that stayed open",
+            "around": [
+              "stale",
+              "finished-elsewhere",
+              "abandoned"
+            ]
+          }
+        ],
+        "steps": [
+          {
+            "title": "A worker starts in working",
+            "text": "Every task begins here. Ten moves leave this state.",
+            "focus": [
+              "working"
+            ]
+          },
+          {
+            "title": "Three ways to wait, one way back",
+            "text": "Parked waits for a decision, blocked needs help, paused waits on purpose. Each resumes to working.",
+            "focus": [
+              "waits",
+              "working"
+            ]
+          },
+          {
+            "title": "The landing lane",
+            "text": "Done on a local-trunk lane means ready to land. A conflict or a red check sends the work to rework.",
+            "focus": [
+              "working",
+              "ready-to-land",
+              "landed",
+              "cleaned",
+              "rework"
+            ]
+          },
+          {
+            "title": "Rows that stayed open",
+            "text": "The work merged or closed while its backlog row stayed open. The owner closes the row.",
+            "focus": [
+              "open-rows",
+              "done"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "next": {
+    "heading": "Say go and the person reads it in Reports",
+    "lines": [
+      "The board reads as a list of shapes, moves and steps until the canvas lands."
+    ]
+  }
+}

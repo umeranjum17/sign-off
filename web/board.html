@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#E8E4E0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131210" media="(prefers-color-scheme: dark)">
+<title>Board · sign-off</title>
+<link rel="stylesheet" href="/tokens.css">
+<!-- The canvas files ship inside the package (web/board/, built by npm run build:board) and the editor asks this board for them, never a CDN. -->
+<script>window.EXCALIDRAW_ASSET_PATH = '/board/';</script>
+<link rel="stylesheet" href="/board/board.css">
+<style>
+  /* The board the agent drew, opened full screen: one bar of sign-off's, the canvas filling the rest, one quiet line at the foot.
+     Every colour is a token of the board's own theme, so a board in light or dark looks like the page it was opened from. */
+  * { box-sizing: border-box; min-width: 0; }
+  /* Two fingers belong to the board, never to the page: the browser keeps no pinch-zoom or rubber band of its own here. */
+  html, body { height: 100%; margin: 0; touch-action: none; overscroll-behavior: none; }
+  body { background: var(--tk-canvas); color: var(--tk-text); font-family: var(--tk-font); -webkit-text-size-adjust: 100%; }
+  .app { height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .bar { display: grid; grid-template-columns: minmax(225px, .9fr) minmax(250px, 1.4fr) auto; align-items: center; gap: calc(var(--tk-sp-4) * 2); padding: var(--tk-sp-4) calc(var(--tk-sp-4) * 1.5); background: var(--tk-raised); border-bottom: 1px solid var(--tk-line); }
+  .kicker { display: block; margin: 0 0 var(--tk-sp-2); color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); font-weight: var(--tk-fw-semibold); text-transform: uppercase; letter-spacing: .1em; line-height: 1.5; }
+  h1 { margin: 0; font-size: var(--tk-fs-head); font-weight: var(--tk-fw-semibold); letter-spacing: -.025em; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .explanation { display: flex; align-items: baseline; gap: var(--tk-sp-3); font-size: var(--tk-fs-row); line-height: 1.6; }
+  .step-label { flex: none; color: var(--tk-text-tertiary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .step-copy { color: var(--tk-text-secondary); max-width: 30ch; }
+  .acts { display: flex; align-items: center; gap: var(--tk-sp-2); }
+  .button { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-height: var(--tk-tap); min-width: var(--tk-tap); padding: var(--tk-sp-2) var(--tk-sp-3); border: 1px solid transparent; border-radius: var(--tk-r-ctl); background: transparent; color: var(--tk-text-secondary); font: var(--tk-fw-medium) var(--tk-fs-row)/1.25 var(--tk-font); text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .button[aria-pressed="true"] { border-color: var(--tk-text-secondary); color: var(--tk-text); }
+  .button.primary { background: var(--tk-go); color: var(--tk-on-go); border-color: var(--tk-go); }
+  .button.exit { margin-right: var(--tk-sp-2); padding-left: var(--tk-sp-2); color: var(--tk-text-secondary); }
+  .button.exit svg { width: var(--tk-icon-s); height: var(--tk-icon-s); margin-right: var(--tk-sp-1); }
+  .button:disabled { color: var(--tk-text-tertiary); cursor: default; }
+  .button:focus-visible { outline: 2px solid var(--tk-go); outline-offset: 3px; }
+  @media (hover: hover) { .button:hover:not(:disabled) { border-color: var(--tk-line); color: var(--tk-text); } .button.primary:hover { border-color: var(--tk-text); color: var(--tk-on-go); } }
+  /* The editor takes the canvas box exactly: absolute edges give it the height a percentage cannot resolve against. */
+  .canvas { position: relative; min-height: 0; overflow: hidden; background: var(--tk-canvas); }
+  .canvas > .excalidraw { position: absolute; inset: 0; height: auto; }
+  /* Two fingers always move the board: the browser keeps its own pinch for the page elsewhere, never here. */
+  .canvas, .canvas .excalidraw, .canvas canvas { touch-action: none; }
+  /* The editor is in view mode, and anything of its own interface that a later version shows is taken out of view here:
+     the bar above is sign-off's, and the journey fails if a control of the editor is on screen. */
+  .canvas .excalidraw .layer-ui__wrapper, .canvas .excalidraw .App-bottom-bar, .canvas .excalidraw .App-top-bar, .canvas .excalidraw .App-menu,
+  .canvas .excalidraw .FixedSideContainer, .canvas .excalidraw .Island, .canvas .excalidraw .scroll-back-to-center, .canvas .excalidraw .scroll-back-to-content,
+  .canvas .excalidraw .excalidraw-contextMenuContainer, .canvas .excalidraw .dropdown-menu, .canvas .excalidraw .HelpButton { display: none !important; }
+  .footer { margin: 0; padding: var(--tk-sp-3) calc(var(--tk-sp-4) * 1.5); border-top: 1px solid var(--tk-line); background: var(--tk-canvas); color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: 1.6; }
+  .footer[hidden] { display: none; }
+  @media (max-width: 1100px) and (min-width: 761px) {
+    .bar { grid-template-columns: minmax(0, 1fr) auto; gap: var(--tk-sp-3) var(--tk-sp-4); }
+    .explanation { grid-column: 1; grid-row: 2; } .step-copy { max-width: none; }
+    .acts { grid-column: 2; grid-row: 1 / 3; }
+  }
+  @media (max-width: 760px) {
+    .bar { grid-template-columns: minmax(0, 1fr); gap: var(--tk-sp-4); padding: var(--tk-sp-4); }
+    .explanation { gap: var(--tk-sp-3); } .step-copy { max-width: none; }
+    .acts { justify-content: space-between; padding-top: var(--tk-sp-3); border-top: 1px solid var(--tk-line); }
+    .button { padding: var(--tk-sp-2) var(--tk-sp-2); } .button.exit { margin-right: 0; padding-left: var(--tk-sp-2); }
+    .footer { padding: var(--tk-sp-3) var(--tk-sp-4); }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="bar">
+    <div class="identity">
+      <p class="kicker">Agent&rsquo;s board</p>
+      <h1 id="title">Loading the board&hellip;</h1>
+    </div>
+    <div class="explanation" aria-live="polite">
+      <span class="step-label" id="count"></span>
+      <span class="step-copy" id="words">The agent&rsquo;s drawing and the steps that explain it.</span>
+    </div>
+    <nav class="acts" aria-label="Board controls">
+      <a class="button exit" id="exit" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Back</a>
+      <button class="button" id="prev" type="button" disabled>Previous</button>
+      <button class="button primary" id="next" type="button" disabled>Next</button>
+      <button class="button" id="move" type="button" aria-pressed="true">Move</button>
+      <button class="button" id="fit" type="button">Fit</button>
+    </nav>
+  </header>
+  <section class="canvas" id="canvas" role="img" aria-label="The board the agent drew"></section>
+  <p class="footer" id="hint">Move around with two fingers, or drag with Move. Fit shows the whole board.</p>
+</main>
+<script type="module">
+  // The canvas bundle draws the scene; this page is sign-off's own and reads only the scene the server checked and measured.
+  import '/board/board.js';
+  const [, , key, section] = location.pathname.split('/');
+  const $ = (id) => document.getElementById(id);
+  const exit = $('exit');
+  if (key) exit.href = `/#reports/${encodeURIComponent(key)}`;
+  // Light or dark is the board's own pick first, then the system's. A pick turns each dark-scheme media rule of the page's sheets on or off,
+  // the same way the board's own pages follow it, so this page is never the wrong colour under the board it was opened from.
+  const pick = (() => { try { return localStorage.getItem('so-theme'); } catch { return null; } })();
+  if (pick) {
+    for (const sheet of document.styleSheets) {
+      let rules = [];
+      try { rules = [...sheet.cssRules]; } catch {}
+      for (const rule of rules) {
+        const media = rule.media?.mediaText;
+        if (media && /prefers-color-scheme/.test(media)) rule.media.mediaText = media.replace(/\(\s*prefers-color-scheme:\s*(dark|light)\s*\)/g, (_, s) => (s === pick ? '(min-width: 0px)' : '(max-width: 0.001px)'));
+      }
+    }
+  }
+  const dark = (pick ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark';
+  document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+  const fail = (why) => {
+    $('hint').hidden = true;
+    $('canvas').innerHTML = '';
+    $('words').textContent = `${why} The report shows this board as a list of its steps, shapes and moves.`;
+  };
+  let data;
+  try {
+    const reply = await fetch(`/api/board/${encodeURIComponent(key)}/${encodeURIComponent(section)}`);
+    if (!reply.ok) throw new Error((await reply.json().catch(() => ({}))).error ?? 'The board could not be read.');
+    data = await reply.json();
+  } catch (e) { fail(e.message); throw e; }
+  document.title = `${data.title} · Board · sign-off`;
+  $('title').textContent = data.title;
+  if (!data.steps.length) $('words').textContent = 'The agent drew this board without steps.';
+  let at = -1;
+  // The canvas paints the board's own paper colour, so a board looks like the page it was opened from and the bar stands out from it.
+  // In dark the editor inverts its whole canvas, as its own dark theme does, so it is given the light paper it inverts.
+  const paper = dark ? '#ffffff' : getComputedStyle(document.body).getPropertyValue('--tk-canvas').trim() || '#ffffff';
+  const mounted = await WB.mount($('canvas'), { scene: data.elements, theme: dark ? 'dark' : 'light', background: paper });
+  /** The frame of the step in view: the elements it names, or the whole board before the first one. */
+  const fit = () => { const step = data.steps[at]; if (step?.ids.length) WB.fit(mounted.api, step.ids); else WB.fit(mounted.api); };
+  // The fit needs the canvas size the editor itself has taken in, and the bar grows as a step's words wrap: it is made again two frames
+  // later, once the editor has measured the box it now has. Zooming changes no layout, so this settles at once instead of repeating itself.
+  let pending = 0;
+  const refit = () => { cancelAnimationFrame(pending); pending = requestAnimationFrame(() => { pending = requestAnimationFrame(fit); }); };
+  /** One step's words and the shapes it frames; before the first step the whole board is in view. */
+  const show = (n) => {
+    at = Math.max(-1, Math.min(n, data.steps.length - 1));
+    const step = data.steps[at];
+    if (step) {
+      $('count').textContent = `${at + 1} of ${data.steps.length}`;
+      $('words').textContent = step.text ? `${step.title} — ${step.text}` : step.title;
+    } else if (data.steps.length) {
+      $('count').textContent = '';
+      $('words').textContent = `${data.steps.length} steps. Next begins.`;
+    }
+    $('prev').disabled = at < 0;
+    $('next').disabled = at >= data.steps.length - 1;
+    refit();
+  };
+  new ResizeObserver(refit).observe($('canvas'));
+  $('prev').onclick = () => show(at - 1);
+  $('next').onclick = () => show(at + 1);
+  $('move').onclick = () => { mounted.api.setActiveTool({ type: 'hand' }); $('move').setAttribute('aria-pressed', 'true'); };
+  $('fit').onclick = () => show(at);
+  show(data.steps.length ? -1 : 0);
+</script>
+</body>
+</html>

@@ -565,7 +565,7 @@ test('post --kind: one message from a file or stdin, checked against its kind, r
   // A key takes only the same message again: another filer, another filed time, or a plain item under it is a conflict.
   for (const [input, args, error, help] of [
     ['', ['--kind', 'ask', '--from', file, '--filer', 'agent-99'], /already holds a different message/, /Post it under a new key/],
-    [JSON.stringify({ ...report, filed: '2026-10-14T07:19:00Z' }), ['--kind', 'report', '--from', '-'], /key slice-5-live already holds a different message/, /Post it under a new key/],
+    [JSON.stringify({ ...report, filed: '2026-10-14T07:19:00Z' }), ['--kind', 'report', '--from', '-'], /key slice-5-live: version 1 is already posted/, /Keep this key/],
     [JSON.stringify({ ...ask, key: 'plain' }), ['--kind', 'ask', '--from', '-'], /key plain already holds a different message/, /Post it under a new key/],
     [JSON.stringify({ ...ask, recommend_value: undefined }), ['--kind', 'ask', '--from', '-'], /stdin: key ship-signin-2: recommend_value is required/, /Add \\"recommend_value\\"/],
     ['', ['--kind', 'report', '--from', file], new RegExp(`${file}: key ship-signin-2: kind is ask, not --kind report`), /Pass --kind ask/],
@@ -1227,10 +1227,13 @@ test('post --kind evidence: media copied and hashed from the message folder, a r
   assert.equal(other.status, 2, other.stdout);
   assert.match(other.stdout, /key signin-phone-2 already holds a different message[^]*Post it under a new key/);
   // No key: the next update number; a run with no media is stored as the update's evidence field.
-  const ran = post(readFileSync(join(fixtures, 'evidence.v1', 'valid-run.json')), '--kind', 'evidence', '--from', '-');
+  const input = JSON.parse(readFileSync(join(fixtures, 'evidence.v1', 'valid-run.json')));
+  Object.assign(input.run, { proof_series_id: 'series', current_head: input.run.commit, proof_verdict: 'pass', proof_ref: { path: 'receipt.json', sha256: 'a'.repeat(64), issuer: 'done-done', validated: true }, release_state: { state: 'unreleased' } });
+  const ran = post(JSON.stringify(input), '--kind', 'evidence', '--from', '-');
   assert.match(ran.stdout, /update-2,2,0,Sign-in screen on a phone,posted/);
   const [, update] = items();
   assert.deepEqual([update.type, update.kind, update.media, update.evidence.commit, update.run], ['evidence', 'evidence', undefined, '0123456789abcdef0123456789abcdef01234567', undefined]);
+  assert.deepEqual(update.evidence, input.run);
   assert.equal(spawnSync('node', [cli, ...asked(['raise', board, '--title', 'Plain?', '--key', 'plain'])], { encoding: 'utf8', env }).status, 0);
   // Media that leads out of the folder, to a non-image or to an unreadable file, evidence in any feed, and a contract key conflict in a feed:
   // each exits 2 and writes nothing.

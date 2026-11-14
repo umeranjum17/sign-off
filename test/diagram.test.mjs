@@ -262,4 +262,11 @@ test('document layout preserves authored text, inline local links and block orde
   } finally { proc.kill(); }
   const bad = { ...report, key: 'bad-document', sections: [{ ...report.sections[0], blocks: [{ type: 'text', text: '[No](../outside.md)' }] }] };
   assert.match(post(bad).stdout, /must be a relative file path/);
+  // A long original keeps its flow: 40 blocks in a section and a table of 100 rows post; one more block or row is refused with the limit named.
+  const flow = (blocks) => ({ ...report, key: 'long-document', sections: [{ ...report.sections[0], blocks }] });
+  const parts = (n) => Array.from({ length: n }, (_, i) => ({ type: 'text', text: `Part ${i}` }));
+  const table = (n) => ({ type: 'table', columns: ['Item', 'State'], rows: Array.from({ length: n }, (_, i) => [`Row ${i}`, 'open']) });
+  assert.equal(post(flow([...parts(39), table(100)])).status, 0);
+  assert.match(post(flow(parts(41))).stdout, /must list 1 to 40 blocks/);
+  assert.match(post(flow([table(101)])).stdout, /must list 1 to 100 rows/);
 });

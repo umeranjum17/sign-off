@@ -13,7 +13,10 @@ if (!lighthouse || !existsSync(lighthouse)) throw new Error('Set LIGHTHOUSE_CLI 
 if (existsSync(join(out, 'board'))) throw new Error('Use a new evidence folder to preserve previous measurements');
 const boardDir = join(out, 'board'), board = join(boardDir, 'board.json');
 mkdirSync(boardDir, { recursive: true }); mkdirSync(join(out, 'tmp'), { recursive: true });
-const env = { ...process.env, PATH: `/usr/bin:${dirname(process.execPath)}:${process.env.PATH}` };
+// The tickets live behind the ticket adapter; the repo's stand-in adapter keeps them in its own folder, which the served board reads through SIGN_OFF_TICKETS_ADAPTER.
+const standin = join(out, 'standin');
+mkdirSync(standin, { recursive: true });
+const env = { ...process.env, PATH: `/usr/bin:${dirname(process.execPath)}:${process.env.PATH}`, SIGN_OFF_TICKETS_ADAPTER: resolve(repo, 'test/support/ticket-adapter-standin.mjs'), TICKET_STANDIN_DIR: standin };
 const isolated = { ...env, HOME: boardDir, XDG_CONFIG_HOME: join(boardDir, '.config'), XDG_DATA_HOME: join(boardDir, '.local/share'), XDG_STATE_HOME: join(boardDir, '.local/state'), XDG_CACHE_HOME: join(boardDir, '.cache') };
 const run = (cmd, args, options = {}) => {
   const r = spawnSync(cmd, args, { cwd: repo, env, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, ...options });
@@ -29,7 +32,9 @@ try {
     const b = JSON.parse(readFileSync(board)), samples = [b.items[0], b.items[5], b.items[8], b.items[4]], projects = ['Beacon', 'Harbour', 'Atlas', 'Cedar'], now = Date.now();
     b.items = Array.from({ length: 60 }, (_, i) => ({ ...samples[i % 4], key: `perf-${i}`, title: `${samples[i % 4].title} · ${i + 1}`, filed: new Date(now - i * 1000).toISOString(), ticket: `T-${i + 1}`, project: projects[i % 4], priority: `P${i % 4}` }));
     writeFileSync(board, JSON.stringify(b));
-    writeFileSync(board.replace('.json', '.tickets.jsonl'), Array.from({ length: 80 }, (_, i) => JSON.stringify({ id: `T-${i + 1}`, title: `Deliver Umer’s project milestone ${i + 1}`, progress: (i % 11) * 10, asked: i % 3 !== 0, project: projects[i % 4], priority: `P${i % 4}`, at: new Date(now).toISOString(), ...(i % 10 ? { parent: `T-${Math.floor(i / 10) * 10 + 1}` } : {}) })).join('\n') + '\n');
+    const stamp = new Date(now).toISOString().replace(/\.\d+Z$/, 'Z');
+    const tickets = Array.from({ length: 80 }, (_, i) => ({ id: `T-${i + 1}`, rev: `r-${i + 1}`, title: `Deliver Umer’s project milestone ${i + 1}`, body: '', kind: 'kind-a', status: `stage-${(i % 3) + 1}`, assignee: null, labels: [], parent: i % 10 ? `T-${Math.floor(i / 10) * 10 + 1}` : null, links: [], created_at: stamp, updated_at: stamp, extra: {} }));
+    writeFileSync(join(standin, 'store.json'), JSON.stringify({ counter: 80, tickets, events: {}, ops: {} }));
     await fetch(`${base}api/decisions`);
   }
   for (const [name, hash] of routes) for (const form of ['mobile', 'desktop']) for (const scheme of ['light', 'dark']) {

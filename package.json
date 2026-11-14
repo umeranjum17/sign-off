@@ -1,6 +1,6 @@
 {
   "name": "sign-off-axi",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "description": "Answer your coding agents’ questions and review their work from one board.",
   "type": "module",
   "bin": { "sign-off-axi": "dist/cli.js" },
@@ -12,11 +12,12 @@
   "keywords": ["coding-agents", "ai-agents", "human-in-the-loop", "approvals", "decisions", "code-review", "cli", "plans", "reports", "evidence"],
   "scripts": {
     "build": "tsc",
+    "build:board": "node scripts/build-board.mjs",
     "build:skill": "tsc && node dist/skill.js",
     "build:demo": "node scripts/build-demo.mjs",
-    "prepack": "tsc",
+    "prepack": "tsc && node scripts/build-board.mjs",
     "test": "tsc && node scripts/slop-lint.mjs && node --test --test-global-setup=test/temp-folder.mjs test/*.test.mjs"
   },
   "dependencies": { "@toon-format/toon": "2.3.1", "axi-sdk-js": "0.1.13", "jpeg-js": "0.4.4" },
-  "devDependencies": { "@types/node": "^26.6.5", "typescript": "^7.0.2" }
+  "devDependencies": { "@excalidraw/excalidraw": "0.18.1", "@types/node": "^26.6.5", "esbuild": "0.25.10", "react": "19.0.0", "react-dom": "19.0.0", "typescript": "^7.0.2" }
 }

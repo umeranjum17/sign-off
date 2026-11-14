@@ -1,5 +1,5 @@
 // The README's pictures: the real board for Umer on a board of its own, at 390x844 (phone, 2x) and 1280x800 (desk, 1x), light and dark, in a headless Chromium of its own over the DevTools
-// protocol. Today, Decide (asks, Taken without you, the Leash chip), a report in the reader with its action bar, Evidence with Previews on, the Tickets epic tree, Designs (phone) and
+// protocol. Today, Decide (asks, Taken without you, the Leash chip), a report in the reader with its action bar, Evidence with Previews on, a ticket, Designs (phone) and
 // Today's More with its Install app row (phone). Every project has its own icon, so no list shows a letter tile; the run fails on a letter tile, overflow, a console error, a failed request or a token in a frame.
 // Usage: node .agents/skills/done-done-verify-sign-off/readme-shots.mjs <output>   (after npm run build)
 // Saves <shot>.<theme>.<width>w.png with its .dom.json, and steps.json.
@@ -12,7 +12,8 @@ const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT), rep
 mkdirSync(out, { recursive: true });
 const dir = mkdtempSync(join(tmpdir(), 'so-rm-')), board = join(dir, 'board.json');
 const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, '.config'), XDG_DATA_HOME: join(dir, '.local/share'),
-  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache') };
+  XDG_STATE_HOME: join(dir, '.local/state'), XDG_CACHE_HOME: join(dir, '.cache'),
+  SIGN_OFF_TICKETS_ADAPTER: join(repo, 'test/support/ticket-adapter-standin.mjs'), TICKET_STANDIN_DIR: join(dir, 'standin') };
 delete env.SIGN_OFF_FILER; delete env.CLAUDE_CODE_SESSION_ID;
 const sh = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, env, ...options }); assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
@@ -32,14 +33,12 @@ try {
   icon('beacon', '#0f766e', '#fff', '<circle cx="32" cy="32" r="8" fill="B"/><circle cx="32" cy="32" r="17" fill="none" stroke="B" stroke-width="4" opacity=".7"/><circle cx="32" cy="32" r="26" fill="none" stroke="B" stroke-width="3" opacity=".4"/>');
   icon('harbor', '#b45309', '#fff', '<path d="M32 12v34M20 24h24M14 40c4 10 12 12 18 12s14-2 18-12" fill="none" stroke="B" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="14" r="4" fill="B"/>');
   for (const [n, f] of [['sign-off', 'sign-off.svg'], ['Beacon', 'beacon.svg'], ['Harbor', 'harbor.svg']]) so('project', board, '--name', n, '--icon', f);
-  const tk = (id, title, project, extra = []) => so('ticket', board, '--id', id, '--description', 'Summary line.', '--title', title, '--project', project, ...extra);
-  tk('E-1', 'Settings page, start to finish', 'sign-off', ['--asked', 'yes', '--priority', 'P1', '--release', '0.6.5']);
-  tk('T-41', 'Ship the new settings page', 'sign-off', ['--parent', 'E-1', '--progress', '70', '--pr', 'https://github.com/umeranjum17/sign-off/pull/241', '--state', 'in progress']);
-  tk('T-42', 'Settings on a phone', 'sign-off', ['--parent', 'T-41', '--progress', '100', '--state', 'done', '--pr', 'https://github.com/umeranjum17/sign-off/pull/239']);
-  tk('T-43', 'Theme in one tap', 'sign-off', ['--parent', 'T-41', '--progress', '40']);
-  tk('T-44', 'Export settings as a file', 'sign-off', ['--parent', 'E-1', '--progress', '0', '--state', 'queued']);
-  tk('T-12', 'Push service for the beta', 'Beacon', ['--progress', '30', '--priority', 'P2', '--hold', 'yes', '--hold-reason', 'waiting on the beta push', '--state', 'on hold']);
-  tk('T-7', 'Tide table on the harbor screen', 'Harbor', ['--asked', 'yes', '--progress', '60']);
+  // The tickets live behind the ticket adapter: the repo's stand-in adapter keeps them in its own folder, which the served board reads. Its words (stage-1 ...) are its own.
+  const stamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z'), tickets = [['E-1', 'Settings page, start to finish', null, 'stage-2'], ['T-41', 'Ship the new settings page', 'E-1', 'stage-2'], ['T-42', 'Settings on a phone', 'T-41', 'stage-3'],
+    ['T-43', 'Theme in one tap', 'T-41', 'stage-2'], ['T-44', 'Export settings as a file', 'E-1', 'stage-1'], ['T-12', 'Push service for the beta', null, 'stage-1'], ['T-7', 'Tide table on the harbor screen', null, 'stage-2']]
+    .map(([id, title, parent, status], n) => ({ id, rev: `r-${n + 1}`, title, body: '', kind: 'kind-a', status, assignee: null, labels: [], parent, links: [], created_at: stamp, updated_at: stamp, extra: {} }));
+  mkdirSync(join(dir, 'standin'), { recursive: true });
+  writeFileSync(join(dir, 'standin/store.json'), JSON.stringify({ counter: tickets.length, tickets, events: {}, ops: {} }));
   const raise = (key, filer, ticket, title, why, outcomes, extra = []) => so('raise', board, '--ask-ref', 'readme-demo', '--filer', filer, '--ticket', ticket, '--key', key, '--title', title, '--why', why,
     ...outcomes.flatMap((o) => ['--outcome', o]), ...extra);
   raise('release-day', 'release-agent', 'T-41', 'Which day should the release ship?', 'Two fixes are still in review: A, B or C.', ['a=It ships now, without the 2 fixes.', 'b=It ships with both fixes.', 'c=It waits for the redesign too.'],
@@ -135,8 +134,8 @@ try {
   sh('ffmpeg', ['-loglevel', 'error', '-y', '-ss', '2', '-i', movie, '-vf', 'fps=8,scale=390:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer', '-loop', '0', join(out, 'answer-light.gif')]);
   assert.ok(readFileSync(join(out, 'answer-light.gif')).length < 1500000, 'README loop under 1.5 MB');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ commit: sh('git', ['rev-parse', 'HEAD'], { cwd: repo }).trim(), target: { version: so('--version').trim() },
-    start: 'An isolated board for Umer: three projects with their own icons, an epic with tickets and tasks, asks (one taken by default, one picked by the agent), a design, a report and proof with done-done runs.',
-    steps: ['Open each README screen at 390 (phone, 2x) and 1280 (desk), light and dark, in a headless Chromium: Today, Decide, a report in the reader, Evidence with Previews on, a ticket of the epic E-1 in Tickets, Designs and Today\'s More with Install app.',
+    start: 'An isolated board for Umer: three projects with their own icons, tickets from the stand-in ticket adapter, asks (one taken by default, one picked by the agent), a design, a report and proof with done-done runs.',
+    steps: ['Open each README screen at 390 (phone, 2x) and 1280 (desk), light and dark, in a headless Chromium: Today, Decide, a report in the reader, Evidence with Previews on, a ticket in Tickets, Designs and Today\'s More with Install app.',
       'Open the release ask from Today and answer it in light; read the saved Friday answer with the CLI and encode each real recording as a GIF under 1.5 MB.',
       'Check every frame: no sideways overflow, no letter tile in a list, no token in the text or address, no console error, no failed request.'],
     result: `${frames.length} frames saved and checked: ${frames.join(', ')}` }, null, 2) + '\n');

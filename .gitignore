@@ -8,3 +8,4 @@ demo-dist/
 *.tgz
 .live-check/
 .validation-board/
+web/board/

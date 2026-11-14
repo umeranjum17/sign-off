@@ -18,6 +18,8 @@ const repo = resolve(import.meta.dirname, '../../..'), cliJs = join(repo, 'dist/
 const dir = mkdtempSync(join(tmpdir(), 'so-actions-dec-')), board = join(dir, 'board.json');
 const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: join(dir, 'data'), XDG_CACHE_HOME: join(dir, 'cache'), XDG_STATE_HOME: join(dir, 'state') };
 for (const k of Object.keys(env)) if (/^(FM_|FIRSTMATE|SIGN_OFF_)/.test(k)) delete env[k];
+// The tickets live behind the ticket adapter: the stand-in keeps them in a folder of its own, one per cell, which is where Approve's ticket is read back from.
+env.SIGN_OFF_TICKETS_ADAPTER = join(repo, 'test/support/ticket-adapter-standin.mjs');
 const run = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 180000, ...options }); assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const cli = (...args) => run(process.execPath, [cliJs, ...args], { env });
 // Filed now: a report over a day old archives by itself, and an archived report's link opens nothing to capture.
@@ -67,7 +69,9 @@ try {
   // Every cell starts from its own throwaway board holding one report, so each frame is the same report in a real state.
   const v2 = messageFile('v2.json', { version: 2, changes: [{ kind: 'added', text: 'The rollback step you asked for' }, { kind: 'rewritten', text: 'Cut the cost estimate to one server', was: 'Cost estimate for two servers' }, { kind: 'removed', text: 'The second-region test' }] });
   for (const [theme, width] of cells) {
-    const cellBoard = join(dir, `board-${theme}-${width}.json`), cellActions = `${cellBoard.replace(/\.json$/, '')}.report-actions.jsonl`, cellLearnings = `${cellBoard.replace(/\.json$/, '')}.report-learnings.jsonl`, cellTickets = `${cellBoard.replace(/\.json$/, '')}.tickets.jsonl`;
+    const cellBoard = join(dir, `board-${theme}-${width}.json`), cellActions = `${cellBoard.replace(/\.json$/, '')}.report-actions.jsonl`, cellLearnings = `${cellBoard.replace(/\.json$/, '')}.report-learnings.jsonl`;
+    env.TICKET_STANDIN_DIR = join(dir, `standin-${theme}-${width}`); mkdirSync(env.TICKET_STANDIN_DIR, { recursive: true });
+    const made = () => JSON.parse(cli('ticket', cellBoard, '--json')).tickets;
     cli('post', cellBoard, '--kind', 'report', '--from', messageFile(`v1-${theme}-${width}.json`), '--filer', FILER);
     const { proc, base } = await serveBoard(cellBoard);
     try {
@@ -107,8 +111,8 @@ try {
     assert.match(sent, /Sent to Ada/);
     assert.equal(lines(cellActions).at(-1).action, 'refine');
     assert.equal(lines(cellActions).at(-1).result, 'version', 'Refine asks for a version, it starts no build');
-    assert.equal(lines(cellTickets).length, 0, 'Refine starts no build');
-    note(`[${theme} ${width}] refine replay: sent back -> "${sent}"; board.report-actions.jsonl action=refine result=version; board.tickets.jsonl absent`);
+    assert.equal(made().length, 0, 'Refine starts no build');
+    note(`[${theme} ${width}] refine replay: sent back -> "${sent}"; board.report-actions.jsonl action=refine result=version; no ticket made`);
     // The owner redoes it: the same key, one version on, with the lines that changed.
     const posted = cli('post', cellBoard, '--kind', 'report', '--from', v2, '--filer', FILER);
     assert.match(posted, /version 2 posted/, posted);
@@ -137,8 +141,8 @@ try {
     const closedLine = lines(cellActions).at(-1), learning = lines(cellLearnings).at(-1);
     assert.equal(closedLine.action, 'reject'); assert.equal(closedLine.result, 'closed');
     assert.equal(learning.rule, 'We do not need a second server for this.');
-    assert.equal(lines(cellTickets).length, 0, 'Reject never starts a build');
-    note(`[${theme} ${width}] reject replay: closed -> "${closed.text}"; board.report-actions.jsonl action=reject result=closed reason=${closedLine.reason}; board.report-learnings.jsonl owner=${learning.owner} rule="${learning.rule}"; board.tickets.jsonl absent`);
+    assert.equal(made().length, 0, 'Reject never starts a build');
+    note(`[${theme} ${width}] reject replay: closed -> "${closed.text}"; board.report-actions.jsonl action=reject result=closed reason=${closedLine.reason}; board.report-learnings.jsonl owner=${learning.owner} rule="${learning.rule}"; no ticket made`);
     drive("await page.eval(() => { const b = document.querySelector('.rda'), s = document.querySelector('.gd-scroll'); if (s) s.scrollTop += b.getBoundingClientRect().top - s.getBoundingClientRect().top - 40; else b.scrollIntoView({ block: 'center' }); }); await nap(600);");
     shot('closed', `Closed: ${closed.text}`, theme, width);
     // Reopen through the board's own endpoint: the report comes back to its three actions.
@@ -155,12 +159,12 @@ try {
     const started = evalIn(`() => document.querySelector('.rda').textContent.replace(/\\s+/g, ' ').trim()`);
     assert.match(started, /Build started/); assert.match(started, /Approved by you/);
     assert.match(started, /The first pull request lands by Fri 6 Nov\. Its ticket is on Tickets\./);
-    const minted = lines(cellTickets);
+    const minted = made();
     assert.equal(minted.length, 1, 'one approval, one ticket');
-    assert.equal(minted[0].id, `build-${KEY}`); assert.equal(minted[0].state, 'queued'); assert.equal(minted[0].stage, 'queued');
+    assert.match(minted[0].body, /Ada starts the build/);
     const approved = lines(cellActions).at(-1);
-    assert.equal(approved.action, 'approve'); assert.equal(approved.result, 'build'); assert.equal(approved.ticket, `build-${KEY}`);
-    note(`[${theme} ${width}] approve replay: "${started}"; board.tickets.jsonl id=${minted[0].id} state=queued stage=queued; board.report-actions.jsonl action=approve result=build ticket=${approved.ticket}`);
+    assert.equal(approved.action, 'approve'); assert.equal(approved.result, 'build'); assert.equal(approved.ticket, minted[0].id);
+    note(`[${theme} ${width}] approve replay: "${started}"; the ticket adapter holds ticket ${minted[0].id}; board.report-actions.jsonl action=approve result=build ticket=${approved.ticket}`);
     // The frame shows the block itself, at the foot of the report where the tap happened.
     drive("await page.eval(() => { const b = document.querySelector('.rda'), s = document.querySelector('.gd-scroll'); if (s) s.scrollTop += b.getBoundingClientRect().top - s.getBoundingClientRect().top - 40; else b.scrollIntoView({ block: 'center' }); }); await nap(600);");
     shot('approved', `Approved: "${started}" — the queued ticket build-${KEY} is on the board and no action is left but the result line.`, theme, width);

@@ -148,8 +148,6 @@ const errors = [], failed = [], report = [], problems = [], shots = [];
 try {
   const url = sh('bash', [join(here, '.agents/skills/done-done-verify-sign-off/feel-board.sh'), dir], { cwd: repo }).trim().split('\n').pop();
   // A ticket the ship ask, the settings proof and a guided report belong to; the digest ask's own, not started.
-  cli('ticket', board, '--id', 'settings-publish', '--description', 'Summary line.', '--title', 'Publish the settings page to the app stores', '--progress', '56', '--priority', 'P1', '--project', 'settings', '--asked', 'yes');
-  cli('ticket', board, '--id', 'digest-monday', '--description', 'Summary line.', '--title', 'Send the weekly digest on Mondays', '--project', 'newsletter', '--asked', 'yes');
   const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z'), guided = JSON.parse(readFileSync(join(repo, 'fixtures/contract/report.v4/valid-full.json'), 'utf8'));
   // Its picture with four rows, so the ask about it shows four of its numbers as the prototype does.
   const visual = { ...guided.visual, rows: [...guided.visual.rows, { label: 'Code step', value: 1.1, note: 'after' }, { label: 'Password step', value: 0.7, note: 'after' }] };

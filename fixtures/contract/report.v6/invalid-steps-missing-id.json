@@ -1,0 +1,106 @@
+{
+  "contract": 1,
+  "kind": "report",
+  "schema": 6,
+  "filer": "agent-41",
+  "filed": "2026-11-13T09:00:00Z",
+  "key": "invalid-steps-missing-id",
+  "title": "Whiteboard: Three states, two moves",
+  "project": "sign-off",
+  "purpose": "other",
+  "about": "One board draws the whole line, so the person reads every state and move in one place.",
+  "understood": [
+    {
+      "label": "You asked",
+      "text": "Draw the state machine on a whiteboard I can read."
+    }
+  ],
+  "visual": {
+    "type": "tiles",
+    "heading": "One board, every state",
+    "rows": [
+      {
+        "label": "States",
+        "text": "3 on the board"
+      },
+      {
+        "label": "Moves",
+        "text": "2 between them"
+      }
+    ]
+  },
+  "actions": {
+    "role": "addons lead",
+    "first_pull_request": "2026-11-20",
+    "recommended": "approve"
+  },
+  "sections": [
+    {
+      "id": "design",
+      "stage": "recommend",
+      "heading": "The line, drawn",
+      "body": "Each shape is one state; each line is a move between two of them.",
+      "board": {
+        "title": "Three states, two moves",
+        "shapes": [
+          {
+            "id": "start",
+            "label": "start",
+            "at": [
+              0,
+              0
+            ],
+            "tone": "start"
+          },
+          {
+            "id": "middle",
+            "label": "middle",
+            "at": [
+              1,
+              1
+            ]
+          },
+          {
+            "id": "end",
+            "label": "end",
+            "at": [
+              2,
+              2
+            ],
+            "tone": "end"
+          }
+        ],
+        "arrows": [
+          {
+            "id": "m1",
+            "from": "start",
+            "to": "middle",
+            "label": "go"
+          },
+          {
+            "id": "m2",
+            "from": "middle",
+            "to": "end",
+            "label": "finish"
+          }
+        ],
+        "steps": [
+          {
+            "title": "It starts at start",
+            "text": "Two moves take it to end.",
+            "focus": [
+              "start",
+              "nothing"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "next": {
+    "heading": "Say go and the person reads it in Reports",
+    "lines": [
+      "The board reads as a list of shapes, moves and steps until the canvas lands."
+    ]
+  }
+}

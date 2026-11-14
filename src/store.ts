@@ -1,7 +1,6 @@
 import { appendFileSync, existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
-import { beadsEvents, beadsOn, readBeadsTickets, writeBeadsTicket } from './beads.js';
 
 export type Option = { value: string; label: string; outcome?: string };
 /** An option's mock file, and an optional http(s) link to open that option live (drawn under the mock, outside its sandboxed frame). */
@@ -30,7 +29,7 @@ export type DesignJourney = { id: string; title: string; screens: { id: string; 
 export const screenViews = (s: DesignJourney['screens'][number]): string[] => [...Object.values(s.views ?? {}), ...(s.frames ?? []).flatMap((f) => Object.values(f.views))];
 /** One section in a plan's send-back: approved, or changed with a note on what to change. */
 export type PlanNote = { section: string; verdict: 'approve' | 'change'; note?: string };
-export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string };
+export type EvidenceLink = { run_id: string; commit: string; outcome: string; repro: string; proof: string; evidence: string; proof_series_id?: string; current_head?: string; proof_verdict?: 'pass' | 'fail' | 'inconclusive'; proof_ref?: { path: string; sha256: string; issuer: 'done-done'; validated: true }; release_state?: { state: 'unknown' | 'unreleased' | 'released'; version?: string; destination?: string } };
 export type Decision = {
   key: string; title: string; about?: string; detail?: string; ask_ref?: string; options: Option[];
   recommend_value?: string; default_if_silent?: string; close: string;
@@ -68,7 +67,7 @@ export type Decision = {
   layout?: 'document'; engagement?: { kind: string; schema: number; filer: string; revision: string }; guided?: boolean; understood?: { label: string; text: string }[]; visual?: GuideVisual; next?: { heading: string; lines: string[] };
   /** A guided report 5: the Actions block it declares (who owns the build, when the first pull request comes, which action it recommends),
    *  its version, what changed since the version before, and every version the board has posted under this key. */
-  actions?: ReportActions; version?: number; changes?: VersionChange[]; versions?: { version: number; at: string; changes: VersionChange[] }[];
+  actions?: ReportActions; version?: number; changes?: VersionChange[]; versions?: { version: number; at: string; changes: VersionChange[]; filed?: string; item?: Record<string, unknown> }[];
   /** Designs: project, date, review status, preview and screen views. An evidence update's `status` is one of EVIDENCE_STATUSES and its `captions` name each capture, in order. */
   status?: 'draft' | 'in_review' | 'approved' | 'Fixed' | 'In progress' | 'Waiting on you'; captions?: string[]; journeys?: DesignJourney[]; recommend?: string;
   /** Design 2: the frame role Yes approves, and the reviewer's note shown as Main reviewed. */
@@ -275,8 +274,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
         && (c.kind === 'rewritten' ? typeof c.was === 'string' && c.was.trim() && [...c.was].length <= 120 : c.was === undefined)))) {
       throw bad('changes', 'must list 1 to 8 lines of what changed, each added, rewritten (with the wording it replaces) or removed');
     }
-    if (d.versions !== undefined && (!Array.isArray(d.versions) || !d.versions.every((v: any) => v && Number.isInteger(v.version) && v.version >= 2 && typeof v.at === 'string' && Array.isArray(v.changes)))) {
-      throw bad('versions', 'must list the versions the board posted, each a number from 2 and the lines that changed');
+    if (d.versions !== undefined && (!Array.isArray(d.versions) || !d.versions.every((v: any) => v && Number.isInteger(v.version) && v.version >= 1 && typeof v.at === 'string' && Array.isArray(v.changes)))) {
+      throw bad('versions', 'must list the versions the board posted, each a number from 1 and the lines that changed');
     }
     if (d.type === 'evidence' && !(Number.isInteger(d.number) && d.number >= 1)) throw bad('number', 'must be a whole number from 1');
     const signin = d.type === 'signin';
@@ -300,8 +299,8 @@ export function loadDecisions(path: string, board?: Record<string, unknown>): De
     }
     // A ladder rung: a diagram image, or an interactive page the board frames in a sandbox.
     // A report is a page and its picture; one stored before reports had pages still loads, as a note with neither.
-    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4, 5].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
-    const engagement = (report && [4, 5].includes(d.schema)) || (plan && d.schema === 3);
+    const report = d.kind === 'report', plan = d.kind === 'plan', design = d.kind === 'design', guided = (report && [3, 4, 5, 6].includes(d.schema)) || (plan && [2, 3].includes(d.schema));
+    const engagement = (report && [4, 5, 6].includes(d.schema)) || (plan && d.schema === 3);
     if (engagement && !isKey(d.filer)) throw bad('filer', 'is required for engagement');
     if (d.type === 'plan' && !plan) throw bad('type', 'plan needs "kind": "plan": post it with sign-off-axi post --kind plan');
     const views = guided ? undefined : report ? (d.view !== undefined || d.preview !== undefined ? VIEWS.interactive : undefined) : plan ? VIEWS.interactive : Object.hasOwn(VIEWS, d.type ?? '') ? VIEWS[d.type] : undefined;
@@ -610,17 +609,17 @@ export type DiscardReason = keyof typeof DISCARD_REASONS;
 /** Undo takes a discard back this long after it: until then its agent is not told, so an undone discard never reaches it. */
 export const UNDO_MS = 10_000;
 export function appendDismissed(decisionsPath: string, keys: string[], dismissed: boolean, reason?: DiscardReason): void {
-  const at = now();
-  for (const key of keys) appendLine(dismissedPath(decisionsPath), { key, dismissed, at, ...(dismissed && reason && { reason }) });
+  const at = now(), reports = dismissed && reason ? readItems(decisionsPath).items.filter((d) => d.kind === 'report') : [];
+  for (const key of keys) { const report = reports.find((d) => d.key === key); appendLine(dismissedPath(decisionsPath), { key, dismissed, at, ...(dismissed && reason && { reason }), ...(report && { version: report.version ?? 1 }) }); }
 }
 /** Each discard the person made, oldest first, and whether it is still the last word on its card (no restore or dismiss since).
  *  A discard that a restore took back inside the Undo window never left the board and is left out. */
-export function readDiscards(decisionsPath: string): { key: string; reason: DiscardReason; at: string; last: boolean }[] {
+export function readDiscards(decisionsPath: string): { key: string; reason: DiscardReason; at: string; last: boolean; version?: number }[] {
   const lines = readRaw(dismissedPath(decisionsPath)).split('\n').flatMap((line) => { try { const x = line && JSON.parse(line); return x && typeof x.key === 'string' && typeof x.at === 'string' ? [x] : []; } catch { return []; } });
   return lines.flatMap((x, i) => {
     const after = lines.slice(i + 1).filter((y) => y.key === x.key);
     return x.dismissed === true && Object.hasOwn(DISCARD_REASONS, x.reason) && !after.some((y) => y.dismissed === false && Date.parse(y.at) - Date.parse(x.at) < UNDO_MS)
-      ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length }] : [];
+      ? [{ key: x.key, reason: x.reason, at: x.at, last: !after.length, ...(Number.isInteger(x.version) && { version: x.version }) }] : [];
   });
 }
 /** The kind and project an agent read an older report's words and set for it, one line per key and change: who set it and when. The report's own file is never rewritten. */
@@ -664,174 +663,6 @@ export function readPromoted(decisionsPath: string, warn: (msg: string) => void 
     }
   });
   return [...promoted];
-}
-/** What a row on the Tickets screen is. epic, ticket and bug are tickets; decision, evidence and merge are the cards and pull requests a ticket links to. A ticket with tickets under it is an epic whatever its type says. */
-export const TICKET_TYPES = ['epic', 'ticket', 'bug', 'decision', 'evidence', 'merge'] as const;
-export type TicketType = (typeof TICKET_TYPES)[number];
-/** A ticket's readable name: a short prefix and a number, as `JG-101`, which rows, the sheet and search show in place of the id's long slug. */
-export const TICKET_KEY = /^[A-Z][A-Z0-9]{1,9}-\d{1,6}$/;
-/** A ticket: a standalone record of work, its percent done and the ticket it sits under, and optionally its priority, its project, whether it is on hold and whether the board's owner asked for it.
- * Cards name one by id; nothing else reads or needs it. */
-export type Ticket = { id: string; title: string; progress: number; parent?: string; priority?: string; project?: string; hold?: boolean; asked?: boolean; release?: string; state?: 'queued' | 'in progress' | 'on hold' | 'done'; prs?: string[]; stage?: 'queued' | 'building' | 'review' | 'merging' | 'done'; last_event_at?: number; /** What the row is: epic, ticket, bug, decision, evidence or merge. Absent reads as a ticket, or an epic once it has tickets under it. */ type?: TicketType; /** Why the ticket is on hold, as written when the hold was recorded: a hold without one is refused. */ hold_reason?: string; /** The open tickets this one waits on, from a Beads row's blocks edges; the sheet names them beside the hold. */ blocked_by?: string[]; /** The readable name a row, the sheet and search show in place of the id's slug (JG-101); absent falls back to the slug. */ key?: string; /** The ticket's description as the sheet draws it: a summary paragraph, then headings, lists, links and quotes; no structure reads as plain text. */ description?: string; /** Who wrote this line (a tool or agent id passed with --filer), kept only when one was given. */ by?: string; at: string };
-/** Tickets, one line per write (`ticket <id> --title`), the latest line per id wins. A board without the file has no tickets, and every card works as before. */
-export const ticketsPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.tickets.jsonl';
-/** The ticket rules, shared by the writer and the reader: a line that breaks one is skipped, never shown half-valid. */
-export const ticketFault = (t: any) => (!isKey(t?.id) ? 'id must be 1-128 of A-Z a-z 0-9 . _ -'
-  : !isText(t.title) || !t.title.trim() || [...t.title].length > 160 ? 'title must be text of 160 characters or fewer'
-  : !(Number.isInteger(t.progress) && t.progress >= 0 && t.progress <= 100) ? 'progress must be a whole number from 0 to 100'
-  : t.parent !== undefined && (!isKey(t.parent) || t.parent === t.id) ? 'parent must be the id of another ticket'
-  : t.priority !== undefined && !PRIORITIES.includes(t.priority) ? `priority must be one of ${PRIORITIES.join(', ')}`
-  : t.project !== undefined && projectFault({ name: t.project }) ? 'project must be a project name, text of 40 characters or fewer'
-  : t.release !== undefined && (!isText(t.release) || !t.release.trim() || [...t.release].length > 40) ? 'release must be text of 40 characters or fewer'
-  : t.state !== undefined && !['queued', 'in progress', 'on hold', 'done'].includes(t.state) ? 'state must be queued, in progress, on hold or done'
-  : t.stage !== undefined && !['queued', 'building', 'review', 'merging', 'done'].includes(t.stage) ? 'stage must be queued, building, review, merging or done'
-  : t.last_event_at !== undefined && !(Number.isSafeInteger(t.last_event_at) && t.last_event_at >= 0 && t.last_event_at <= 8640000000000) ? 'last_event_at must be nonnegative whole epoch seconds in the date range'
-  : t.prs !== undefined && (!Array.isArray(t.prs) || !t.prs.every((u: any) => { try { return typeof u === 'string' && /^https?:\/\//.test(u) && !!new URL(u).hostname; } catch { return false; } })) ? 'prs must be an array of full HTTP or HTTPS URLs'
-  : t.by !== undefined && !isKey(t.by) ? 'by must be 1-128 of A-Z a-z 0-9 . _ -'
-  : t.type !== undefined && !(TICKET_TYPES as readonly string[]).includes(t.type) ? `type must be one of ${TICKET_TYPES.join(', ')}`
-  : t.hold_reason !== undefined && (!isText(t.hold_reason) || !t.hold_reason.trim() || [...t.hold_reason].length > 160) ? 'hold_reason must be text of 160 characters or fewer'
-  : t.key !== undefined && (typeof t.key !== 'string' || !TICKET_KEY.test(t.key)) ? 'key must be a readable name such as JG-101 (a prefix of A-Z and 0-9, a dash, then a number)'
-  : t.description !== undefined && (!isText(t.description) || !t.description.trim() || [...t.description].length > 4000) ? 'description must be text of 4000 characters or fewer'
-  : t.hold !== undefined && typeof t.hold !== 'boolean' ? 'hold must be true or false'
-  : t.asked !== undefined && typeof t.asked !== 'boolean' ? 'asked must be true or false' : '');
-/** A release names what ships (v1.4, 2026-11), never when: a word like "later" beside a priority reads as a contradiction, and priority is where urgency goes. */
-export const releaseIsWhen = (release: unknown) => typeof release === 'string' && /^(later|soon|now|next|someday|eventually|asap|urgent|tbd|tba|backlog|never)$/i.test(release.trim());
-/** Whether a ticket is still open work: not marked done by state, stage or progress. */
-const ticketOpen = (t: Ticket) => t.state !== 'done' && t.stage !== 'done' && t.progress < 100;
-/** A ticket's readable name: its `key` when the feed names one, else its id, the long slug the board has always used. */
-export const ticketName = (t: Pick<Ticket, 'id' | 'key'>) => t.key || t.id;
-/** Whether a ticket is held, by either of the two fields that say so. */
-export const ticketHeld = (t: Pick<Ticket, 'hold' | 'state'>) => t.hold === true || t.state === 'on hold';
-/** The work a ticket names, for telling the same work filed twice: its project, what it sits under and its title, without regard to case or spacing. */
-export const ticketWork = (t: Pick<Ticket, 'title' | 'project' | 'parent'>) => [t.project?.toLowerCase() ?? '', t.parent ?? '', t.title.trim().replace(/\s+/g, ' ').toLowerCase()].join('\0');
-/** The open ticket that already tracks this work under another id, if any: a second one is the same work filed twice. */
-export const ticketTwin = (tickets: Ticket[], t: Pick<Ticket, 'id' | 'title' | 'project' | 'parent'>) => tickets.find((x) => x.id !== t.id && ticketOpen(x) && ticketWork(x) === ticketWork(t));
-const STAGES = ['queued', 'building', 'review', 'merging', 'done'];
-/** Open tickets that are the same work keep one record: the first id written, with the furthest stage and progress either one reached. `folded` learns each later id and the id it joined. */
-function oneOfEach(tickets: Ticket[], folded?: Map<string, string>): Ticket[] {
-  const first = new Map<string, Ticket>(), far = (t: Ticket) => STAGES.indexOf(t.stage ?? '') * 1000 + t.progress;
-  for (const t of tickets) {
-    const key = ticketOpen(t) ? ticketWork(t) : t.id, had = first.get(key);
-    if (!had) first.set(key, t);
-    else folded?.set(t.id, had.id), first.set(key, { ...(far(t) > far(had) ? t : had), id: had.id, at: Date.parse(t.at) > Date.parse(had.at) ? t.at : had.at });
-  }
-  return [...first.values()];
-}
-const TICKET_FIELDS = ['parent', 'priority', 'project', 'hold', 'hold_reason', 'type', 'key', 'description', 'asked', 'release', 'state', 'prs', 'stage', 'last_event_at', 'by'] as const;
-/** A ticket's fields in the file's order, leaving out each optional one it does not carry. */
-const ticketLine = (t: any): Ticket => ({ id: t.id, title: t.title, progress: t.progress, ...Object.fromEntries(TICKET_FIELDS.filter((k) => t[k] !== undefined && !(k === 'release' && releaseIsWhen(t[k]))).map((k) => [k, t[k]])), at: t.at });
-export function appendTicket(decisionsPath: string, t: Omit<Ticket, 'at'>): Ticket {
-  const line = ticketLine({ ...t, at: now() });
-  if (beadsOn()) { writeBeadsTicket(line); return line; }
-  appendLine(ticketsPath(decisionsPath), line);
-  return line;
-}
-/** Every ticket as its latest line says, in the order each was first written. A torn or broken line is skipped and reported through warn.
- * An id whose open work an earlier id already tracks is read as that ticket, and `folded`, when given, learns which, so a link to it still opens the work. */
-export function readTickets(decisionsPath: string, warn: (msg: string) => void = () => {}, folded?: Map<string, string>): Ticket[] {
-  if (beadsOn()) return oneOfEach(readBeadsTickets(warn), folded);
-  const latest = new Map<string, Ticket>();
-  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line, n) => {
-    let t;
-    try { t = line && JSON.parse(line); } catch {}
-    if (line && (!t || ticketFault(t))) return warn(`skipped unreadable line ${n + 1} in ${ticketsPath(decisionsPath)}`);
-    if (t) latest.set(t.id, ticketLine(t));
-  });
-  return oneOfEach([...latest.values()], folded);
-}
-/** What was finished in the last seven days (today and the six before, UTC): a ticket whose line moves its state to done from a state it had. A ticket that first appears done, or whose
- *  state is only filled in as done, was not finished that day, so a bulk import is never counted as a week's work. */
-export function readTicketWeek(decisionsPath: string, nowMs = Date.now()) {
-  const last = new Map<string, Ticket>(), hits: { at: string; id: string }[] = [];
-  if (beadsOn()) { for (const t of readBeadsTickets(() => {})) last.set(t.id, t); hits.push(...beadsEvents().filter((e) => e.kind === 'state').map((e) => ({ at: e.at, id: e.ticket }))); }
-  else readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
-    let t: Ticket;
-    try { t = line && JSON.parse(line); } catch { return; }
-    if (!t || ticketFault(t)) return;
-    const had = last.get(t.id);
-    if (had?.state && had.state !== 'done' && t.state === 'done') hits.push({ at: t.at, id: t.id });
-    last.set(t.id, t);
-  });
-  const days = Array.from({ length: 7 }, (_, i) => new Date(nowMs - (6 - i) * 864e5).toISOString().slice(0, 10)), byProject = new Map<string, number>();
-  const done = days.map((day) => hits.filter((h) => h.at.startsWith(day)).length);
-  for (const h of hits) if (days.includes(h.at.slice(0, 10))) { const p = last.get(h.id)?.project ?? ''; byProject.set(p, (byProject.get(p) ?? 0) + 1); }
-  return { days: days.map((day, i) => ({ day, done: done[i] })), done: done.reduce((a, b) => a + b, 0), projects: [...byProject].map(([project, n]) => ({ project, done: n })).sort((a, b) => b.done - a.done) };
-}
-/** One move on a ticket. Beside what the feed always said it carries what a row and its expanded view show: the ticket's project, priority and pull requests as it has them now
- *  (so every row has its tags), its stage and state as that line wrote them, the changed field's before and after (stage, progress, state, hold) and, only when the line named one, who wrote it. */
-export type TicketActivity = { ticket: string; title: string; kind: 'created' | 'stage' | 'progress' | 'state' | 'merged' | 'hold' | 'release'; text: string; at: string;
-  project?: string; priority?: string; stage?: string; state?: string; prs?: string[]; from?: string; to?: string; by?: string;
-  /** The earlier changes of the same ticket within BURST_MS of this one, oldest first: a burst is one row that carries the newest change's headline. */
-  earlier?: Omit<TicketActivity, 'earlier' | 'ask'>[];
-  /** For a ticket the owner asked for: the captain's words from the ask card that names it (its full body, else its title), as stored, and when it was filed. */
-  ask?: { text: string; at: string } };
-/** Changes of one ticket this close together are one burst. */
-const BURST_MS = 120_000;
-/** Ticket history is already append-only; derive the small activity feed from each ticket's successive public records. */
-export function readTicketActivity(decisionsPath: string): TicketActivity[] {
-  if (beadsOn()) return foldBursts(beadsEvents(), decisionsPath, new Set(readBeadsTickets(() => {}).filter((t) => t.asked).map((t) => t.id)));
-  const previous = new Map<string, Ticket>(), events: { event: TicketActivity; order: number }[] = [];
-  readRaw(ticketsPath(decisionsPath)).split('\n').forEach((line) => {
-    let t: Ticket;
-    try { t = line && JSON.parse(line); } catch { return; }
-    if (!t || ticketFault(t) || !Number.isFinite(Date.parse(t.at))) return;
-    const had = previous.get(t.id), at = t.at;
-    const add = (kind: TicketActivity['kind'], text: string, change?: [string | undefined, string | undefined]) => events.push({ event: { ticket: t.id, title: t.title, kind, text, at,
-      ...(t.stage && { stage: t.stage }), ...(t.state && { state: t.state }),
-      ...(change && { from: change[0] ?? 'none', to: change[1] ?? 'none' }), ...(t.by && { by: t.by }) }, order: events.length });
-    if (!had) add('created', 'Ticket created');
-    else {
-      if (had.stage !== t.stage) add('stage', t.stage ? `Stage moved to ${t.stage}` : 'Stage cleared', [had.stage, t.stage]);
-      if (had.progress !== t.progress) add('progress', `Progress changed to ${t.progress}%`, [`${had.progress}%`, `${t.progress}%`]);
-      const merged = had.stage !== 'done' && t.stage === 'done';
-      if (merged) add('merged', 'Ticket merged', [had.stage, t.stage]);
-      const wasHeld = had.hold === true || had.state === 'on hold', isHeld = t.hold === true || t.state === 'on hold';
-      const holdChanged = wasHeld !== isHeld;
-      if (holdChanged) add(isHeld ? 'hold' : 'release', isHeld ? (t.hold_reason ? `Put on hold: ${t.hold_reason}` : 'Put on hold') : 'Hold released', [wasHeld ? 'on hold' : 'not on hold', isHeld ? 'on hold' : 'not on hold']);
-      const stateChanged = had.state !== t.state;
-      if (stateChanged && !(merged && t.state === 'done') && !(holdChanged && (had.state === 'on hold' || t.state === 'on hold')))
-        add('state', t.state ? `State changed to ${t.state}` : 'State cleared', [had.state, t.state]);
-    }
-    previous.set(t.id, t);
-  });
-  // The ticket's own tags, as its cards show them now: a priority or a project given on a later line is on every event of the ticket, so a row always carries them.
-  for (const { event } of events) { const now = previous.get(event.ticket)!; Object.assign(event, { ...(now.project && { project: now.project }), ...(now.priority && { priority: now.priority }), ...(now.prs?.length && { prs: now.prs }) }); }
-  const live = new Set(readTickets(decisionsPath).map((t) => t.id));
-  const newest = events.filter(({ event }) => live.has(event.ticket)).sort((a, b) => Date.parse(b.event.at) - Date.parse(a.event.at) || b.order - a.order).map(({ event }) => event);
-  return foldBursts(newest, decisionsPath, new Set([...previous.values()].filter((t) => t.asked).map((t) => t.id)));
-}
-function foldBursts(newest: TicketActivity[], decisionsPath: string, asked: Set<string>): TicketActivity[] {
-  // Folded newest first: an older change of a ticket joins that ticket's open row while it is within BURST_MS of the row's oldest change.
-  const rows: TicketActivity[] = [], open = new Map<string, TicketActivity>();
-  for (const e of newest) {
-    const head = open.get(e.ticket);
-    if (head && Date.parse(head.earlier?.[0]?.at ?? head.at) - Date.parse(e.at) <= BURST_MS) (head.earlier ??= []).unshift(e);
-    else { rows.push(e); open.set(e.ticket, e); }
-  }
-  const words = askWords(decisionsPath, asked);
-  for (const e of rows) if (words.has(e.ticket)) e.ask = words.get(e.ticket);
-  return rows;
-}
-/** What the ask card naming each ticket says, as stored (its body, the captain's full words, else its title), and when it was filed: the earliest such card. A board that cannot be read, or a ticket with no card, gives nothing. */
-function askWords(decisionsPath: string, ids: Set<string>): Map<string, { text: string; at: string }> {
-  const out = new Map<string, { text: string; at: string }>();
-  if (!ids.size) return out;
-  let items: any[] = [];
-  try { items = readItems(decisionsPath).items; } catch {}
-  for (const d of items) if (ids.has(d?.ticket) && (d.type ?? 'decision') === 'decision' && isText(d.title) && d.title.trim() && isText(d.filed) && Number.isFinite(Date.parse(d.filed))
-    && !(out.has(d.ticket) && Date.parse(out.get(d.ticket)!.at) <= Date.parse(d.filed))) out.set(d.ticket, { text: isText(d.body) && d.body.trim() ? d.body : d.title, at: d.filed });
-  return out;
-}
-/** The progress roll-up: a ticket with tickets under it on the board is as far along as they are on average (each of them rolled up the same way), and one with none keeps its own.
- * A loop of parents stops where it would come back round. */
-export function rollUp(tickets: Ticket[]): Ticket[] {
-  const under = new Map<string, Ticket[]>();
-  for (const t of tickets) if (t.parent) under.set(t.parent, [...(under.get(t.parent) ?? []), t]);
-  const done = (t: Ticket, path: Set<string>): number => {
-    const kids = (under.get(t.id) ?? []).filter((k) => !path.has(k.id));
-    return kids.length ? Math.round(kids.reduce((n, k) => n + done(k, new Set([...path, k.id])), 0) / kids.length) : t.progress;
-  };
-  return tickets.map((t) => ({ ...t, progress: done(t, new Set([t.id])) }));
 }
 /** A project's own icon: a picture in the board's folder, pinned by its hash so the board serves only the file that was set. */
 export type IconRef = { path: string; sha256: string; bytes: number };
@@ -942,20 +773,30 @@ export const ARCHIVE_MS = 24 * 3_600_000;
 /** Keys hidden now: the last line for each dismissed it, and no answer or round came after it. A torn line is skipped and reported through warn.
  * `items`, when given, adds the archive: reports filed over a day ago that no log line ever named. Restore writes a line, so a restored item stays. */
 export function readDismissed(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): string[] {
-  const hidden = new Map<string, string>(), named = new Set<string>();
+  const { dismissed, deferred, archived } = readHidden(decisionsPath, answers, rounds, warn, items);
+  return [...dismissed, ...deferred, ...archived];
+}
+/** The hidden keys split by why: dismissed by a person, deferred (a dismiss line marked `deferred: true`) or archived on their own. Same rules as readDismissed. */
+export function readHidden(decisionsPath: string, answers: Record<string, Answer>, rounds: Round[], warn: (msg: string) => void = () => {}, items: Decision[] = []): { dismissed: string[]; deferred: string[]; archived: string[] } {
+  const hidden = new Map<string, { at: string; deferred: boolean }>(), named = new Set<string>();
   readRaw(dismissedPath(decisionsPath)).split('\n').forEach((line, n) => {
     try {
       const x = line && JSON.parse(line);
-      if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, x.at);
+      if (x?.dismissed === true && typeof x.key === 'string' && typeof x.at === 'string') hidden.set(x.key, { at: x.at, deferred: x.deferred === true });
       else if (x) hidden.delete(x.key);
       if (x) named.add(x.key);
     } catch {
       warn(`skipped unreadable line ${n + 1} in ${dismissedPath(decisionsPath)}`);
     }
   });
-  const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
-  return [...[...hidden].filter(([key, at]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at)).map(([key]) => key), ...archived];
+  const archived = items.filter((d) => d.type !== 'evidence' && !asks(d) && !named.has(d.key) && Date.now() - Date.parse(d.versions?.at(-1)?.at ?? d.filed ?? '') > ARCHIVE_MS).map((d) => d.key);
+  const live = [...hidden].filter(([key, { at }]) => !(answers[key]?.at > at) && !rounds.some((r) => r.key === key && r.at > at));
+  return { dismissed: live.filter(([, h]) => !h.deferred).map(([key]) => key), deferred: live.filter(([, h]) => h.deferred).map(([key]) => key), archived };
 }
+export const CARD_STATES = ['open', 'deferred', 'answered', 'archived', 'dismissed'] as const;
+export type CardState = (typeof CARD_STATES)[number];
+/** The one lifecycle value of a card. Hidden wins (dismissed, deferred, archived), then an answer settles it, else it is open. Read is a separate mark and never changes it. */
+export const cardState = (c: { hidden?: 'dismissed' | 'deferred' | 'archived'; answered: boolean }): CardState => c.hidden ?? (c.answered ? 'answered' : 'open');
 
 /** A comment on one item or a prompt queued for the agent; delivered is when poll handed it over. */
 export type Message = { id: string; kind: 'comment' | 'prompt'; key?: string; text: string; at: string; delivered?: string };
@@ -1157,7 +998,7 @@ export function markEngagementSeen(file: string, id: string, revision: number) {
  * The agent's marks are one line each in <board>.trail.jsonl: a mark names a key and covers every send on it up to its time. The person opening a reply, or an answer the leash took, marks it seen. */
 export type TrailMark = { op: 'delivered' | 'read' | 'reply' | 'seen'; key: string; id?: string; text?: string; link?: string; /** Follow-up buttons under a reply that asks for a next step: one tap answers. */ options?: Option[]; at: string };
 export type Reply = { at: string; text?: string; link?: string; options?: Option[]; acted?: true };
-export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; /** A ticket comment's words (the board keeps them nowhere else), or the words of an answer written instead of picked. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
+export type Trail = { id: string; key: string; kind: 'answer' | 'round' | 'comment' | 'ask' | 'part' | 'ticket' | 'discard'; part?: string; /** An answer the leash took: its first step reads Taken or Picked, and `opened` is when the person first opened the card after it. */ taken?: Took['taken']; opened?: string; reason?: DiscardReason; version?: number; /** A ticket comment's words (the board keeps them nowhere else), or the words of an answer written instead of picked. */ said?: string; at: string; delivered?: string; read?: string; reply?: Reply; /** Every reply when the agent answered the same send more than once, oldest first; `reply` is the last. */ replies?: Reply[]; seen?: string };
 export const trailPath = (decisionsPath: string) => decisionsPath.replace(/\.json$/, '') + '.trail.jsonl';
 export const appendMark = (decisionsPath: string, mark: Omit<TrailMark, 'at'>, at = now()) => appendLine(trailPath(decisionsPath), { ...mark, at });
 /** `delivery` is the owner dispatch's record per Go deeper ask (src/owner.ts deliveries): handed to the author's session, then acknowledged by it. */
@@ -1170,7 +1011,7 @@ export function readTrail(decisionsPath: string, items: Decision[], delivery: Re
   const sends: Trail[] = [
     ...answerLines(decisionsPath).filter((a) => a.answer !== '' && !a.merged_by).map((a): Trail => ({ id: `answer:${a.key}:${a.at}`, key: a.key, kind: 'answer', at: a.at, read: taken(a) === '' ? a.at : taken(a), ...(a.taken && { taken: a.taken }), ...(a.answer === 'text' && { said: a.note }) })),
     ...readRounds(decisionsPath).map((r): Trail => ({ id: `round:${r.key}:${r.at}`, key: r.key, kind: 'round', at: r.at })),
-    ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at })),
+    ...readDiscards(decisionsPath).map((x): Trail => ({ id: `discard:${x.key}:${x.at}`, key: x.key, kind: 'discard', reason: x.reason, at: x.at, ...(x.version && { version: x.version }) })),
     ...readMessages(decisionsPath).flatMap((m): Trail[] => (m.kind === 'comment' && m.key ? [{ id: m.id, key: m.key, kind: 'comment', at: m.at, delivered: m.delivered }] : [])),
     // On a guided plan or report: each Go deeper (or other) ask on a part, read when a wait handed it over or its author's session acknowledged it, replied once answered;
     // and each Agree, Disagree or Comment on a part, read when a wait handed it over, replied with the agent's words.
