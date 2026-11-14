@@ -33,17 +33,25 @@ export function allows(expression) {
   return expr.split(' AND ').every((id) => ALLOWED.has(id.replace(/\+$/, '')));
 }
 
-/** The package a bundled file belongs to, from its path inside node_modules; null for sign-off's own files. */
+/**
+ * The package a bundled file belongs to: its folder under the root and its name, taken from the LAST node_modules/ of the path,
+ * so a copy nested inside another package (its own version, its own licence) is charged to itself and not to the package that holds it.
+ * Null for sign-off's own files.
+ */
 export function packageOf(path) {
-  const m = /(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+)\//.exec(path);
-  return m ? m[1] : null;
+  const m = /^(.*(?:^|\/)node_modules\/((?:@[^/]+\/)?[^/]+))\//.exec(path);
+  return m ? { dir: m[1], name: m[2] } : null;
 }
 
-/** Every bundled package with its version, licence id and the licence and notice files it carries. */
+/** Every bundled package, one per folder, with its version, licence id and the licence and notice files it carries. */
 export function packagesOf(metafile, root) {
-  const names = [...new Set(Object.keys(metafile.inputs).map(packageOf).filter(Boolean))].sort();
-  return names.map((name) => {
-    const dir = join(root, 'node_modules', name), pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+  const found = new Map();
+  for (const path of Object.keys(metafile.inputs)) {
+    const p = packageOf(path);
+    if (p) found.set(p.dir, p.name);
+  }
+  return [...found].sort(([a, x], [b, y]) => x.localeCompare(y) || a.localeCompare(b)).map(([rel, name]) => {
+    const dir = join(root, rel), pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     const files = readdirSync(dir).filter((f) => (LICENCE_FILE.test(f) || NOTICE_FILE.test(f)) && statSync(join(dir, f)).isFile());
     return {
       name, version: pkg.version, dir,
@@ -56,7 +64,9 @@ export function packagesOf(metafile, root) {
 
 /** The review: what ships, what is wrong with it, and the notices text that carries every licence and notice file. */
 export function review(packages, root, fonts) {
-  const problems = [], licenceTexts = new Map(), sections = [];
+  const problems = [], sections = [];
+  // Per licence and source, each distinct text and the packages it is the text of: the holder is part of the text, so a package whose
+  // file names another holder keeps its own text and is never covered by another package's.
   const byLicence = new Map();
   for (const p of packages) {
     const id = p.license.trim();
@@ -72,10 +82,10 @@ export function review(packages, root, fonts) {
     }
     if (text) {
       const where = `${id}${from ? ` (${from})` : ''}`;
-      if (!licenceTexts.has(where)) licenceTexts.set(where, text);
-      const names = byLicence.get(where) ?? [];
-      names.push(`${p.name}@${p.version}`);
-      byLicence.set(where, names);
+      const texts = byLicence.get(where) ?? new Map(), key = text.replace(/\s+/g, ' ').trim(), entry = texts.get(key) ?? { text: text.trim(), names: [] };
+      // Two folders holding the same name and version are one package to name.
+      if (!entry.names.includes(`${p.name}@${p.version}`)) entry.names.push(`${p.name}@${p.version}`);
+      byLicence.set(where, texts.set(key, entry));
     }
     for (const f of p.notices) sections.push(`NOTICE file of ${p.name}@${p.version} (${f}), as it ships:\n\n${readFileSync(join(p.dir, f), 'utf8').trim()}\n`);
   }
@@ -83,9 +93,14 @@ export function review(packages, root, fonts) {
     'Every package the canvas bundle holds is listed here, with the text of the licence it names. A licence id outside the build\'s',
     'allowed list fails the build, and so does a package with no licence text anywhere. Each NOTICE file ships as it is.', '',
     '## Packages, by licence and source', ''];
-  for (const [where, names] of [...byLicence].sort()) lines.push(`- ${where}: ${names.sort().join(', ')}`);
+  const groups = [...byLicence].sort(([a], [b]) => a.localeCompare(b))
+    .map(([where, texts]) => [where, [...texts.values()].map((e) => ({ text: e.text, names: e.names.sort() })).sort((a, b) => a.names[0].localeCompare(b.names[0]))]);
+  for (const [where, entries] of groups) lines.push(`- ${where}: ${[...new Set(entries.flatMap((e) => e.names))].sort().join(', ')}`);
   lines.push('');
-  for (const [where, text] of [...licenceTexts].sort()) lines.push(`## ${where}`, '', text.trim(), '');
+  for (const [where, entries] of groups) {
+    lines.push(`## ${where}`, '');
+    for (const { text, names } of entries) lines.push(`The text, as shipped by ${names.join(', ')}:`, '', text, '');
+  }
   lines.push('## The drawing font', '');
   for (const f of fonts) {
     lines.push(`${f.family}, drawn by every label on a board, ships with sign-off-axi as the file ${f.file}, from @excalidraw/excalidraw ${packages.find((p) => p.name === '@excalidraw/excalidraw')?.version ?? ''}.`,

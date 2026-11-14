@@ -51,7 +51,7 @@ export async function canvas({ write = true } = {}) {
   const built = await esbuild.build({ ...OPTIONS, write });
   const packages = packagesOf(built.metafile, root);
   const verdict = review(packages, root, [{ family: FONT.family, file: `fonts/${FONT.family}/ (${fonts.length} subset files)`, copyright }]);
-  const result = { packages, fonts, copyright, ...verdict };
+  const result = { packages, fonts, copyright, metafile: built.metafile, ...verdict };
   if (!write || verdict.problems.length) return { ...result, bytes: 0 };
   mkdirSync(join(out, 'fonts', FONT.family), { recursive: true });
   for (const f of fonts) writeFileSync(join(out, 'fonts', FONT.family, f), readFileSync(join(fontDir, f)));

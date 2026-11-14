@@ -4,7 +4,7 @@
 // carries no licence text anywhere stops the build.
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -57,9 +57,40 @@ test('a licence that may not ship here is refused, and so is a package with no l
   assert.equal(allows('(MIT OR Apache-2.0) AND 0BSD'), true);
 });
 
-test('the bundle is read from the build: every input file belongs to a package the review names', async () => {
+/**
+ * The packages the bundle really holds, read from the build's own input list and each package's own package.json, and not from the
+ * review: the folder after the LAST node_modules/ of an input path is a package, so a copy nested in another package counts as itself.
+ */
+const bundled = (metafile) => {
+  const found = new Map();
+  for (const file of Object.keys(metafile.inputs)) {
+    const at = file.lastIndexOf('node_modules/');
+    if (at < 0) continue;
+    const start = at + 'node_modules/'.length, parts = file.slice(start).split('/');
+    const dir = file.slice(0, start) + parts.slice(0, parts[0].startsWith('@') ? 2 : 1).join('/');
+    const { name, version } = JSON.parse(readFileSync(join(root, dir, 'package.json'), 'utf8'));
+    found.set(dir, `${name}@${version}`);
+  }
+  return found;
+};
+
+test('the bundle is read from the build: every package it holds, nested copies too, is named in the notices', async () => {
   const built = await canvas({ write: false });
   const names = new Set(built.packages.map((p) => p.name));
   assert.ok(names.has('@excalidraw/excalidraw'), 'the canvas itself is a reviewed package');
   assert.equal(packagesOf({ inputs: { 'src/cli.ts': {} } }, root).length, 0, "sign-off's own files belong to no package");
+  const real = bundled(built.metafile);
+  assert.ok(real.size > 100, `the bundle's own packages are enumerated: ${real.size}`);
+  assert.ok([...real.keys()].some((dir) => dir.split('node_modules/').length > 2), 'a copy nested inside another package is among them');
+  // The claim the notices make about themselves: every package the bundle holds is listed, with its own name and version.
+  const claim = 'Every package the canvas bundle holds is listed here';
+  assert.ok(built.text.includes(claim), 'the notices still make the claim');
+  const unnamed = [...new Set(real.values())].filter((id) => !new RegExp(`(?:: |, )${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:,|\n)`).test(built.text));
+  assert.deepEqual(unnamed, [], 'every bundled package is named in the notices');
+  // And its own licence text ships, holder included: a text another package shares in name only does not stand for it.
+  const flat = (text) => text.replace(/\s+/g, ' ').trim(), shipped = flat(built.text);
+  const own = [...real].flatMap(([dir, id]) => readdirSync(join(root, dir)).filter((f) => /^licen[cs]e(\.(md|txt))?$/i.test(f)).map((f) => ({ id, text: flat(readFileSync(join(root, dir, f), 'utf8')), f })));
+  assert.ok(own.length > 80, `the packages with a licence file of their own are read: ${own.length}`);
+  const missing = own.filter(({ text }) => !shipped.includes(text)).map(({ id, f }) => `${id} ${f}`);
+  assert.deepEqual(missing, [], "every bundled package's own licence text is in the notices");
 });

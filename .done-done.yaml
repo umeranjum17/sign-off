@@ -79,6 +79,9 @@ journeys:
   # both themes (the canvas must not reach it), and the approved-design capture rides in the same run.
   board-page:
     command: 'npm run build > /dev/null && node scripts/build-board.mjs && for w in 390 1280; do for t in light dark; do node .agents/skills/done-done-verify-sign-off/board-page-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done && node .agents/skills/done-done-verify-sign-off/first-open-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440'
+  # The canvas's licence and notice review (CLI only, screen: none): the real build and its notices, the packages nested inside other packages each named with their own version, and the test that reads the bundle's packages from the esbuild metafile; then the Designs capture at 1440, dark.
+  board-notices:
+    command: 'npm run build > /dev/null && bash .agents/skills/done-done-verify-sign-off/board-notices-proof.sh'
   # Lossless reference images, pinned document downloads and original ragged/spanned tables, at 390 and 1280 in both themes.
   kit-documents:
     command: 'npm run build > /dev/null && for w in 390 1280; do for t in light dark; do KIT_DOCUMENTS=1 node .agents/skills/done-done-verify-sign-off/kit-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" $t $w || exit 1; done; done'
