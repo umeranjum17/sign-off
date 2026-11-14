@@ -28,7 +28,8 @@
   .button { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-height: var(--tk-tap); min-width: var(--tk-tap); padding: var(--tk-sp-2) var(--tk-sp-3); border: 1px solid transparent; border-radius: var(--tk-r-ctl); background: transparent; color: var(--tk-text-secondary); font: var(--tk-fw-medium) var(--tk-fs-row)/1.25 var(--tk-font); text-decoration: none; white-space: nowrap; cursor: pointer; }
   .button[aria-pressed="true"] { border-color: var(--tk-text-secondary); color: var(--tk-text); }
   .button.primary { background: var(--tk-go); color: var(--tk-on-go); border-color: var(--tk-go); }
-  .button.close { margin-left: var(--tk-sp-2); }
+  .button.exit { margin-right: var(--tk-sp-2); padding-left: var(--tk-sp-2); color: var(--tk-text-secondary); }
+  .button.exit svg { width: var(--tk-icon-s); height: var(--tk-icon-s); margin-right: var(--tk-sp-1); }
   .button:disabled { color: var(--tk-text-tertiary); cursor: default; }
   .button:focus-visible { outline: 2px solid var(--tk-go); outline-offset: 3px; }
   @media (hover: hover) { .button:hover:not(:disabled) { border-color: var(--tk-line); color: var(--tk-text); } .button.primary:hover { border-color: var(--tk-text); color: var(--tk-on-go); } }
@@ -53,7 +54,7 @@
     .bar { grid-template-columns: minmax(0, 1fr); gap: var(--tk-sp-4); padding: var(--tk-sp-4); }
     .explanation { gap: var(--tk-sp-3); } .step-copy { max-width: none; }
     .acts { justify-content: space-between; padding-top: var(--tk-sp-3); border-top: 1px solid var(--tk-line); }
-    .button { padding: var(--tk-sp-2) var(--tk-sp-2); } .button.close { margin-left: 0; }
+    .button { padding: var(--tk-sp-2) var(--tk-sp-2); } .button.exit { margin-right: 0; padding-left: var(--tk-sp-2); }
     .footer { padding: var(--tk-sp-3) var(--tk-sp-4); }
   }
 </style>
@@ -70,11 +71,11 @@
       <span class="step-copy" id="words">The agent&rsquo;s drawing and the steps that explain it.</span>
     </div>
     <nav class="acts" aria-label="Board controls">
-      <button class="button" id="back" type="button" disabled>Back</button>
+      <a class="button exit" id="exit" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>Back</a>
+      <button class="button" id="prev" type="button" disabled>Previous</button>
       <button class="button primary" id="next" type="button" disabled>Next</button>
       <button class="button" id="move" type="button" aria-pressed="true">Move</button>
       <button class="button" id="fit" type="button">Fit</button>
-      <a class="button close" id="close" href="/">Close</a>
     </nav>
   </header>
   <section class="canvas" id="canvas" role="img" aria-label="The board the agent drew"></section>
@@ -85,8 +86,8 @@
   import '/board/board.js';
   const [, , key, section] = location.pathname.split('/');
   const $ = (id) => document.getElementById(id);
-  const close = $('close');
-  if (key) close.href = `/#reports/${encodeURIComponent(key)}`;
+  const exit = $('exit');
+  if (key) exit.href = `/#reports/${encodeURIComponent(key)}`;
   // Light or dark is the board's own pick first, then the system's. A pick turns each dark-scheme media rule of the page's sheets on or off,
   // the same way the board's own pages follow it, so this page is never the wrong colour under the board it was opened from.
   const pick = (() => { try { return localStorage.getItem('so-theme'); } catch { return null; } })();
@@ -138,12 +139,12 @@
       $('count').textContent = '';
       $('words').textContent = `${data.steps.length} steps. Next begins.`;
     }
-    $('back').disabled = at < 0;
+    $('prev').disabled = at < 0;
     $('next').disabled = at >= data.steps.length - 1;
     refit();
   };
   new ResizeObserver(refit).observe($('canvas'));
-  $('back').onclick = () => show(at - 1);
+  $('prev').onclick = () => show(at - 1);
   $('next').onclick = () => show(at + 1);
   $('move').onclick = () => { mounted.api.setActiveTool({ type: 'hand' }); $('move').setAttribute('aria-pressed', 'true'); };
   $('fit').onclick = () => show(at);

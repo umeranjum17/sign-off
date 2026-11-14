@@ -193,3 +193,57 @@ export function scene(board: any) {
   const steps: BoardStep[] = (board.steps ?? []).map((s: any) => ({ title: s.title, ...(s.text ? { text: s.text } : {}), ids: s.focus.flatMap((id: string) => ids.get(id) ?? []) }));
   return { elements: [...zones, ...shapes, ...arrows], steps, title: board.title as string };
 }
+
+/** The board as a picture for the report it sits on: the scene the canvas draws, as one SVG of plain boxes, lines and words.
+ *  It is a picture, not the editor — one request, no script — and it measures the board with the same geometry the page and the check use,
+ *  so the preview, the canvas and the check cannot disagree. Its paper is paper in either theme, as a whiteboard is, so the block never has to be
+ *  redrawn when the board's light or dark is flipped. `width` and `height` are the picture's own size, so a page reserves its room before it loads. */
+export function preview(board: any): string {
+  const pal = { paper: '#ffffff', ink: '#1d1d1f', line: '#6b7280', mute: '#4b5563', head: '#5f6672' };
+  const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  const { elements } = scene(board), parts: string[] = [], room = [Infinity, Infinity, -Infinity, -Infinity];
+  const grow = (x: number, y: number, w: number, h: number) => { room[0] = Math.min(room[0], x); room[1] = Math.min(room[1], y); room[2] = Math.max(room[2], x + w); room[3] = Math.max(room[3], y + h); };
+  /** Words centred on a point, one line to each line of the label, so a shape's two-line label sits inside it. */
+  const words = (text: string, cx: number, cy: number, size: number, fill: string) => {
+    const lines = text.split('\n'), lh = size * 1.3, first = cy - ((lines.length - 1) * lh) / 2 + size * 0.35;
+    return lines.map((line, i) => `<text x="${cx}" y="${first + i * lh}" text-anchor="middle" font-size="${size}" fill="${fill}">${esc(line)}</text>`).join('');
+  };
+  /** The head of an arrow at a point, pointing away from the other end. */
+  const head = (x: number, y: number, dx: number, dy: number) => {
+    const len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len, s = 11, w = 5;
+    return `<path d="M${x} ${y}L${x - ux * s - uy * w} ${y - uy * s + ux * w}L${x - ux * s + uy * w} ${y - uy * s - ux * w}Z" fill="${pal.head}"/>`;
+  };
+  for (const e of elements) {
+    grow(e.x, e.y, e.width, e.height);
+    const label = (e as any).label;
+    // A zone is the scene's own `z:` box and its `zl:` words; every other element is a shape or a line.
+    if (String(e.id).startsWith('z:')) {
+      parts.push(`<rect x="${e.x}" y="${e.y}" width="${e.width}" height="${e.height}" rx="8" fill="none" stroke="${pal.line}" stroke-width="1.5" stroke-dasharray="7 6"/>`);
+    } else if (String(e.id).startsWith('zl:')) {
+      parts.push(`<text x="${e.x}" y="${e.y + 14 * 1.15}" font-size="14" fill="${pal.mute}">${esc((e as any).text)}</text>`);
+    } else if (e.type === 'rectangle' || e.type === 'ellipse' || e.type === 'diamond') {
+      const fill = (e as any).backgroundColor;
+      const paint = e.type === 'ellipse'
+        ? `<ellipse cx="${e.x + e.width / 2}" cy="${e.y + e.height / 2}" rx="${e.width / 2}" ry="${e.height / 2}" fill="${fill}"/>`
+        : e.type === 'diamond'
+          ? `<polygon points="${e.x + e.width / 2},${e.y} ${e.x + e.width},${e.y + e.height / 2} ${e.x + e.width / 2},${e.y + e.height} ${e.x},${e.y + e.height / 2}" fill="${fill}"/>`
+          : `<rect x="${e.x}" y="${e.y}" width="${e.width}" height="${e.height}" rx="6" fill="${fill}"/>`;
+      parts.push(paint + (label ? words(label.text, e.x + e.width / 2, e.y + e.height / 2, label.fontSize, pal.ink) : ''));
+    } else if (e.type === 'arrow') {
+      const x2 = e.x + e.width, y2 = e.y + e.height;
+      parts.push(`<line x1="${e.x}" y1="${e.y}" x2="${x2}" y2="${y2}" stroke="${pal.line}" stroke-width="1.5"${(e as any).strokeStyle === 'dashed' ? ' stroke-dasharray="7 6"' : ''}/>`);
+      parts.push(head(x2, y2, e.width, e.height));
+      if ((e as any).startArrowhead) parts.push(head(e.x, e.y, -e.width, -e.height));
+      if (label) {
+        const cx = e.x + e.width / 2, cy = e.y + e.height / 2, w = label.text.length * label.fontSize * 0.52 + 6;
+        grow(cx - w / 2, cy - label.fontSize * 0.9, w, label.fontSize * 1.8);
+        parts.push(`<rect x="${cx - w / 2}" y="${cy - label.fontSize * 0.75}" width="${w}" height="${label.fontSize * 1.5}" rx="3" fill="${pal.paper}"/>`);
+        parts.push(words(label.text, cx, cy, label.fontSize, pal.mute));
+      }
+    }
+  }
+  const pad = 12, w = Math.round(room[2] - room[0] + pad * 2), h = Math.round(room[3] - room[1] + pad * 2);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${room[0] - pad} ${room[1] - pad} ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="${esc(board.title)}">`
+    + `<rect x="${room[0] - pad}" y="${room[1] - pad}" width="${w}" height="${h}" fill="${pal.paper}"/>`
+    + `<g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">${parts.join('')}</g></svg>`;
+}

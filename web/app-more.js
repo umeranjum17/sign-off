@@ -1216,6 +1216,18 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /* ---- A guided plan (plan 2) or report (report 3): one scroll, built from the message's fields. ----
      Read receipts and Go deeper are real: a part read for a moment is saved on the board (/api/reads), and Go deeper asks the agent (/api/deeper),
      whose answer (sign-off-axi deeper) is polled and shown under the part that was tapped. */
+  /** The place in a report a board was opened from, kept in this tab: the board's block, and how far below the top of the report it sat. A board opens as a page
+   *  of its own, so the report is drawn again on the way back, and this is what puts the person back where they left it instead of at the top of the report. */
+  const boardPlace = (key) => `so-board-place:${key}`, restored = new Set();
+  const keepPlace = (key, block) => {
+    const s = document.querySelector('#reader .gd-scroll');
+    if (s) try { sessionStorage.setItem(boardPlace(key), String(block.getBoundingClientRect().top - s.getBoundingClientRect().top)); restored.delete(key); } catch {}
+  };
+  /** The kept place of a report, once for this document: a report drawn again as the board changes must not jump back to the board on every redraw. */
+  const takePlace = (key) => {
+    if (restored.has(key)) return null;
+    try { const v = sessionStorage.getItem(boardPlace(key)); if (v === null) return null; restored.add(key); return Number(v); } catch { return null; }
+  };
   function guideView(d) {
     const plan = d.type === 'plan', key = d.key, sections = d.sections ?? [], decisions = d.decisions ?? [], asks = plan || decisions.length > 0, by = (stage) => sections.filter((s) => s.stage === stage);
     const live = !FROZEN && !state.readonly && !d.historical;
@@ -1645,17 +1657,24 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       };
       return E('figure', 'kt kt-video gd-wide', frame, ...(b.caption ? [E('figcaption', 'kt-cap', b.caption)] : []));
     }
-    // ---- a board on a section, read as a list: its steps, then the shapes, the moves between them and the zones. The canvas comes in a later slice, so a board reads here, in an export and on a read-only board.
+    // ---- a board on a section, where the agent explains it: a framed picture of the drawing with one way in, then the board's steps and its shapes,
+    // moves and zones as a list. The list stays under the picture, so a board reads in an export, on a read-only board and when the picture cannot load.
     function boardList(b, section) {
       const name = new Map((b.shapes ?? []).map((s) => [s.id, s.label]));
       const part = (head, rows) => rows.length ? E('div', 'kb-part', E('h4', '', head), E('ul', 'kb-list', ...rows)) : '';
-      // The board the agent drew opens full screen: its canvas, its steps and sign-off's own bar. A Mermaid board has no canvas yet, so it stays a list.
-      const open = b.shapes?.length ? [el('a', { class: 'kb-open', href: `/board/${encodeURIComponent(key)}/${section}` }, gic('expand'), E('span', '', 'Open board'))] : [];
-      return el('section', { class: 'kb-board', 'aria-label': `Board: ${b.title}` }, E('h3', 'kb-title', b.title), ...open,
+      // The board's own page draws the canvas. A Mermaid board has no canvas yet, and an exported copy has no board to open, so both stay a list.
+      const page = b.shapes?.length && !FROZEN ? `/board/${encodeURIComponent(key)}/${section}` : '';
+      const pic = page ? el('img', { class: 'kb-pic', src: `${page}/preview.svg`, alt: `The board, drawn small: ${b.title}`, loading: 'lazy', decoding: 'async' }) : '';
+      const open = page ? el('a', { class: 'kb-open', href: page }, glyph('expand'), E('span', '', 'Open board')) : '';
+      // The picture is the board's own geometry drawn small, and the entry opens it full screen in this report's place, which is kept for the way back.
+      const fig = el('figure', { class: 'kb-frame' }, pic, open ? el('figcaption', { class: 'kb-bar' }, E('span', 'kb-say', 'The agent’s board'), open) : '');
+      const box = el('section', { class: 'kb-board', 'aria-label': `Board: ${b.title}` }, E('h3', 'kb-title', b.title), pic || open ? fig : '',
         part('Steps', (b.steps ?? []).map((x) => E('li', '', E('b', '', x.title), ...(x.text ? [E('span', '', x.text)] : [])))),
         part('Shapes', (b.shapes ?? []).map((s) => E('li', '', E('b', '', s.label), ...(s.note ? [E('span', '', s.note)] : [])))),
         part('Moves', (b.arrows ?? []).map((a) => E('li', '', E('b', '', `${name.get(a.from) ?? a.from} → ${name.get(a.to) ?? a.to}`), ...(a.label ? [E('span', '', a.label)] : []), ...(a.note ? [E('span', '', a.note)] : [])))),
         part('Zones', (b.zones ?? []).map((z) => E('li', '', E('b', '', z.label), E('span', '', z.around.map((id) => name.get(id) ?? id).join(', '))))));
+      if (open) open.onclick = () => keepPlace(key, box);
+      return box;
     }
     function blockFig(s, b) {
       const local = (file) => `${kitUrl(s, file)}?download=1`;
@@ -2289,6 +2308,23 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       else if (!need && timer) { clearInterval(timer); timer = undefined; }
     }
     root.sync = sync;
+    // A board's Back returns the person to the block it was opened from: the report is drawn again, and the block is put back where it was on the screen.
+    // A report settles in stages (its pictures arrive, the typeface swaps), so the block is put back on the first frames and again when either lands.
+    const place = takePlace(key);
+    if (place !== null) {
+      const put = () => {
+        const block = root.querySelector('.kb-board');
+        if (!block) return;
+        const off = block.getBoundingClientRect().top - scroll.getBoundingClientRect().top - place;
+        if (Math.abs(off) > 1) scroll.scrollTop += off;
+      };
+      let frames = 0;
+      const settle = () => { put(); if (++frames < 30) requestAnimationFrame(settle); };
+      settle();
+      setTimeout(put, 500);
+      document.fonts?.ready.then(put).catch(() => {});
+      root.querySelectorAll('.kb-pic').forEach((img) => img.addEventListener('load', put, { once: true }));
+    }
     deeps.forEach((b) => b.addEventListener('click', () => { b.dataset.shut = b.getAttribute('aria-expanded') === 'true' ? '' : '1'; }));
     setStage(stages[0]);
     if (!plan) { actOn = deskMq.matches; paintView(); paintActOpen(); }

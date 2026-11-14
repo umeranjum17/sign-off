@@ -14,7 +14,7 @@ const out = join(root, 'web/board');
 const FONT = { family: 'Excalifont', from: 'node_modules/@excalidraw/excalidraw/dist/prod/fonts/Excalifont' };
 const OPTIONS = {
   entryPoints: [join(root, 'scripts/board/entry.js')], bundle: true, splitting: true, format: 'esm', minify: true, outdir: out,
-  entryNames: 'board', chunkNames: 'chunks/[name]-[hash]', assetNames: 'fonts/[name]-[hash]', legalComments: 'none', metafile: true, logLevel: 'warning',
+  entryNames: 'board-[hash]', chunkNames: 'chunks/[name]-[hash]', assetNames: 'fonts/[name]-[hash]', legalComments: 'none', metafile: true, logLevel: 'warning',
   conditions: ['production'], define: { 'process.env.NODE_ENV': '"production"', 'process.env.IS_PREACT': '"false"' },
   loader: { '.woff2': 'file', '.ttf': 'file', '.woff': 'file' },
 };
@@ -56,6 +56,13 @@ export async function canvas({ write = true } = {}) {
   mkdirSync(join(out, 'fonts', FONT.family), { recursive: true });
   for (const f of fonts) writeFileSync(join(out, 'fonts', FONT.family, f), readFileSync(join(fontDir, f)));
   writeFileSync(join(out, 'NOTICES.txt'), verdict.text);
+  // Every canvas file is named for its own content, so a browser keeps it for good and asks nothing for it on a later open. The two files the page
+  // names keep their names and carry one line each to the hashed file of this build: a rebuilt canvas writes new names, so nothing stale is served.
+  const entry = (ext) => Object.keys(built.metafile.outputs).find((file) => !file.includes('/chunks/') && file.endsWith(ext));
+  for (const [ext, line] of [['.js', (name) => `import './${name}';\n`], ['.css', (name) => `@import url('./${name}');\n`]]) {
+    const made = entry(ext);
+    if (made) writeFileSync(join(out, `board${ext}`), line(made.slice(made.lastIndexOf('/') + 1)));
+  }
   return { ...result, bytes: bytesIn(out) };
 }
 

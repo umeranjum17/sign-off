@@ -17,7 +17,7 @@ import { AxiError, runAxiCli } from 'axi-sdk-js';
 import { ATTACH_DEFAULT_MB, ATTACH_MAX, ATTACH_NAME, type Answer, guardOf, plainAsk, type Took, type AttachRef, CHAPTERS_MAX, type CopyRef, SIGNED_IN, type Round, type Sent, CLEARED, type Decision, type MockRef, type DemoRef, type MediaRef, InputError, MEDIA_MAX, NOTE_MAX, type Option, REPLY, answersPath, appendAnnotation, appendPartComment, annotationsPath, markCommentsRead, readPartComments, replyComment, asks, appendAnswer, appendDismissed, DISCARD_REASONS, type DiscardReason, readDiscards, UNDO_MS, appendPromoted, appendReopened, readReopened, reopenedNow, ReopenError, appendKind, readKinds, appendSendBack, REPORT_ACTIONS, REPORT_RESULTS, REPORT_REASONS, type ReportActions, appendReportAction, readReportActions, appendReportLearning, readReportLearnings, reportActionsPath, appendTicketComment, readTicketComments, ticketCommentFault, appendProject, readProjects, projectFault, iconPathFault, iconContentFault, ICON_BYTES, ICON_TYPES, type Project, PRIORITIES, REPORT_PARTS, REPORT_PURPOSES, appendDesignAnswer, answerLines, appendMark, readTrail, trailPath, appendMessage, appendRound, awaitsVerdict, lapsed, askEngagement, checkEngagement, markEngagementSeen, appendRead, appendOpened, readOpened, appendSigninOpened, appendThreadDone, readThreadDone, readSigninOpened, answerDeeper, askDeeper, deeperPath, guidePart, markDeeperRead, readDeeper, readReads, screenViews, seenAt, isKey, loadDecisions, markDelivered, markSeen, messagesPath, readAnnotations, readAnswers, reading, readDismissed, readHidden, cardState, CARD_STATES, readItems, readPromoted, sameDecision, readMessages, readRounds, roundsPath, sameRound, seenBy, seenPath, sentIds, unreadable as reasonOf, writeItems } from './store.js';
 
 import { ContractError, KINDS, MEDIA_BYTES, REPORT_INIT, checkMessage, diagramPages, diagramViews, downloadFiles, galleryFrames, guided, kitWarnings, mediaFiles, parseMessage, reportPage } from './contract.js';
-import { boardIds, checkBoard, scene } from './board.js';
+import { boardIds, checkBoard, preview, scene } from './board.js';
 import { reportContent } from './report-content.js';
 import { type Fault, faults, isStill } from './evidence-text.js';
 import { isRecording } from './recording.js';
@@ -2988,8 +2988,11 @@ const served = Buffer.from(page.toString().replace(/href="(tokens|ui|app)\.css"/
   // home-screen icon are not what the person came for. app.js names both once the first screen has drawn.
   .replace(/<link rel="icon" href="icon\.svg"([^>]*)>/, '<link data-icon="icon.svg" rel="icon"$1>')
   .replace(/<link rel="manifest" href="manifest\.webmanifest"([^>]*)>/, '<link data-manifest="manifest.webmanifest" rel="manifest"$1>'));
-/** The worker's cache is named by the whole build, so a changed page, stylesheet or worker replaces the kept copy at the next visit and never mixes two. */
-const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).digest('hex').slice(0, 16))};\n${APP.worker}`);
+/** The canvas's own build, read from the loader npm run build:board writes: every canvas file it names carries its content's hash, so the loader's
+ *  bytes are the build's identity, and a rebuilt canvas names new files and a new worker cache. Empty when this copy has no canvas built. */
+const BOARD_LOADER = (() => { try { return readFileSync(new URL('../web/board/board.js', import.meta.url)); } catch { return Buffer.alloc(0); } })();
+/** The worker's cache is named by the whole build, so a changed page, stylesheet, worker or canvas replaces the kept copy at the next visit and never mixes two. */
+const worker = Buffer.from(`const BUILD = ${JSON.stringify(createHash('sha256').update(served).update(APP.worker).update(APP.pwa).update(BOARD_LOADER).digest('hex').slice(0, 16))};\n${APP.worker}`);
 const pageTag = `"${createHash('sha256').update(served).digest('hex').slice(0, 32)}"`;
 // Level 9 takes about 50 ms and level 11 over half a second for 7% less, so the page is squeezed at 9.
 const squeezed: Record<string, Buffer> = {};
@@ -3001,9 +3004,13 @@ const unchanged = (req: IncomingMessage, tag: string) => req.headers['if-none-ma
 const pointer = Buffer.from(`<script>${readFileSync(new URL('../web/point.js', import.meta.url), 'utf8')}</script>`);
 /** The whiteboard's own page (web/board.html), the canvas files it loads (web/board/, built by npm run build:board) and its policy: no host but this one. */
 const BOARD_PAGE = readFileSync(new URL('../web/board.html', import.meta.url));
+const BOARD_PAGE_TAG = `"${createHash('sha256').update(BOARD_PAGE).digest('hex').slice(0, 32)}"`;
 const BOARD_DIR = new URL('../web/board/', import.meta.url);
 const BOARD_CSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; form-action 'none'; base-uri 'none'";
-const CANVAS_FILE = /^(board\.(js|css)|NOTICES\.txt|chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2)$/;
+const CANVAS_FILE = /^(board\.(js|css)|NOTICES\.txt|chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2|board-[\w-]+\.(js|css))$/;
+/** A canvas file whose name carries its content's hash (the drawing font's own files do, as Excalidraw's build names them): it is never served under another
+ *  name, so a browser keeps it for good and asks nothing for it on a later open. */
+const CANVAS_STAMPED = /^(?:chunks\/[\w.-]+\.js|fonts\/[\w./-]+\.woff2|board-[\w-]+\.(?:js|css))$/;
 const CANVAS_TYPE: Record<string, string> = { '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.woff2': 'font/woff2' };
 /** A board a report holds, checked again as the page reads it: the section's board, and the scene the canvas draws from it. */
 function boardAt(key: string, section: number) {
@@ -3012,7 +3019,7 @@ function boardAt(key: string, section: number) {
   const checked = checkBoard(board);
   if (!checked.ok) return { why: `This board is not one sign-off can draw: ${checked.problem}.` } as const;
   if (checked.form !== 'shapes') return { why: 'This board is Mermaid text, which sign-off cannot draw yet.' } as const;
-  return { report: report!, ...scene(board) };
+  return { report: report!, board, ...scene(board) };
 }
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 /** A file's identity for the board's kept read: inode, size and change time, so a rewrite that keeps its size still counts as a change. */
@@ -3842,26 +3849,40 @@ const server = createServer(async (req, res) => {
     return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
   }
   if (req.method === 'GET' && req.url === '/favicon.ico') return res.writeHead(204).end();
-  // The whiteboard: a board a report holds, opened full screen and read only. Its page, its scene and the canvas files that draw it.
+  // The whiteboard: a board a report holds, opened full screen and read only. Its page, its scene, its picture for the report, and the canvas that draws them.
   if (req.method === 'GET' && (req.url ?? '').split('?')[0]!.startsWith('/board/')) {
-    const path = new URL(req.url!, 'http://board').pathname, name = path.slice('/board/'.length);
+    const url = new URL(req.url!, 'http://board'), path = url.pathname, name = path.slice('/board/'.length);
     if (CANVAS_FILE.test(name)) {
       let bytes: Buffer;
       try { bytes = readFileSync(new URL(name, BOARD_DIR)); } catch { return res.writeHead(503, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end('The board\u2019s canvas files are not built in this copy. Run npm run build:board.'); }
-      const tag = `"${sha256(bytes).slice(0, 32)}"`, headers = { 'content-type': CANVAS_TYPE[extname(name)]!, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: tag, vary: 'accept-encoding' };
+      const tag = `"${sha256(bytes).slice(0, 32)}"`, headers = { 'content-type': CANVAS_TYPE[extname(name)]!, 'cache-control': CANVAS_STAMPED.test(name) ? 'private, max-age=31536000, immutable' : 'no-cache', 'x-content-type-options': 'nosniff', etag: tag, vary: 'accept-encoding' };
       if (unchanged(req, tag)) return res.writeHead(304, headers).end();
       const sent = COMPRESSIBLE.test(headers['content-type']) ? squeeze(req, bytes) : { bytes };
       return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
     }
+    // The picture the report shows where the agent explains the board: the scene the canvas draws, as one SVG, so the two cannot disagree.
+    const pic = /^\/board\/([^/]+)\/(\d+)\/preview\.svg$/.exec(path), board = pic && boardAt(decodeURIComponent(pic[1]!), Number(pic[2]));
+    if (pic) {
+      if (!board || 'why' in board) return res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end(board ? board.why : 'No board there.');
+      const svg = Buffer.from(preview(board.board));
+      const tag = `"${sha256(svg).slice(0, 32)}"`, headers = { 'content-type': 'image/svg+xml; charset=utf-8', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: tag, vary: 'accept-encoding' };
+      if (unchanged(req, tag)) return res.writeHead(304, headers).end();
+      const sent = squeeze(req, svg);
+      return res.writeHead(200, { ...headers, ...(sent.encoding && { 'content-encoding': sent.encoding }), 'content-length': sent.bytes.length }).end(sent.bytes);
+    }
     const at = /^\/board\/([^/]+)\/(\d+)$/.exec(path), found = at && boardAt(decodeURIComponent(at[1]!), Number(at[2]));
     if (!found || 'why' in found) return res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-cache' }).end(found ? found.why : 'No board there.');
-    return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': BOARD_CSP, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' }).end(BOARD_PAGE);
+    const pageHeaders = { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': BOARD_CSP, 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff', etag: BOARD_PAGE_TAG };
+    if (unchanged(req, BOARD_PAGE_TAG)) return res.writeHead(304, pageHeaders).end();
+    return res.writeHead(200, pageHeaders).end(BOARD_PAGE);
   }
   if (req.method === 'GET' && (req.url ?? '').split('?')[0]!.startsWith('/api/board/')) {
-    // The scene the page draws: every box and line already measured by the board's own geometry, and each step's frame.
+    // The scene the page draws: every box and line already measured by the board's own geometry, and each step's frame. A later open asks again and is told 304.
     const at = /^\/api\/board\/([^/]+)\/(\d+)$/.exec(new URL(req.url!, 'http://board').pathname), found = at && boardAt(decodeURIComponent(at[1]!), Number(at[2]));
     if (!found || 'why' in found) return res.writeHead(404, { 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ error: found ? found.why : 'No board there.' }));
-    return res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ title: found.title, steps: found.steps, elements: found.elements }));
+    const body = Buffer.from(JSON.stringify({ title: found.title, steps: found.steps, elements: found.elements })), tag = `"${sha256(body).slice(0, 32)}"`, headers = { 'content-type': 'application/json', 'cache-control': 'no-cache', etag: tag };
+    if (unchanged(req, tag)) return res.writeHead(304, headers).end();
+    return res.writeHead(200, headers).end(body);
   }
   if (req.method === 'GET' && req.url === '/') {
     // The three files the first screen needs are named by the answer that carries the shell, so a phone starts reading them with the page itself

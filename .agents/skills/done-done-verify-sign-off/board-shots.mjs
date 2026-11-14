@@ -141,6 +141,27 @@ try {
   assert.deepEqual(seen.zones, data.zones.map((z) => z.label));
   assert.equal(seen.zoneMembers[0], data.zones[0].around.map((id) => label.get(id)).join(', '));
   assert.match(seen.section, /The line, drawn/);
+  // The block starts with a framed picture of the drawing and one way in: the board's own page, full screen, in this report's place.
+  drive('await page.eval(() => { document.querySelector(".kb-board")?.scrollIntoView({ block: "center" }); }); await new Promise(r => setTimeout(r, 1200));');
+  const frame = ask(() => {
+    const box = document.querySelector('.kb-board'), fig = box.querySelector('.kb-frame'), pic = box.querySelector('.kb-pic'), open = box.querySelector('.kb-open');
+    const r = (e) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }; };
+    const list = box.querySelector('.kb-part');
+    return { pic: r(pic), frame: r(fig), open: r(open), drawn: pic ? [pic.naturalWidth, pic.naturalHeight, pic.complete] : null,
+      alt: pic?.getAttribute('alt') ?? '', href: open?.getAttribute('href') ?? '', label: open?.textContent.trim() ?? '',
+      say: box.querySelector('.kb-say')?.textContent ?? '',
+      titleFirst: !!fig && !!(box.querySelector('.kb-title').compareDocumentPosition(fig) & Node.DOCUMENT_POSITION_FOLLOWING),
+      listAfter: !!list && !!pic && !!(list.compareDocumentPosition(pic) & Node.DOCUMENT_POSITION_PRECEDING) };
+  });
+  assert.ok(frame.drawn && frame.drawn[0] > 0 && frame.drawn[1] > 0, `the picture drew the board: ${frame.drawn}`);
+  assert.match(frame.alt, /^The board, drawn small: The line after the plan/, 'the picture says which board it is');
+  assert.equal(frame.say, 'The agent’s board');
+  assert.equal(frame.label, 'Open board');
+  assert.equal(frame.href, `/board/${message.key}/0`, 'Open board opens this report\'s board page');
+  assert.ok(frame.titleFirst, 'the block names the board first');
+  assert.ok(frame.listAfter, 'the list of steps, shapes, moves and zones follows the picture');
+  assert.ok(frame.pic.y >= frame.frame.y - 1 && frame.pic.y + frame.pic.h <= frame.frame.y + frame.frame.h + 1, 'the picture sits inside its frame');
+  assert.ok(frame.open.y >= frame.frame.y && frame.open.y <= frame.frame.y + frame.frame.h + 60, 'the entry sits with the frame it belongs to');
   assert.deepEqual(seen.clipped, [], 'no label is cut off');
   assert.equal(seen.overflow, false); assert.deepEqual(seen.overflowing, []);
   assert.match(browser('console', '--type', 'error'), /no console messages found/);

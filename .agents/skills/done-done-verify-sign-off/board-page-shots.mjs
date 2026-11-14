@@ -124,7 +124,9 @@ try {
   assert.equal(opened.locked, opened.count, 'every element the agent drew is locked');
   // The editor in view mode keeps every control of its own out of sight: the bar is sign-off's.
   assert.deepEqual(opened.controls, [], 'no control of the editor is in view');
-  assert.deepEqual(opened.bar, ['Back', 'Next', 'Move', 'Fit', 'Close']);
+  assert.deepEqual(opened.bar, ['Back', 'Previous', 'Next', 'Move', 'Fit']);
+  // Back is the way out of the board and into the report it was opened from, and it keeps that address; Previous walks the walk-through.
+  assert.equal(await js(`document.getElementById('exit').getAttribute('href')`), `/#reports/${message.key}`, 'Back returns to the report the board was opened from');
   assert.match(opened.words, /6 steps/, 'the board says how many steps it has');
   // A phone shows no sideways scroll, and nothing of the page is drawn over.
   const layout = await js(`({ scroll: document.documentElement.scrollWidth, inner: innerWidth, canvas: document.getElementById('canvas').getBoundingClientRect().height, bar: document.querySelector('.bar').getBoundingClientRect().bottom, docHeight: document.documentElement.scrollHeight, innerHeight })`);
@@ -153,11 +155,11 @@ try {
     steps.push({ step: n + 1, title: data.steps[n].title, zoom: at.zoom, framed: framed.length });
   }
   await shot(`board-page-step.${theme}.${width}w.png`);
-  // Back walks the walk-through backwards and stops at the first step.
-  await js(`document.getElementById('back').click()`); await wait(300);
-  assert.ok((await scene()).step.endsWith(`of ${data.steps.length}`), 'Back leaves the last step for the one before it');
-  for (let i = 0; i < data.steps.length + 2; i++) { await js(`document.getElementById('back').click()`); await wait(80); }
-  assert.equal(await js(`document.getElementById('back').disabled`), true, 'Back stops at the first step');
+  // Previous walks the walk-through backwards and stops at the first step.
+  await js(`document.getElementById('prev').click()`); await wait(300);
+  assert.ok((await scene()).step.endsWith(`of ${data.steps.length}`), 'Previous leaves the last step for the one before it');
+  for (let i = 0; i < data.steps.length + 2; i++) { await js(`document.getElementById('prev').click()`); await wait(80); }
+  assert.equal(await js(`document.getElementById('prev').disabled`), true, 'Previous stops at the first step');
   // No request left this board, and the page logged no error.
   const foreign = [...new Set(requests.filter((u) => !u.startsWith(base) && !u.startsWith('data:')))];
   assert.deepEqual(foreign, [], `the board asks no other host for anything; it asked ${foreign.length}: ${foreign.slice(0, 6).join(' ')}`);
@@ -170,7 +172,7 @@ try {
     target: { version: `${JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version} at ${spawnSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: repo, encoding: 'utf8' }).stdout.trim()}` },
     start: 'A clean board holding one report 6 whose design section carries the first real board (17 shapes, 22 arrows, one zone, six steps), posted through the CLI, with the canvas built by npm run build:board.',
     steps: ['Open the report and follow its Open board into the board page at this width.', 'Read the board as it opens, pinch it with two fingers, and step through the walk-through with Next and Back.'],
-    result: 'The board draws full screen with sign-off\'s own bar (Back, Next, Move, Fit, Close), no control of the editor in view, a pinch that changes the zoom, every step framed, and no request to another host.',
+    result: 'The board draws full screen with sign-off\'s own bar (Back, Previous, Next, Move, Fit), no control of the editor in view, a pinch that changes the zoom, every step framed, and no request to another host.',
   }));
   console.log(`board page ${theme} ${width}: ${opened.count} elements, pinch ${opened.zoom.toFixed(2)} to ${pinched.zoom.toFixed(2)}, ${data.steps.length} steps framed`);
 } finally {
