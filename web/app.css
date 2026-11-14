@@ -2186,10 +2186,12 @@
   
   
   
-  /* The Activity tab: the filters (project, priority, type), how many events they leave, then each day under its heading with a rail down it and a dot at each event. */
-  
-  
-  
+  /* The Activity tab: the filter by who did it, how many events it leaves, then each day under its heading with a dot at each event. */
+  .tk-filters { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+  .tk-sel { flex: 1 1 0; min-width: 0; max-width: 16rem; height: 2.5rem; padding: 0 1.5rem 0 0.75rem; border: 0; border-radius: 1.25rem; appearance: none; text-overflow: ellipsis; color: var(--tk-ink); font: inherit; font-size: var(--tk-fs-row); font-weight: 500;
+    background-color: var(--tk-card); box-shadow: var(--tk-elev-card), inset 0 1px 0 var(--tk-hl); background-repeat: no-repeat; background-size: 0.3125rem 0.3125rem; background-position: calc(100% - 0.9375rem) 50%, calc(100% - 0.625rem) 50%;
+    background-image: linear-gradient(45deg, transparent 50%, var(--tk-text-tertiary) 50%), linear-gradient(135deg, var(--tk-text-tertiary) 50%, transparent 50%); }
+  .tk-sel:focus-visible { outline: 2px solid var(--tk-ink); outline-offset: 2px; }
   .tk-count { margin: 0.5rem 0.25rem 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); line-height: var(--tk-lh-meta); font-variant-numeric: tabular-nums; }
   
   
@@ -2474,28 +2476,27 @@ textarea.tk-ni { min-height: 4.5rem; resize: vertical; }
   #tk-new { max-width: 30rem; margin: auto; border-radius: 1.75rem; }
   #tk-new::before { content: none; }
 }
-/* Epics: the tickets still open under an epic on its card, and New ticket in this epic on its page. */
+/* Epics: the tickets under an epic on its card, and New ticket in this epic on its page. */
+.tk-ekids { display: flex; flex-direction: column; gap: var(--tk-sp-1); margin: var(--tk-sp-1) 0 0; padding-top: var(--tk-sp-2); border-top: 1px solid var(--tk-line); }
+.tk-ekid { display: flex; align-items: baseline; gap: var(--tk-sp-2); min-width: 0; color: var(--tk-text); font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
+.tk-ekid i { flex: none; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--tk-track); box-shadow: inset 0 0 0 1.5px var(--tk-text-tertiary); align-self: center; }
+.tk-ekid > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tk-eks { flex: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-meta); }
+.tk-emore { color: var(--tk-text-secondary); font-size: var(--tk-fs-meta); }
+.tk-addin { display: inline-flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; margin: var(--tk-sp-2) 0 0; padding: 0 var(--tk-sp-4); border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-size: var(--tk-fs-row); font-weight: 600; cursor: pointer; }
+.tk-addin .glyph { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2; }
 
-
-
- 
-
-
-
-
-/* All tickets, grouped by epic: Group by, then each epic's head (key, title, how many are done) over its tickets, and the tickets under none. */
-
-
-
-
-
-
-
-
-
-
- 
-
+/* All tickets, grouped by epic: Group by, then each epic's head (its title and how many tickets sit under it) over its tickets, and the tickets under none. */
+.tk-gby { display: flex; align-items: center; gap: var(--tk-sp-3); margin: var(--tk-sp-1) 0 var(--tk-sp-2); }
+.tk-gl { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
+.tk-gseg { flex: 1; max-width: 14rem; margin: 0; }
+.tk-eb { margin: var(--tk-sp-3) 0 0; }
+.tk-eh { display: flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; padding: 0 var(--tk-sp-1); color: var(--tk-ink); text-decoration: none; }
+.tk-eh .tk-tile { flex: none; }
+.tk-et { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tk-fs-head); font-weight: 500; letter-spacing: -0.014em; }
+.tk-eh small { flex: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-variant-numeric: tabular-nums; }
+.tk-eh .glyph { flex: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; color: var(--tk-text-tertiary); }
+@media (min-width: 64rem) { .tk-et { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
 /* From the first-draft pass over the Tickets screens: the adapter's error reads as a headline and its message, with a primary Retry; the ticket's controls are 44px targets. */
 .es-error > b { font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
 .es-error > span:not(.es-mark) { max-width: 20rem; overflow-wrap: anywhere; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }

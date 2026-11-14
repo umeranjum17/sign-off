@@ -525,6 +525,35 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     see.onclick = () => { all ? tkMore.delete(g.value) : tkMore.add(g.value); render(); };
     return el('section', { 'aria-label': g.name }, el('h2', { class: 'ui-sec' }, g.name, el('small', {}, String(g.list.length)), g.list.length > 5 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? rows : rows.slice(0, 5))));
   }
+  /** How All tickets is grouped: by the status words the backend lists, or by the epic each ticket sits under. The pick is kept while the board is open. */
+  let tkGroupBy = 'status';
+  /** In the order the backend lists its statuses, then the most recently changed: the client ranks no status word of its own. */
+  const tkStanding = (list) => { const rank = new Map(tkValues('status').map((v, i) => [v.value, i])), of = (t) => rank.get(t.status) ?? rank.size;
+    return [...list].sort((x, y) => of(x) - of(y) || (Date.parse(y.updated_at) || 0) - (Date.parse(x.updated_at) || 0)); };
+  /** The epic a ticket sits under: the last ticket up its `parent` links, which the interface calls the ticket others name as their parent. A ticket with no parent sits under none. */
+  function tkEpicOf(t) { const seen = new Set(); let at = t; while (at?.parent && !seen.has(at.id)) { seen.add(at.id); at = tkById(at.parent); } return at && at !== t ? at : undefined; }
+  /** The pick between the two groupings, above the lists; it shows only where some ticket names a parent, since without one there is nothing to group by. */
+  function tkGroupPick() {
+    if (!tkAll().some((t) => t.parent)) return '';
+    const b = (v, w) => { const x = el('button', { type: 'button', 'aria-pressed': String(tkGroupBy === v) }, w); x.onclick = () => { if (tkGroupBy !== v) { buzz('tick'); tkGroupBy = v; render(); } }; return x; };
+    return el('div', { class: 'tk-gby' }, el('span', { class: 'tk-gl' }, 'Group by'), el('div', { class: 'ui-seg tk-gseg', role: 'group', 'aria-label': 'Group tickets by' }, b('status', 'Status'), b('epic', 'Epic')));
+  }
+  /** One epic in All tickets grouped by epic: its head opens the epic's page, then the tickets under it — five on a phone, the rest behind one button. */
+  function tkEpicBlock(e, kids, desk) {
+    const key = `epic-${e.id}`, all = tkMore.has(key), shown = all ? kids : kids.slice(0, 5);
+    const head = el('a', { class: 'tk-eh', href: `#epics/${e.id}` }, tkTile(true), el('span', { class: 'tk-et', dir: 'auto' }, e.title), el('small', {}, String(kids.length)), glyph('right'));
+    const more = kids.length > 5 ? (() => { const b = el('button', { class: 'see' }, all ? 'Show fewer' : `${kids.length - 5} more`); b.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); }; return b; })() : '';
+    return desk ? el('section', { class: 'ui-card tk-card', 'aria-label': e.title }, head, el('ul', { class: 'ui-list tk-rows' }, ...kids.map(tkRow)))
+      : el('section', { class: 'tk-eb', 'aria-label': e.title }, head, el('ul', { class: 'ui-card ui-list' }, ...shown.map(tkRow)), more);
+  }
+  /** All tickets grouped by epic: each epic with the tickets under it, in the backend's own status order, then the tickets under no epic. */
+  function tkByEpic(list, desk) {
+    const kids = new Map();
+    for (const t of list) { const e = tkEpicOf(t); if (e) kids.set(e.id, [...(kids.get(e.id) ?? []), t]); }
+    const blocks = tkAll().filter((t) => kids.has(t.id)).sort((x, y) => kids.get(y.id).length - kids.get(x.id).length).map((e) => tkEpicBlock(e, tkStanding(kids.get(e.id)), desk));
+    const loose = list.filter((t) => !tkEpicOf(t));
+    return [...blocks, ...(loose.length ? [tkGroup({ value: 'noepic', name: 'No epic', list: tkStanding(loose) }, desk)] : [])];
+  }
   /** The head of every Tickets view, on a phone and on a desk. */
   function tkHead(on, ...tools) {
     const sub = tk.tickets ? el('p', { class: 'tk-total', role: 'status' }, `${tk.tickets.length} tickets${tk.tickets.length ? ` · ${tkCounts(tk.tickets)}` : ''}`) : '';
@@ -532,28 +561,34 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return [el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), sub),
       el('div', { class: 'acts' }, ...tkPills(), tkTabs(on), tkNewButton(), ...tools, themeButton()))];
   }
-  /** The list: every ticket (those that fit the filters) grouped by status, in the order the backend lists its statuses. */
+  /** The list: every ticket (those that fit the filters), grouped by status in the order the backend lists them or by the epic each sits under. */
   function tickets(by, id, subpage) {
     if (subpage === 'activity') return activityPage();
     if (subpage === 'epics') return epicsPage(id);
-    const desk = !phone(), picked = id && tkById(id), list = tkFiltered(), groups = tkGroups(list), open = picked || (desk ? list[0] : undefined);
+    const desk = !phone(), picked = id && tkById(id), list = tkFiltered(), open = picked || (desk ? list[0] : undefined);
     tkShown.id = open?.id ?? '';
     if (id) tkWant(id);
     const empty = !tk.tickets || !tk.tickets.length ? tkNote('tickets', 'pick', 'No tickets yet', 'Tickets show here as the ticket system has them.') : !list.length
       ? emptyState('empty', { mark: 'list', title: 'No tickets match', text: 'Nothing matches these filters right now.', act: ['Clear filters', () => { tkFilters = {}; render(); }] }) : null;
     if (empty) empty.classList.add('tk-empty');
-    const head = tkHead('tickets', tkFilter());
-    if (!desk) return [...head, ...(empty ? [empty] : groups.map((g) => tkGroup(g))), picked ? tkSheet(picked) : (tkUp = '')];
-    const half = Math.ceil(groups.length / 2);
-    return [el('div', { class: 'ui-desk tk-desk' }, ...head, empty ? empty : el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, ...groups.slice(0, half).map((g) => tkGroup(g, true))), el('div', { class: 'ui-col s4' }, ...groups.slice(half).map((g) => tkGroup(g, true))),
+    const head = tkHead('tickets', tkFilter()),
+      parts = tkGroupBy === 'epic' ? tkByEpic(list, desk) : tkGroups(list).map((g) => tkGroup(g, desk));
+    if (!desk) return [...head, ...(empty ? [empty] : [tkGroupPick(), ...parts]), picked ? tkSheet(picked) : (tkUp = '')];
+    const half = Math.ceil(parts.length / 2);
+    return [el('div', { class: 'ui-desk tk-desk' }, ...head, empty ? empty : el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkGroupPick(), ...parts.slice(0, half)), el('div', { class: 'ui-col s4' }, ...parts.slice(half)),
       open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, emptyState('empty', { mark: 'pick', title: id ? 'Ticket not found' : 'No ticket open', text: id ? 'It may have been moved. Pick another from the list.' : 'Pick a ticket from the list to read it here.', small: true }))))];
   }
-  /** The Epics view: every ticket that others name as their parent, as a card with what is under it counted by status; a card opens that ticket's own tickets, grouped by status. */
+  /** The Epics view: every ticket that others name as their parent, as a card with the tickets under it and how they stand; a card opens that epic's own page — its tickets grouped by status, and New ticket in this epic. */
   function epicsPage(by) {
     const parents = tkFiltered().filter((t) => tkUnder(t).length), drill = parents.find((t) => t.id === by) ?? (by && tkById(by));
-    const card = (e) => { const kids = tkUnder(e);
-      return el('a', { class: 'ui-card tk-ecard', href: `#epics/${e.id}`, 'aria-label': `${e.title}, ${kids.length} under it, ${tkCounts(kids)}` }, el('span', { class: 'tk-ecard-t', dir: 'auto' }, e.title), el('span', { class: 'tk-ms-v' }, `${kids.length}`, el('small', {}, ' under it')), el('span', { class: 'meta' }, tkCounts(kids))); };
-    const inEpic = (e) => [el('a', { class: 'tk-back', href: '#epics' }, glyph('left'), 'All epics'), el('section', { class: 'ui-card tk-epic', 'aria-label': e.title }, el('ul', { class: 'ui-list tk-epic-list' }, tkRow(e))),
+    const card = (e) => { const kids = tkStanding(tkUnder(e));
+      return el('a', { class: 'ui-card tk-ecard', href: `#epics/${e.id}`, 'aria-label': `${e.title}, ${kids.length} under it, ${tkCounts(kids)}` }, el('span', { class: 'tk-ecard-t', dir: 'auto' }, e.title),
+        el('span', { class: 'tk-ms-v' }, `${kids.length}`, el('small', {}, ' under it')), el('span', { class: 'meta' }, tkCounts(kids)),
+        el('span', { class: 'tk-ekids' }, ...kids.slice(0, 3).map((k) => el('span', { class: 'tk-ekid', dir: 'auto' }, el('i', { 'aria-hidden': 'true' }), el('span', {}, k.title), el('span', { class: 'tk-eks' }, tkWord('status', k.status)))),
+          kids.length > 3 ? el('span', { class: 'tk-emore' }, `+ ${kids.length - 3} more`) : '')); };
+    /** The one button that makes a ticket already under this epic: the form opens with its parent picked. */
+    const add = (e) => { if (!tkCanMake()) return ''; const b = el('button', { type: 'button', class: 'tk-addin' }, glyph('plus'), 'New ticket in this epic'); b.onclick = () => tkForm(undefined, { parent: e.id }); return b; };
+    const inEpic = (e) => [el('a', { class: 'tk-back', href: '#epics' }, glyph('left'), 'All epics'), el('section', { class: 'ui-card tk-epic', 'aria-label': e.title }, el('ul', { class: 'ui-list tk-epic-list' }, tkRow(e))), add(e),
       ...tkGroups(tkUnder(e)).map((g) => el('section', { 'aria-label': g.name }, el('h2', { class: 'ui-sec' }, g.name, el('small', {}, String(g.list.length))), el('ul', { class: 'ui-card ui-list tk-epic-list' }, ...g.list.map(tkRow))))];
     const body = !tk.tickets || !parents.length ? [tkNote('epics', 'layers', 'No epics yet', 'A ticket that others sit under shows here, with what is under it counted by status.')]
       : drill ? inEpic(drill) : [el('p', { class: 'tk-count', role: 'status' }, `${plural(parents.length, 'ticket')} with tickets under them`), el('div', { class: 'tk-ecards' }, ...parents.map(card))];
@@ -576,6 +611,17 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const tkEvent = (e, title) => el('li', {}, el('div', { class: 'tk-ev' }, el('span', { class: 'rm' },
     el('span', { class: 'l1' }, title ? el('a', { class: 't', href: `#ticket/${e.ticket}`, dir: 'auto' }, title) : '', el('span', { class: 'meta' }, [e.event.type, e.event.actor].filter(Boolean).join(' · '))),
     e.event.text ? el('span', { class: 'tk-evt', dir: 'auto' }, e.event.text) : '', ...e.event.changes.map((c) => el('span', { class: 'meta', dir: 'auto' }, tkChange(c))), el('time', { class: 'pct', datetime: e.event.at }, tkWhen(e.event.at)))));
+  /** Activity's filter by who did it: the one person picked, as the backend's history names them, or everyone. */
+  let tkWho = '';
+  /** The person filter: one pick over the actors the events name, and Everyone; nothing where the backend names nobody. */
+  function tkWhoFilter(events) {
+    const people = [...new Set(events.map((e) => e.event.actor).filter(Boolean))].sort((x, y) => x.localeCompare(y));
+    if (!people.length) return '';
+    const s = el('select', { class: 'tk-sel', 'aria-label': 'Filter activity by person' }, el('option', { value: '' }, 'Everyone'), ...people.map((p) => el('option', { value: p }, p)));
+    s.value = people.includes(tkWho) ? tkWho : (tkWho = '');
+    s.onchange = () => { tkWho = s.value; render(); };
+    return el('div', { class: 'tk-filters', role: 'group', 'aria-label': 'Filter activity' }, s);
+  }
   function activityPage() {
     tkReadActivity();
     const head = tkHead('activity'), a = tkActivity.events;
@@ -586,11 +632,13 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     else if (!a) body = emptyState('loading', { title: 'Loading activity' });
     else if (!a.events.length) body = emptyState('empty', { mark: 'clock', title: 'No activity yet', text: 'The backend has recorded no events for these tickets.' });
     else {
-      const days = new Map();
-      for (const e of a.events) { const k = new Date(e.event.at).toDateString(); days.set(k, [...(days.get(k) ?? []), e]); }
-      body = el('div', { class: 'tk-acts' }, el('p', { class: 'tk-count', role: 'status' }, `${plural(a.events.length, 'event')} from the ${a.covered} of ${a.total} tickets that changed last`),
-        ...[...days.values()].map((list) => el('section', { class: 'tk-day', 'aria-label': dayHead(list[0].event.at) }, el('h2', { class: 'ui-sec' }, dayHead(list[0].event.at), el('small', {}, String(list.length))),
-          el('ul', { class: 'ui-card ui-list tk-feed' }, ...list.map((e) => tkEvent(e, e.title))))));
+      const shown = a.events.filter((e) => !tkWho || e.event.actor === tkWho), days = new Map();
+      for (const e of shown) { const k = new Date(e.event.at).toDateString(); days.set(k, [...(days.get(k) ?? []), e]); }
+      const all = `${plural(a.events.length, 'event')} from the ${a.covered} of ${a.total} tickets that changed last`;
+      body = el('div', { class: 'tk-acts' }, tkWhoFilter(a.events), el('p', { class: 'tk-count', role: 'status' }, tkWho ? `${shown.length} of ${all}` : all),
+        ...(shown.length ? [...days.values()].map((list) => el('section', { class: 'tk-day', 'aria-label': dayHead(list[0].event.at) }, el('h2', { class: 'ui-sec' }, dayHead(list[0].event.at), el('small', {}, String(list.length))),
+          el('ul', { class: 'ui-card ui-list tk-feed' }, ...list.map((e) => tkEvent(e, e.title)))))
+          : [emptyState('empty', { mark: 'list', title: 'No activity matches', text: 'This backend recorded no event of these by that person.', act: ['Show everyone', () => { tkWho = ''; render(); }] })]));
     }
     return phone() ? [...head, body] : [el('div', { class: 'ui-desk tk-desk' }, ...head, el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s12' }, body)))];
   }
@@ -694,8 +742,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   /** The form's words as the field's value: a list is split at commas, an empty ref or assignee is none, an empty extra key is left out. */
   const tkRead = (f, text) => (f.type === 'set' ? text.split(',').map((x) => x.trim()).filter(Boolean) : text === '' && (f.type === 'ref' || f.name === 'assignee') ? null : text);
   const tkValue = (t, name) => (name.startsWith('extra.') ? t.extra?.[name.slice(6)] : t[name]);
-  function tkForm(existing) {
+  function tkForm(existing, preset = {}) {
     const fields = tkFormFields(), inputs = new Map(), notes = new Map(), original = existing && Object.fromEntries(fields.map((f) => [f.name, tkValue(existing, f.name)]));
+    /** What a new form starts with (the epic a ticket is made under) or an edit with. */
+    const start = (f) => (existing ? tkShow(f, tkValue(existing, f.name)) : preset[f.name] !== undefined ? tkShow(f, preset[f.name]) : '');
     let rev = existing?.rev, attempt = { key: '', id: '' };
     const refs = tkAll().filter((x) => x.id !== existing?.id);
     const control = (f) => {
@@ -706,7 +756,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       else if (f.type === 'enum') { const have = vals.some((o) => o.value === v); x = el('select', { class: 'tk-ni tk-nsel', 'aria-label': label }, ...(f.required || (existing && v !== undefined) ? [] : [el('option', { value: '' }, 'Backend default')]), ...(v && !have ? [el('option', { value: v }, v)] : []), ...vals.map((o) => el('option', { value: o.value }, o.label ?? o.value))); }
       else { x = el('input', { type: 'text', class: 'tk-ni', autocomplete: 'off', 'aria-label': label, ...(vals.length && { list: `tk-list-${f.name.replace(/\W/g, '-')}` }) }); }
       if (f.required) x.setAttribute('required', 'true');
-      x.value = existing ? tkShow(f, v) : '';
+      x.value = start(f);
       inputs.set(f.name, x);
       const note = el('p', { class: 'tk-nerr', role: 'alert', hidden: 'true' }); notes.set(f.name, note);
       return el('label', { class: 'tk-nf' }, el('span', { class: 'tk-nl' }, label), x, ...(vals.length && f.type !== 'enum' ? [el('datalist', { id: `tk-list-${f.name.replace(/\W/g, '-')}` }, ...vals.map((o) => el('option', { value: o.value }, o.label ?? '')))] : []), note);
@@ -738,7 +788,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
         const made = await tkCall(existing ? `/api/tickets/${encodeURIComponent(existing.id)}` : '/api/tickets', { ...request, op_id: attempt.id });
         await readTickets(true);
         say(existing ? 'Saved' : `Created ${made.ticket.title}`, 4000, undefined, 'ok');
-        if (again) { for (const x of inputs.values()) x.value = ''; attempt = { key: '', id: '' }; busy(false); inputs.get('title')?.focus(); }
+        if (again) { for (const f of fields) inputs.get(f.name).value = start(f); attempt = { key: '', id: '' }; busy(false); inputs.get('title')?.focus(); }
         else { tkFormSheet.close(); if (!existing) location.hash = `#ticket/${made.ticket.id}`; }
       } catch (e) {
         busy(false);

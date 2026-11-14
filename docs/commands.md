@@ -109,7 +109,7 @@ sign-off-axi ticket --id T-29 --text "Needs a screenshot."
 sign-off-axi raise --ask-ref <captain-message-id-or-hold-id> --ticket T-29 --title "Ship the settings page on Friday?" ...
 ```
 
-A stale `--rev` is refused as a `conflict` with the current rev; `--op-id <key>` makes a repeated write safe. The card shows a **Ticket** row (on an ask, **Its ask**) with the id, that opens the ticket: its fields, More fields, the tickets under it, its cards and its history. The board's **Tickets** screen has three tabs, Tickets, Epics and Activity; see [file-formats.md](file-formats.md#tickets).
+A stale `--rev` is refused as a `conflict` with the current rev; `--op-id <key>` makes a repeated write safe. The card shows a **Ticket** row (on an ask, **Its ask**) with the id, that opens the ticket: its fields, More fields, the tickets under it, its cards and its history. The board's **Tickets** screen has three tabs, Tickets, Epics and Activity; see [file-formats.md](file-formats.md#tickets). On Tickets, **Group by** shows the list by the status words the backend lists or by the epic each ticket sits under, with the tickets under none last; an epic's page carries **New ticket in this epic**; and Activity names who made or moved each ticket, with a pick to read one person's events.
 
 ### Reading and writing tickets over HTTP
 

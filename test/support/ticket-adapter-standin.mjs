@@ -2,13 +2,14 @@
 // A small ticket adapter for the conformance script (docs/ticket-adapter.md): called as `adapter <operation>` with one JSON request on stdin, it keeps its tickets in
 // $TICKET_STANDIN_DIR/store.json and answers with one JSON response on stdout. Its words (stage-1, kind-a) are its own; nothing in sign-off may depend on them.
 // The fault file next to the store (written by ticket-adapter-standin-faults.mjs) makes its backend unreadable or readable only in part, as the conformance script asks.
+// TICKET_STANDIN_ACTOR=<name> is who this backend says did a write: its history events carry that name, and nothing else changes. The interface gives an actor no meaning.
 // TICKET_STANDIN_BUG=<name> makes it break one rule on purpose, so the tests can show the conformance script catches each break:
 //   empty-on-failure (an unreadable backend lists as empty), complete-false (a partial list answered as a success), drops-extra (an update forgets the extra keys it did
 //   not name), ignores-rev (a stale rev is accepted), no-op-id (a repeated create makes a second ticket).
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const dir = process.env.TICKET_STANDIN_DIR, bug = process.env.TICKET_STANDIN_BUG ?? '', [op] = process.argv.slice(2);
+const dir = process.env.TICKET_STANDIN_DIR, bug = process.env.TICKET_STANDIN_BUG ?? '', actor = process.env.TICKET_STANDIN_ACTOR || null, [op] = process.argv.slice(2);
 const values = (...v) => v.map((value) => ({ value }));
 const fields = [{ name: 'title', type: 'string', required: true }, { name: 'body', type: 'text' }, { name: 'kind', type: 'enum', values: values('kind-a', 'kind-b') },
   { name: 'status', type: 'enum', values: values('stage-1', 'stage-2', 'stage-3') }, { name: 'assignee', type: 'string' }, { name: 'labels', type: 'set' }, { name: 'parent', type: 'ref' },
@@ -69,7 +70,7 @@ if (op === 'get') send({ ticket: find(req.id) });
 if (op === 'history') { find(req.id); send({ events: store.events[req.id] ?? [] }); }
 if (op === 'comment') {
   replayed(); find(req.id);
-  done({ event: record(req.id, 'comment', req.text) });
+  done({ event: record(req.id, 'comment', req.text, [], actor) });
 }
 if (op === 'create') {
   replayed();
@@ -79,7 +80,7 @@ if (op === 'create') {
   if (t.parent && !store.tickets.some((x) => x.id === t.parent)) invalid(['parent', `No ticket ${t.parent}.`]);
   const made = { id: `tk-${store.tickets.length + 1}`, rev: rev(), title: t.title, body: t.body ?? '', kind: t.kind ?? 'kind-a', status: t.status ?? 'stage-1', assignee: t.assignee ?? null,
     labels: t.labels ?? [], parent: t.parent ?? null, links: t.links ?? [], created_at: now(), updated_at: now(), extra };
-  store.tickets.push(made); record(made.id, 'created', null);
+  store.tickets.push(made); record(made.id, 'created', null, [], actor);
   done({ ticket: made });
 }
 if (op === 'update') {
@@ -96,6 +97,6 @@ if (op === 'update') {
     ...[...new Set([...Object.keys(t.extra), ...Object.keys(next.extra)])].filter((k) => canon(t.extra[k]) !== canon(next.extra[k])).map((k) => ({ field: `extra.${k}`, from: t.extra[k] ?? null, to: next.extra[k] ?? null }))];
   if (!changes.length) done({ ticket: t });
   Object.assign(t, next, { rev: rev(), updated_at: now() });
-  record(t.id, 'changed', null, changes);
+  record(t.id, 'changed', null, changes, actor);
   done({ ticket: t });
 }
