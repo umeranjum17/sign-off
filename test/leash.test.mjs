@@ -43,7 +43,6 @@ const answers = (board) => JSON.parse(run('answers', board, '--json').stdout);
 test('When it matters: the board takes the default at silent_by, also one that fell due while it was closed, and the waiting agent wakes with it', async () => {
   const board = folder('matters');
   assert.equal(raise(board, 'missed', 'Which day should the release ship?', '--silent-by', at(-60_000)).status, 0);
-  assert.equal(raise(board, 'soon', 'Which day should the docs ship?', '--silent-by', at(3_000)).status, 0);
   assert.equal(raise(board, 'no-deadline', 'Which day should the blog post ship?').status, 0);
   // Nothing is taken while the board is closed, and a raise never takes a default.
   assert.deepEqual(answers(board), {});
@@ -54,7 +53,9 @@ test('When it matters: the board takes the default at silent_by, also one that f
     assert.equal(first.code ?? 0, 0, first.stdout);
     assert.deepEqual(Object.keys(JSON.parse(first.stdout)), ['missed']);
     assert.equal(JSON.parse(first.stdout).missed.taken, 'default');
-    // The next is timed to its own silent_by.
+    // The next is timed to its own silent_by. It is raised on the running board once that read is done, so its 3 seconds are counted from the raise and not from a start
+    // that a busy host can stretch past them; the board looks again every few seconds and takes it when it falls due.
+    assert.equal(raise(board, 'soon', 'Which day should the docs ship?', '--silent-by', at(3_000)).status, 0);
     const second = await waitFor(board, '--filer', 'agent-1', '--timeout', '15');
     assert.match(second.stdout, /soon,a,\S+,default/, second.stdout);
     assert.match(second.stdout, /taken: default is the default the board took/);

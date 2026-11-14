@@ -5587,8 +5587,11 @@ test('the inbox has #fleet: the agents talking to each other, muted by its own c
     assert.deepEqual(ents.map(([t, h]) => [t.includes('#fleet') ? '#fleet' : t.includes('Agents') ? 'Agents' : t, h]), [['#fleet', '#inbox/fleet'], ['Agents', '#channels'], ['Done0', null]]);
     await evaluate('document.querySelector(".ib-fleet").click()');
     await until(() => evaluate('document.querySelectorAll(".ib-msg").length >= 3'));
-    // The agents' own words, the ticket and the card as chips that read a title and open what they name.
-    const chips = await evaluate('JSON.stringify([...document.querySelectorAll(".ib-mention")].map((a) => [a.querySelector("span").textContent, a.querySelector("small").textContent.trim(), a.getAttribute("href")]))').then(JSON.parse);
+    // The agents' own words, the ticket and the card as chips that read a title and open what they name. The words draw as soon as the channel is read, and a ticket's mention
+    // becomes its chip when the ticket system answers, which a slow adapter delays, so the page is read once both chips are on it.
+    const chipsOf = () => evaluate('JSON.stringify([...document.querySelectorAll(".ib-mention")].map((a) => [a.querySelector("span").textContent, a.querySelector("small").textContent.trim(), a.getAttribute("href")]))').then(JSON.parse);
+    await until(async () => (await chipsOf()).length === 2);
+    const chips = await chipsOf();
     assert.deepEqual(chips, [['Move the ticket owner', '· ticket', `#ticket/${tk}`], ['Ship the release notes this week?', '· decision', '#inbox/notes']]);
     assert.equal(await evaluate('document.body.innerText.includes("'+tk+'")'), false);
     // Muting is this channel's own control, kept for the next visit, and it says what it does not do.
