@@ -1471,27 +1471,8 @@
   addEventListener('click', (e) => { if (e.target.closest?.('a[href="#find"]')) e.preventDefault(), openSearch(); });
 
   /* Tickets: the screens are app-more.js's and read the tickets through the board's ticket API. What this file draws of them is a card's Ticket row and a ticket's tile. */
-  // The property rows' marks, as the prototype draws them: a flag, a half-filled circle, two stacked sheets and a clock; fixed strings from this page.
-  const TK_MARKS = { chip: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 3v3.5M14.5 3v3.5M9.5 17.5V21M14.5 17.5V21M3 9.5h3.5M3 14.5h3.5M17.5 9.5H21M17.5 14.5H21"/>', flag: '<path d="M5 21V4h11l-2 4 2 4H5"/>', half: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/>',
-    layers: '<rect x="3" y="3" width="12" height="12" rx="2"/><path d="M9 21h10a2 2 0 0 0 2-2V9"/>', clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>',
-    'no-person': '<circle cx="12" cy="8" r="3.2"/><path d="M5.5 19.5c0-3.3 2.9-5.5 6.5-5.5M4 4l16 16"/>',
-    pause: '<path d="M9 6v12M15 6v12"/>' };
   /** A ticket's tile; the one with other tickets under it wears the epic's mark. */
   const tkTile = (epic) => { const s = el('span', { class: 'ui-icon tk-tile', role: 'img', 'aria-label': epic ? 'Has tickets under it' : 'Ticket' }); s.innerHTML = `<svg viewBox="0 0 24 24"><use href="#tk-${epic ? 'e' : 't'}"/></svg>`; return s; };
-  const tkMark = (a) => { const s = el('span', { class: 'tk-k', 'aria-hidden': 'true' }); s.innerHTML = `<svg viewBox="0 0 24 24">${TK_MARKS[a]}</svg>`; return s; };
-  function tkSettle() {
-    if (phone()) return;
-    for (const l of document.querySelectorAll('.tk-card .tk-rows')) {
-      l.classList.remove('fades', 'at-end'); l.style.height = l.style.flex = l.style.paddingBottom = '';
-      if (l.scrollHeight <= l.clientHeight + 1) continue;
-      const top = l.getBoundingClientRect().top + l.clientTop, h = l.clientHeight, ends = [...l.children].map((r) => r.getBoundingClientRect().bottom - top);
-      const last = ends.filter((b) => b <= h + 0.5).at(-1) ?? 0, room = h - last;
-      if (room < 40) { l.style.flex = 'none'; l.style.height = `${last}px`; continue; }
-      l.style.setProperty('--fz', `${room}px`); l.style.paddingBottom = `${room}px`; l.classList.add('fades');
-      l.addEventListener('scroll', () => l.classList.toggle('at-end', l.scrollTop + l.clientHeight >= l.scrollHeight - 2));
-    }
-  }
-  addEventListener('resize', () => document.querySelector('.tk-desk') && tkSettle());
   /** On a desk a list's column and the open item scroll inside themselves; while one holds more than it shows it fades out over its last 64px, and the fade goes at its end. */
   // What is in them can grow after they are drawn (a report's page loads), so each is looked at again when a part of it changes size.
   const settled = 'ResizeObserver' in window && new ResizeObserver(() => uiSettle());
@@ -2317,8 +2298,8 @@
   /** A sign-in as a page of its own: its key, the headline, what it unlocks, how long the link lasts (on a phone; on a desk the row beside it counts that down) and where it signs in,
    *  with Open sign-in as the one button; once tapped it says it waits for you until the agent closes the card. */
   /** Copies a fact's whole value: the clipboard API where the board is a secure context, else a hidden box the browser copies from. The button says Copied for a moment,
-   *  then returns to its own name, and the board's toast shows the word. */
-  async function copyValue(text, btn) {
+   *  then returns to its own name, and the board's toast shows the word (unless the caller says the button's own word is enough). It answers whether the copy worked. */
+  async function copyValue(text, btn, quiet = false) {
     const said = (label) => { btn.setAttribute('aria-label', label); btn.classList.toggle('ok', label === 'Copied'); clearTimeout(btn.said); btn.said = setTimeout(() => said(btn.dataset.name), 1600); };
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; }
@@ -2327,7 +2308,8 @@
       try { const box = el('textarea', { 'aria-hidden': 'true', style: 'position: fixed; top: 0; left: -9999px; opacity: 0' }); box.value = text; document.body.append(box); box.select(); ok = document.execCommand('copy'); box.remove(); } catch {}
     }
     said(ok ? 'Copied' : 'Could not copy');
-    if (ok) say('Copied', 1600);
+    if (ok && !quiet) say('Copied', 1600);
+    return ok;
   }
   /** One row of a sign-in's facts: its icon, the label, which keeps its word, and the value, which takes the free width and wraps inside it. A value that cannot wrap cleanly
    *  (a link, or one long word) keeps one line with an ellipsis beside a copy button that hands over the whole value. */
@@ -2750,7 +2732,6 @@
     fold();
     applyPicks();
     if (FROZEN) freeze();
-    if (document.querySelector('.tk-desk')) requestAnimationFrame(tkSettle), document.fonts.ready.then(tkSettle);
     if (document.querySelector('.ui-desk')) requestAnimationFrame(uiSettle), document.fonts.ready.then(uiSettle);
   }
   function freeze() {

@@ -6,7 +6,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { recordsDir } from './records.mjs';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
@@ -19,8 +19,11 @@ const records = recordsDir(out);
 mkdirSync(records, { recursive: true });
 const repo = resolve(process.env.SIGN_OFF_REPO ?? resolve(import.meta.dirname, '../../..')), cliJs = join(repo, 'dist/cli.js');
 const dir = mkdtempSync(join(tmpdir(), 'so-comment-')), board = join(dir, 'board.json');
-const env = { ...process.env, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: join(dir, 'data'), XDG_CACHE_HOME: join(dir, 'cache'), XDG_STATE_HOME: join(dir, 'state') };
+const env = { ...process.env, PATH: dirname(process.execPath) + ':' + process.env.PATH, HOME: dir, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: join(dir, 'data'), XDG_CACHE_HOME: join(dir, 'cache'), XDG_STATE_HOME: join(dir, 'state') };
 for (const k of Object.keys(env)) if (/^(FM_|FIRSTMATE|SIGN_OFF_)/.test(k)) delete env[k];
+// The report names a ticket (T-29), and the page reads a ticket's title through the board, which answers 503 (and the console logs an error) when no ticket adapter is set:
+// the repo's stand-in adapter keeps its tickets in a folder of its own (its `env node` line finds this run's node through PATH, as HOME is a folder with no node manager).
+env.SIGN_OFF_TICKETS_ADAPTER = join(repo, 'test/support/ticket-adapter-standin.mjs'); env.TICKET_STANDIN_DIR = join(dir, 'standin'); mkdirSync(env.TICKET_STANDIN_DIR);
 const run = (bin, args, options = {}) => { const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options }); assert.equal(r.status, 0, `${bin} ${args.join(' ')}\n${r.stdout}${r.stderr}`); return r.stdout; };
 const cli = (...args) => run(process.execPath, [cliJs, ...args], { env });
 const FILER = process.env.SEND_FEEDBACK_ONLY ? 'Umer' : 'agent-41', KEY = 'part-report', REC = 'part-report-2', PART = 'found', FOOT = 'this', ITEM = 'found:0';

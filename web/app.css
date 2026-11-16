@@ -2063,19 +2063,136 @@
   body.tickets .ui-sec .see { min-height: 0; padding: 0; border: 0; background: none; font: inherit; font-size: var(--tk-fs-row); line-height: 1.5rem; font-weight: 500; }
   
   
-  .tk-empty { margin-top: 1rem; }
   /* The project filter's sheet: Every project, then each project with its tickets' count, the one picked checked. */
   :is(.tk-pick, .dl-pick) { width: 100%; min-height: 3rem; padding: 0; border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--tk-fs-row); text-align: left; }
   :is(.tk-pick, .dl-pick) .k { color: var(--tk-ink); } :is(.tk-pick, .dl-pick):active { background: none; } :is(.tk-pick, .dl-pick) .glyph { width: 1rem; height: 1rem; color: var(--tk-ink); }
-  /* A ticket over the list, on a phone: a sheet from the bottom over a dimmed list, up to 48px from the top, scrolling inside. */
+  /* ---- The Tickets board and a ticket's sheet, in the calm look the captain picked on 16 Nov (the "option 2" design): near-white and soft grey, one indigo accent, 13px type, hairlines and no
+     heavy borders. It has tokens of its own, light and dark, because it is a design of its own; every other screen keeps the board's warm ones. The greys that carry words are set to read at
+     4.5:1 on both grounds (the design's own tertiary grey did not). ---- */
+  :root { --cb-bg: #FFFFFF; --cb-panel: #F7F7F8; --cb-ink: #1C1D21; --cb-ink2: #5F6270; --cb-ink3: #686B78; --cb-line: #ECECF0; --cb-hover: #F3F3F6; --cb-accent: #5A62D1; --cb-dim: rgba(10, 11, 16, 0.28); --cb-shadow: 0 8px 30px rgba(20, 21, 30, 0.12); }
+  @media (prefers-color-scheme: dark) { :root { --cb-bg: #101113; --cb-panel: #161719; --cb-ink: #ECECEF; --cb-ink2: #A2A5B1; --cb-ink3: #8B8E9A; --cb-line: #232428; --cb-hover: #1A1B1E; --cb-accent: #8E95F2; --cb-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); } }
+  /* The screen is one frame the height of the window; each column scrolls inside itself. */
+  body:has(.tkb) { padding-bottom: 0; overflow: hidden; background: var(--cb-bg); }
+  body:has(.tkb) main { max-width: none; padding: 0; }
+  .tkb { display: flex; flex-direction: column; height: 100dvh; color: var(--cb-ink); font: 13px/1.45 var(--tk-font); letter-spacing: -0.003em; }
+  .tkb :focus-visible, .tk-over :focus-visible { outline: 2px solid var(--cb-accent); outline-offset: -2px; border-radius: 6px; }
+  .tkb-top { display: flex; align-items: center; gap: 14px; flex: none; height: 52px; padding: 0 20px; }
+  .tkb-top h1 { margin: 0; font-size: 14px; line-height: 1.45; font-weight: 600; letter-spacing: -0.003em; color: var(--cb-ink); outline: none; }
+  .tkb-top .sum { color: var(--cb-ink3); }
+  .tkb-top .tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .tkb-link { padding: 8px 10px; border-radius: 6px; color: var(--cb-ink2); font-size: 12.5px; text-decoration: none; }
+  .tkb-link:hover { background: var(--cb-hover); color: var(--cb-ink); }
+  .tkb-top .ui-rb { width: 36px; height: 36px; min-height: 0; padding: 0; border: 0; border-radius: 8px; background: none; box-shadow: none; color: var(--cb-ink2); }
+  .tkb-top .ui-rb:hover { background: var(--cb-hover); color: var(--cb-ink); }
+  .tkb-top .ui-rb.on { background: var(--cb-hover); color: var(--cb-accent); }
+  .tkb-top .ui-rb .glyph { width: 18px; height: 18px; }
+  .tkb-pills { display: flex; flex-wrap: wrap; gap: 6px; flex: none; padding: 0 20px 10px; }
+  .tkb-pills .tk-fpill { margin: 0; background: var(--cb-panel); box-shadow: none; color: var(--cb-ink2); font-size: 12.5px; font-weight: 400; }
+  .tkb > .es { margin: 8px 20px; background: var(--cb-panel); box-shadow: none; }
+  .tkb-tabs { display: none; }
+  .tkb-mark { display: inline-grid; flex: none; place-items: center; width: 14px; height: 14px; }
+  .tkb-mark svg { width: 14px; height: 14px; fill: none; stroke: var(--cb-ink3); stroke-width: 1.5; }
+  .tkb-mark path { fill: var(--cb-ink2); stroke: none; }
+  .tkb-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 1fr); gap: 12px; flex: 1; min-height: 0; padding: 0 20px 20px; overflow-x: auto; }
+  .tkb-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-radius: 12px; background: var(--cb-panel); }
+  .tkb-ch { display: flex; align-items: center; gap: 8px; flex: none; margin: 0; padding: 14px 16px 10px; font-size: 13px; line-height: 1.45; font-weight: 600; letter-spacing: -0.003em; color: var(--cb-ink); }
+  .tkb-ch .n, .tkb-tab .n { color: var(--cb-ink3); font-weight: 400; font-variant-numeric: tabular-nums; }
+  .tkb-cards { display: flex; flex-direction: column; gap: 6px; min-height: 0; padding: 2px 8px 10px; overflow: auto; scrollbar-width: thin; }
+  .tkb-card { container-type: inline-size; display: block; padding: 11px 13px 10px; border-radius: 9px; background: var(--cb-bg); box-shadow: 0 0 0 1px var(--cb-line); color: inherit; text-decoration: none; transition: box-shadow 120ms; }
+  .tkb-card:hover { box-shadow: 0 0 0 1px var(--cb-ink3); }
+  .tkb-card[aria-current] { box-shadow: 0 0 0 1.5px var(--cb-accent); }
+  .tkb-card .t { display: -webkit-box; overflow: hidden; font-weight: 500; line-height: 1.4; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .tkb-card .id, .tkb-id code { font: 11.5px/1.3 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: 0; }
+  .tkb-card .id { display: block; margin-top: 5px; color: var(--cb-ink3); }
+  .tkb-card .m { display: flex; align-items: center; gap: 6px; margin-top: 6px; overflow: hidden; color: var(--cb-ink3); font-size: 12px; white-space: nowrap; }
+  .tkb-card .m span:not(.o) { overflow: hidden; text-overflow: ellipsis; }
+  /* The project keeps its words up to half the line, a long assignee (a real lane's name) gives way first, both with an ellipsis; the time after them stays whole, each set off by a dot. */
+  .tkb-card .m .proj { flex: none; max-width: 50%; }
+  .tkb-card .m span.ago, .tkb-card .m span.dot { flex: none; overflow: visible; }
+  @container (max-width: 215px) { .tkb-card .m .u { display: none; } }
+  .tkb-none { margin: 0; padding: 6px 8px; color: var(--cb-ink3); font-size: 12.5px; }
+  .tkb-card .o { display: grid; flex: none; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--cb-panel); color: var(--cb-ink2); font-size: 11px; }
+  .tkb-more { padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--cb-ink2); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+  .tkb-more:hover { background: var(--cb-hover); color: var(--cb-ink); }
+  /* A phone: one column in view at a time, a tab for each (the count on it, and the name of the one in view), the cards on the full width. */
+  @media (max-width: 63.999rem) {
+    .tkb-top { height: 48px; padding: 0 16px; }
+    .tkb-top .sum { display: none; }
+    .tkb-pills { padding: 0 16px 10px; }
+    .tkb-tabs { display: flex; flex: none; gap: 4px; padding: 0 12px 10px; overflow-x: auto; scrollbar-width: none; }
+    .tkb-tab { display: flex; align-items: center; gap: 7px; flex: none; height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: none; color: var(--cb-ink2); font: inherit; white-space: nowrap; cursor: pointer; }
+    .tkb-tab .w { display: none; }
+    .tkb-tab[aria-selected="true"] { background: var(--cb-hover); color: var(--cb-ink); font-weight: 500; }
+    .tkb-tab[aria-selected="true"] .w { display: inline; }
+    .tkb-board { display: flex; gap: 0; padding: 0; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+    .tkb-board::-webkit-scrollbar { display: none; }
+    .tkb-col { flex: 0 0 100%; border-radius: 0; background: none; scroll-snap-align: start; }
+    .tkb-ch { display: none; }
+    .tkb-cards { gap: 8px; padding: 4px 16px calc(8rem + env(safe-area-inset-bottom)); scrollbar-width: none; }
+    .tkb-card { padding: 13px 14px 12px; }
+    .tkb-card .t { font-size: 15px; }
+    .tkb-card .m { font-size: 12.5px; }
+  }
+  /* A ticket over the board as a sheet: from the foot on a phone (up to 86% of the window, scrolling inside), from the right edge on a desk. */
   .tk-over { position: fixed; z-index: 30; inset: 0; }
-  .tk-scrim { position: absolute; inset: 0; background: var(--tk-scrim); }
-  .tk-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-width: 30rem; max-height: calc(100% - 3rem); margin: 0 auto; padding: 0 1rem calc(2rem + env(safe-area-inset-bottom)); overflow: auto;
-    overscroll-behavior: contain; border-radius: 1.75rem 1.75rem 0 0; background: var(--tk-card); color: var(--tk-text); box-shadow: var(--tk-elev-sheet); }
+  .tk-scrim { position: absolute; inset: 0; background: var(--cb-dim); }
+  .tk-sheet { position: absolute; right: 0; bottom: 0; left: 0; max-width: 30rem; max-height: 86dvh; margin: 0 auto; padding: 0 20px calc(28px + env(safe-area-inset-bottom)); overflow: auto; overscroll-behavior: contain;
+    border-radius: 16px 16px 0 0; background: var(--cb-bg); color: var(--cb-ink); box-shadow: var(--cb-shadow); font: 13px/1.45 var(--tk-font); letter-spacing: -0.003em; }
+  .tk-sheet .grab { width: 36px; height: 4px; margin: 8px auto 0; border-radius: 2px; background: var(--cb-line); }
   .tk-over.up .tk-sheet { animation: sheet-up 300ms var(--ease); } .tk-over.up .tk-scrim { animation: tk-fade 250ms var(--ease); }
   @keyframes tk-fade { from { opacity: 0; } }
   body:has(.tk-sheet) { overflow: hidden; }
-  .tk-sheet .grab { width: 2.25rem; height: 0.25rem; margin: 0.5rem auto; border-radius: 2px; background: var(--tk-line); }
+  @media (min-width: 64rem) {
+    .tk-sheet { top: 0; right: 0; left: auto; width: 440px; max-width: none; max-height: none; margin: 0; border-radius: 0; }
+    .tk-sheet .grab { display: none; }
+    .tk-over.up .tk-sheet { animation-name: tk-slide; }
+  }
+  @keyframes tk-slide { from { transform: translateX(2rem); opacity: 0; } }
+  .tk-sheet .tk-shd { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; margin: 0 -8px 0 0; padding-top: 6px; color: var(--cb-ink3); font-size: 12px; }
+  .tk-sheet .tk-shd .ui-lab { display: block; flex: 1; min-width: 0; overflow: hidden; color: inherit; font-size: inherit; text-overflow: ellipsis; white-space: nowrap; }
+  .tk-sheet .tk-shd { position: sticky; top: 0; z-index: 1; background: var(--cb-bg); }
+  .tk-sheet .tk-shd .tk-edit { min-width: 44px; min-height: 44px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--cb-ink2); font: inherit; font-size: 12.5px; }
+  .tk-sheet .tk-shd .tk-edit:hover { background: var(--cb-hover); color: var(--cb-ink); }
+  .tk-sheet .tk-shd .x { color: var(--cb-ink2); }
+  .tk-sheet .tk-shd .x::before { background: none; }
+  .tk-sheet .tk-shd .x:hover::before { background: var(--cb-hover); }
+  .tk-sheet .tk-dt { margin: 4px 0 6px; color: var(--cb-ink); font-size: 18px; line-height: 1.35; font-weight: 600; letter-spacing: -0.012em; }
+  /* The ticket's own id, whole: one tap copies it. */
+  .tkb-id { display: flex; align-items: center; gap: 10px; width: fit-content; max-width: 100%; min-height: 30px; margin: 8px 0 10px; padding: 5px 8px 5px 10px; border: 0; border-radius: 7px; background: var(--cb-panel); color: var(--cb-ink2); font: inherit; text-align: left; cursor: pointer; }
+  .tkb-id:hover { background: var(--cb-hover); color: var(--cb-ink); }
+  .tkb-id code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tkb-id span { flex: none; color: var(--cb-ink3); font-size: 12px; }
+  .tkb-state { display: flex; align-items: center; gap: 8px; margin: 0; color: var(--cb-ink2); }
+  .tkb-facts { display: grid; gap: 12px; margin: 18px 0 0; padding: 0; }
+  .tkb-facts > div { display: grid; grid-template-columns: 88px 1fr; gap: 12px; }
+  .tkb-facts dt { color: var(--cb-ink3); }
+  .tkb-facts dd { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 0; color: var(--cb-ink); }
+  .tkb-facts a { color: var(--cb-accent); text-decoration: none; }
+  .tkb-facts a:hover { text-decoration: underline; }
+  .tk-sheet .ui-dl { margin: 26px 0 10px; color: var(--cb-ink3); font-size: 12px; font-weight: 500; }
+  .tk-sheet .tk-note { margin: 0; color: var(--cb-ink3); font-size: 13px; }
+  .tk-sheet .ui-props { margin: 0; padding: 0 12px; border-radius: 12px; background: var(--cb-panel); }
+  .tk-sheet .ui-pr { min-height: 40px; color: var(--cb-ink); font-size: 13px; }
+  .tk-sheet .ui-pr + .ui-pr::before { background: var(--cb-line); }
+  .tk-sheet .ui-pr .k { color: var(--cb-ink3); } .tk-sheet .ui-pr .v { color: var(--cb-ink); }
+  .tk-sheet .ui-list { background: var(--cb-panel); box-shadow: none; }
+  .tk-sheet .tk-ni { background: var(--cb-panel); color: var(--cb-ink); font-size: 13px; }
+  .tk-sheet .tk-ni::placeholder { color: var(--cb-ink3); }
+  .tk-sheet .tk-comment { margin-top: 18px; }
+  .tk-sheet .tk-ngo { min-height: 36px; padding: 0 16px; font-size: 13px; }
+  .tkb-lab { padding: 1px 8px; border-radius: 9px; background: var(--cb-panel); color: var(--cb-ink2); font-size: 12px; }
+  .tk-sheet :is(.tk-in, .tk-desc) { background: var(--cb-panel); }
+  /* A ticket's history: a dot on a line for each event the backend recorded, the latest marked. */
+  .tkb-life { margin: 0; padding: 0; list-style: none; }
+  .tkb-life li { position: relative; padding: 0 0 18px 22px; }
+  .tkb-life li::before { content: ""; position: absolute; left: 4px; top: 5px; width: 7px; height: 7px; border-radius: 50%; background: var(--cb-ink3); }
+  .tkb-life li::after { content: ""; position: absolute; left: 7px; top: 15px; bottom: -1px; width: 1px; background: var(--cb-line); }
+  .tkb-life li:last-child { padding-bottom: 0; } .tkb-life li:last-child::after { display: none; }
+  .tkb-life li.now::before { background: var(--cb-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--cb-accent) 20%, transparent); }
+  .tkb-life b { font-weight: 500; }
+  .tkb-life .by { color: var(--cb-ink3); }
+  .tkb-life .when { display: block; color: var(--cb-ink3); font-size: 12.5px; }
+  .tkb-life .note { display: block; margin-top: 2px; color: var(--cb-ink2); font-size: 12.5px; }
   
   
   
@@ -2120,8 +2237,6 @@
   /* The ticket: its project and state (with Close on a phone), its title in full, its properties, the tickets under it, Linked and Activity. */
   .tk-shd { color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); line-height: 1.5rem; }
   .tk-dt { margin: 0.5rem 0 0; color: var(--tk-ink); font-size: 1.25rem; line-height: 1.75rem; font-weight: 500; letter-spacing: -0.017em; outline: none; }
-  .tk-k { display: inline-grid; flex: none; place-items: center; width: 1.125rem; height: 1.125rem; }
-  .tk-k svg { width: 1.125rem; height: 1.125rem; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-props { margin-top: 0.5rem; }
   :is(.tk-sheet, .tk-pane, .tk-evs) .ui-pr .v > span:not(.ui-bar) { white-space: normal; }
   .tk-in { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); } .tk-in .ui-icon { box-shadow: none; }
@@ -2131,13 +2246,11 @@
   
   .tk-epic-list { margin: 0.25rem 0 0; padding: 0.25rem 0.75rem; }
   /* On a desk the epics share one card, whose own padding is the row's inset. */
-  .tk-desk .tk-card > .tk-epic > .tk-epic-list { margin: 0; padding: 0; }
   .tk-desk .tk-epic + .tk-epic { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--tk-line); }
   
   /* A ticket's readable name (JG-101) leads its row's title line in the title's own type, not as a chip beside it; the slug it replaced is the row's small second line. */
   
   
-  .tk-slug { margin: 0.125rem 0 0; color: var(--tk-text-tertiary); font-size: var(--tk-fs-small); line-height: var(--tk-lh-small); overflow-wrap: anywhere; }
   /* A description as the sheet draws it: the summary a step larger, then headings, lists, links and quoted words, each with its own spacing. */
   .tk-desc { margin-top: 0.5rem; border-radius: 1rem; background: var(--tk-inset); padding: 0.75rem 1rem; }
   .tk-desc > * + * { margin-top: 0.5rem; }
@@ -2159,13 +2272,6 @@
   @media (min-width: 64rem) {
     .tk-dhead .tk-fpill { margin: 0; }
     
-    .tk-card { display: flex; flex-direction: column; min-height: 0; padding: 1.25rem 1.5rem; }
-    .tk-ch { display: flex; flex: none; align-items: center; gap: 0.5rem; height: 2rem; margin: 0; color: var(--tk-ink); font-size: var(--tk-fs-head); line-height: 1.5rem; font-weight: 500; letter-spacing: -0.014em; white-space: nowrap; }
-    .tk-ch small { color: var(--tk-text-tertiary); font-size: inherit; font-weight: 500; font-variant-numeric: tabular-nums; }
-    .tk-rows { flex: 1 1 auto; min-height: 0; margin: 0.25rem 0 0; padding: 0; overflow: auto; overflow-x: hidden; scrollbar-width: none; scroll-snap-type: y mandatory; overscroll-behavior: contain; }
-    .tk-rows > li { scroll-snap-align: start; }
-    .tk-rows.fades:not(.at-end) { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fz)), transparent); }
-    .tk-rows::-webkit-scrollbar { display: none; }
     .tk-desk .ui-row { z-index: 0; height: 5.5rem; }
     .tk-desk .ui-row .rm { gap: 0.375rem; }
     .tk-desk .ui-row .l1 { align-items: flex-start; height: auto; }
@@ -2173,10 +2279,7 @@
     .tk-desk .ui-row:hover:not([aria-current]) { opacity: 0.85; }
 
     .tk-row[aria-current]::after { content: ""; position: absolute; z-index: -1; inset: 0.25rem -0.5rem; border-radius: 0.875rem; background: var(--tk-inset); }
-    .tk-pane .tk-dt { font-size: 1.5rem; line-height: 2rem; }
-    .tk-pane > * { flex-shrink: 0; }
     .tk-desk .tk-in .ui-row { height: auto; min-height: 4.25rem; padding: 0.75rem 0; }
-    .tk-desk .tk-empty { width: 25rem; margin: 0; }
   }
   /* The Activity feed's row is a button built as the In progress cards' row: the same tile, title, priority chip and stage chip. */
   button.tk-ev { padding: 0; border: 0; border-radius: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
@@ -2490,21 +2593,10 @@ textarea.tk-ni { min-height: 4.5rem; resize: vertical; }
 .tk-addin { display: inline-flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; margin: var(--tk-sp-2) 0 0; padding: 0 var(--tk-sp-4); border: 0; border-radius: 999px; background: var(--tk-go); color: var(--tk-on-go); font: inherit; font-size: var(--tk-fs-row); font-weight: 600; cursor: pointer; }
 .tk-addin .glyph { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2; }
 
-/* All tickets, grouped by epic: Group by, then each epic's head (its title and how many tickets sit under it) over its tickets, and the tickets under none. */
-.tk-gby { display: flex; align-items: center; gap: var(--tk-sp-3); margin: var(--tk-sp-1) 0 var(--tk-sp-2); }
-.tk-gl { flex: none; color: var(--tk-text-secondary); font-size: var(--tk-fs-row); }
-.tk-gseg { flex: 1; max-width: 14rem; margin: 0; }
-.tk-eb { margin: var(--tk-sp-3) 0 0; }
-.tk-eh { display: flex; align-items: center; gap: var(--tk-sp-2); min-height: 2.75rem; padding: 0 var(--tk-sp-1); color: var(--tk-ink); text-decoration: none; }
-.tk-eh .tk-tile { flex: none; }
-.tk-et { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--tk-fs-head); font-weight: 500; letter-spacing: -0.014em; }
-.tk-eh small { flex: none; color: var(--tk-text-tertiary); font-size: var(--tk-fs-row); font-variant-numeric: tabular-nums; }
-.tk-eh .glyph { flex: none; width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 1.6; color: var(--tk-text-tertiary); }
-@media (min-width: 64rem) { .tk-et { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } }
 /* From the first-draft pass over the Tickets screens: the adapter's error reads as a headline and its message, with a primary Retry; the ticket's controls are 44px targets. */
 .es-error > b { font-size: var(--tk-fs-head); line-height: var(--tk-lh-head); font-weight: 600; }
 .es-error > span:not(.es-mark) { max-width: 20rem; overflow-wrap: anywhere; font-size: var(--tk-fs-row); line-height: var(--tk-lh-row); }
 .es-error .es-act { min-width: 7rem; margin-top: 1rem; background: var(--tk-go); color: var(--tk-on-go); }
 .es-error .es-act:focus-visible { outline-offset: 4px; }
-.tk-shd .tk-edit, .tk-pane .tk-edit { min-width: 2.75rem; min-height: 2.75rem; }
+.tk-shd .tk-edit { min-width: 2.75rem; min-height: 2.75rem; }
 .tk-dl li + li { margin-top: 0.25rem; }

@@ -33,4 +33,4 @@ Regression and captures: `SEND_FEEDBACK_ONLY=1 node .agents/skills/done-done-ver
 
 Set `COMMENT_PROTO=<approved prototype index.html>` to save the report, ask and evidence reference at every width and theme, and horizontal pairs under `vs-proto/`. The supplied board prototype has no Designs view and no Sending/Not sent state; design change-note frames therefore document the real app without claiming a missing approved mock.
 
-The comment-send fixture pins a project picture through the real CLI for its report, ask and evidence rows; refreshed list frames must show those project pictures and reject monograms.
+The comment-send fixture pins a project picture through the real CLI for its report, ask and evidence rows; refreshed list frames must show those project pictures and reject monograms. Its board also names the repo's stand-in ticket adapter with an empty store: the fixture report names a ticket, the page reads that ticket's title through the board, and a board with no adapter answers 503, which the clean-console check rejects.

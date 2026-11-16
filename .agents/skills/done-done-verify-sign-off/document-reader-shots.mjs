@@ -74,7 +74,10 @@ await cdp('Page.enable'); await cdp('Runtime.enable');
 await cdp('Emulation.setDeviceMetricsOverride', phone ? { width, height: 844, deviceScaleFactor: 2, mobile: true } : { width, height: 900, deviceScaleFactor: 2, mobile: false });
 await cdp('Emulation.setTouchEmulationEnabled', phone ? { enabled: true, maxTouchPoints: 5 } : { enabled: false });
 await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
-const go = async (hash) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(100); await cdp('Page.navigate', { url: base + hash }); await wait(1800); };
+// The board paints Today first, then fetches its styles and the file that draws a report (see loadMore in web/app.js), so when a report's sections are on screen is the machine's to say,
+// not a number of milliseconds: a page is open when its sections are drawn, and a page that never draws them fails here naming what is missing, not as a count of 0 sections later.
+const until = async (expression, what, ms = 60000) => { for (const end = Date.now() + ms; Date.now() < end; await wait(50)) if (await evaluate(expression).catch(() => false)) return; assert.fail(`never: ${what}`); };
+const go = async (hash) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(100); await cdp('Page.navigate', { url: base + hash }); await until(`!!document.querySelector('.gd-sec')`, `the report at ${hash} drew no sections`); };
 const tap = async (selector) => { assert.ok(await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); e?.click(); return !!e; })()`), `nothing to tap at ${selector}`); await wait(450); };
 const type = (selector, value) => evaluate(`(() => { const i = [...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.getClientRects().length) ?? document.querySelector(${JSON.stringify(selector)}); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`).then(() => wait(450));
 const show = (selector, block = 'start') => evaluate(`(() => { document.querySelector(${JSON.stringify(selector)})?.scrollIntoView({ block: ${JSON.stringify(block)} }); })()`).then(() => wait(350));

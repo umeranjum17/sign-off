@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // A small ticket adapter for the conformance script (docs/ticket-adapter.md): called as `adapter <operation>` with one JSON request on stdin, it keeps its tickets in
-// $TICKET_STANDIN_DIR/store.json and answers with one JSON response on stdout. Its words (stage-1, kind-a) are its own; nothing in sign-off may depend on them.
+// $TICKET_STANDIN_DIR/store.json and answers with one JSON response on stdout. Its words (stage-1, kind-a) are its own; nothing in sign-off may depend on them. A ticket may carry a read-only `project` (a seeded one does; one the stand-in makes has none).
 // The fault file next to the store (written by ticket-adapter-standin-faults.mjs) makes its backend unreadable or readable only in part, as the conformance script asks.
 // TICKET_STANDIN_ACTOR=<name> is who this backend says did a write: its history events carry that name, and nothing else changes. The interface gives an actor no meaning.
 // TICKET_STANDIN_BUG=<name> makes it break one rule on purpose, so the tests can show the conformance script catches each break:
@@ -13,7 +13,7 @@ const dir = process.env.TICKET_STANDIN_DIR, bug = process.env.TICKET_STANDIN_BUG
 const values = (...v) => v.map((value) => ({ value }));
 const fields = [{ name: 'title', type: 'string', required: true }, { name: 'body', type: 'text' }, { name: 'kind', type: 'enum', values: values('kind-a', 'kind-b') },
   { name: 'status', type: 'enum', values: values('stage-1', 'stage-2', 'stage-3') }, { name: 'assignee', type: 'string' }, { name: 'labels', type: 'set' }, { name: 'parent', type: 'ref' },
-  { name: 'links', type: 'links' }, { name: 'created_at', type: 'datetime', readonly: true }, { name: 'updated_at', type: 'datetime', readonly: true }, { name: 'extra.estimate', type: 'string' }];
+  { name: 'links', type: 'links' }, { name: 'created_at', type: 'datetime', readonly: true }, { name: 'updated_at', type: 'datetime', readonly: true }, { name: 'project', type: 'string', label: 'Project', readonly: true }, { name: 'extra.estimate', type: 'string' }];
 const EDITABLE = ['title', 'body', 'kind', 'status', 'assignee', 'labels', 'parent', 'links', 'extra'];
 const SHAPE = { describe: [[], []], list: [[], ['cursor', 'limit']], get: [['id'], []], create: [['ticket', 'op_id'], []], update: [['id', 'rev', 'op_id'], ['set', 'unset']], history: [['id'], ['cursor']], comment: [['id', 'text', 'op_id'], []] };
 

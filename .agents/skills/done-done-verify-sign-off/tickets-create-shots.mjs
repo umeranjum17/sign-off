@@ -1,6 +1,6 @@
 // The Tickets screens that make and group tickets, over a ticket adapter, driven in a headless Chromium of its own over the DevTools protocol with exact device
 // metrics (390x844 with mobile emulation, 1280x800), on a throwaway board and the repo's stand-in adapter: the New ticket sheet with its fields and allowed words
-// drawn from `describe` (title, body, kind, parent, assignee), a ticket made under an epic, All tickets grouped by epic, one epic's page with New ticket in this
+// drawn from `describe` (title, body, kind, parent, assignee), a ticket made under an epic, the Epics view with each epic's count, one epic's page with New ticket in this
 // epic, and Activity filtered to one person. Every word comes from the backend; the client names no status and no kind of its own.
 // Usage: node tickets-create-shots.mjs <evidence folder> [light|dark] [390|1280]   (no theme or width: all four combinations, one run each)
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
@@ -104,25 +104,21 @@ try {
   const events = JSON.parse(cli('ticket', board, '--id', made.id, '--history', '--json')).events;
   assert.ok(events.some((e) => e.type === 'created' && e.actor === 'Umer'), `who made it: ${JSON.stringify(events.map((e) => [e.type, e.actor]))}`);
   steps.push(`made ${made.id} under tk-1, assigned to Umer, kind-b: the backend read it back under its epic and its history names Umer as its maker`);
-  // All tickets, grouped by the epic each sits under: each epic's head over the tickets under it, then the tickets under none.
-  await go('#tickets');
-  await until(`!!document.querySelector('.tk-gby')`, 'the Group by pick');
-  await js(`${button('Epic')}.click()`);
-  await until(`document.querySelectorAll('.tk-eh').length >= 2`, 'the epic heads');
-  let f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, heads: [...document.querySelectorAll('.tk-eh')].map((h) => h.innerText.replace(/\\s+/g, ' ').trim()),
-    groups: [...document.querySelectorAll('main section[aria-label] h2')].map((h) => h.textContent.trim()), rows: [...document.querySelectorAll('.tk-row .t')].map((r) => r.textContent.trim()) })`);
-  assert.equal(f.overflow, false, 'no sideways overflow'), assert.ok(f.heads.some((h) => h.startsWith('Ship the settings page')) && f.heads.some((h) => h.startsWith('Move the export')), `epic heads ${JSON.stringify(f.heads)}`);
-  assert.ok(f.groups.some((g) => g.startsWith('No epic')), `the tickets under none ${JSON.stringify(f.groups)}`);
-  assert.ok(f.rows.includes('Ship the billing page') && f.rows.includes('Sort the inbox by hand'), `the rows ${JSON.stringify(f.rows)}`);
+  // The Epics view: each ticket that others sit under as a card with how many are under it and how they stand, and the ticket just made counted under its epic.
+  await go('#epics');
+  await until(`document.querySelectorAll('.tk-ecard').length >= 2`, 'the epic cards');
+  let f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, cards: [...document.querySelectorAll('.tk-ecard')].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) })`);
+  assert.equal(f.overflow, false, 'no sideways overflow'), assert.ok(f.cards.some((c) => c.startsWith('Ship the settings page') && /5 under it/.test(c)) && f.cards.some((c) => c.startsWith('Move the export') && /1 under it/.test(c)), `epic cards ${JSON.stringify(f.cards)}`);
   save('by-epic', f);
-  await check('by-epic', 'Group by Epic puts every ticket under the epic it sits under: each epic\'s title and how many are under it, the tickets under it, and the tickets under no epic');
+  await check('by-epic', 'Epics shows each epic with how many tickets are under it and how they stand, the ticket just made counted under the epic it was made in');
   // One epic's page: New ticket in this epic, and its tickets grouped by the backend's statuses.
   await go('#epics/tk-1');
   await until(`document.body.innerText.includes('New ticket in this epic')`, 'the epic page');
   f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, add: !!${button('New ticket in this epic')},
     groups: [...document.querySelectorAll('main section[aria-label] h2')].map((h) => h.textContent.trim()), rows: [...document.querySelectorAll('.tk-row .t')].map((r) => r.textContent.trim()) })`);
   assert.ok(f.add, 'New ticket in this epic is on the epic'), assert.equal(f.overflow, false, 'no sideways overflow');
-  assert.ok(f.groups.some((g) => g.startsWith('stage-1')) && f.groups.some((g) => g.startsWith('stage-2')), `its tickets by status ${JSON.stringify(f.groups)}`);
+  assert.ok(f.groups.some((g) => g.startsWith('Stage 1')) && f.groups.some((g) => g.startsWith('Stage 2')), `its tickets by status ${JSON.stringify(f.groups)}`);
+  assert.ok(f.rows.includes('Ship the billing page'), 'the ticket just made is under its epic');
   assert.ok(!f.rows.includes('Sort the inbox by hand'), 'a ticket under no epic is not on this epic');
   save('epic', f);
   await check('epic', 'An epic\'s page carries New ticket in this epic and the tickets under it, grouped by the status words the backend gave');
@@ -143,8 +139,8 @@ try {
   assert.deepEqual(errors, [], 'no page error');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: two epics with tickets under them, a ticket under no epic made by Sam, and one ticket per backend status',
-    steps: ['Open Tickets and press New ticket', 'Pick the kind, the epic and the assignee, then Create ticket', 'Group the list by Epic', 'Open an epic\'s page', 'Open Activity and pick one person'],
-    result: `At ${width}px${phone ? ' with mobile emulation' : ''}, ${theme}: the New ticket sheet draws its fields and allowed words from the backend and makes a ticket under the epic picked; All tickets groups by the epic each ticket sits under, with a head per epic and the tickets under none; an epic's page carries New ticket in this epic and its tickets by status; Activity names who did each event and filters to one person.` }, null, 2));
+    steps: ['Open Tickets and press New ticket', 'Pick the kind, the epic and the assignee, then Create ticket', 'Open Epics', 'Open an epic\'s page', 'Open Activity and pick one person'],
+    result: `At ${width}px${phone ? ' with mobile emulation' : ''}, ${theme}: the New ticket sheet draws its fields and allowed words from the backend and makes a ticket under the epic picked; Epics counts the tickets under each epic, with a head per epic and the tickets under none; an epic's page carries New ticket in this epic and its tickets by status; Activity names who did each event and filters to one person.` }, null, 2));
 } finally {
   try { ws?.close(); } catch {}
   try { chrome.kill(); } catch {}
