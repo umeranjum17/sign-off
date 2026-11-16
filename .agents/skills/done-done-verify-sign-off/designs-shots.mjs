@@ -340,8 +340,16 @@ try {
   console.log(JSON.stringify(facts, null, 2));
   if (after) assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {
-  browser(['close']);
-  if (server) await new Promise((ok, no) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', no); stop.once('exit', (code) => code === 0 ? ok() : no(Error(log))); });
+  // Cleanup, not a check: every capture and its measurements are asserted above, so a close or a stop that fails or is killed (no status, a signal)
+  // is named in one line and never fails the journey, nor replaces the error already on its way out. The captures still go through `browser` and `sh`.
+  const ended = (status, signal, said) => `exit status ${status}${signal ? `, signal ${signal}` : ''}${said.trim() ? `: ${said.replace(/\s+/g, ' ').trim().slice(0, 120)}` : ''}`;
+  const closed = spawnSync('agent-browser', ['--json', '--hide-scrollbars', String(phone), 'close'], { encoding: 'utf8', timeout: 30000, env: browserEnv });
+  if (closed.status !== 0) console.log(`cleanup: agent-browser close ended with ${ended(closed.status, closed.signal, closed.error?.message ?? closed.stdout + closed.stderr)}`);
+  if (server) {
+    const stopped = await new Promise((ok) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', (e) => ok(e.message)); stop.once('exit', (code, signal) => ok(code === 0 ? '' : ended(code, signal, log))); });
+    // The board is this run's own child: a stop that failed ends it here, so it cannot keep the run waiting.
+    if (stopped) { console.log(`cleanup: sign-off-axi stop ended with ${stopped}`); server.kill(); }
+  }
   await wait(300);
   rmSync(dir, { recursive: true, force: true });
 }
