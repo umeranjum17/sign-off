@@ -61,18 +61,18 @@ try {
   await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] });
   const png = async (name, say) => { await wait(400); writeFileSync(join(out, `${name}.${theme}.${width}.png`), Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64')); steps.push(`${name}: ${say}`); };
   const go = async (hash) => { await cdp('Page.navigate', { url: 'about:blank' }); await wait(150); await cdp('Page.navigate', { url: base + hash }); await wait(600); };
-  const facts = (extra = '') => js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, rows: document.querySelectorAll('.tk-row').length, text: document.body.innerText ${extra} })`);
+  const facts = (extra = '') => js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, rows: document.querySelectorAll('.tkb-card').length, text: document.body.innerText ${extra} })`);
   const save = (name, value) => writeFileSync(join(out, `${name}.${theme}.${width}.json`), JSON.stringify(value));
   const button = (text) => `[...document.querySelectorAll('button')].find((b) => b.textContent === ${JSON.stringify(text)} && b.offsetParent)`;
   fault('none');
   // The list, grouped by the backend's own statuses in the order it lists them.
   await go('#tickets');
-  await until(`document.querySelectorAll('.tk-row').length >= 5`, 'the ticket rows');
+  await until(`document.querySelectorAll('.tkb-card').length >= 5`, 'the ticket rows');
   let f = await facts(`, groups: [...document.querySelectorAll('main section[aria-label] h2')].map((h) => h.textContent)`);
   assert.equal(f.width, width), assert.equal(f.overflow, false, 'no sideways overflow');
   assert.ok(f.groups.some((g) => g.startsWith('stage-1')) && f.groups.some((g) => g.startsWith('stage-3')), `groups ${JSON.stringify(f.groups)}`);
   save('list', f);
-  await png('list', 'Tickets lists every ticket grouped by the status words the backend gave, with their counts');
+  await png('list', 'Tickets is a column for each status word the backend gave, with their counts, and each card has the ticket\'s own id');
   // One ticket: its fields, the More fields block, the history the backend recorded.
   await go('#ticket/tk-1');
   await until(`document.body.innerText.includes('More fields') && document.body.innerText.includes('History') && !document.body.innerText.includes('Loading history')`, 'the ticket');
@@ -113,7 +113,7 @@ try {
   // Retry once the backend is back: the list returns.
   fault('none');
   await js(`${button('Retry')}.click()`);
-  await until(`document.querySelectorAll('.tk-row').length >= 5`, 'the list after Retry');
+  await until(`document.querySelectorAll('.tkb-card').length >= 5`, 'the list after Retry');
   assert.deepEqual(errors, [], 'no page error');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
     start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: a ticket with two keys of extra, four tickets under it in three of the backend\'s statuses, and a card that names the first',

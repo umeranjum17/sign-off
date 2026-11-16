@@ -380,8 +380,13 @@ journeys:
   # Each card shows one state in list --json and status --json (CLI only, screen: none); then the Designs capture at 1440, dark.
   card-state:
     command: 'npm run build > /dev/null && node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440 && node --test test/card-state.test.mjs > "$DONE_DONE_EVIDENCE_ROOT/card-state.log" 2>&1'
+  # The Tickets board (the captain's option 2): one column per status the adapter lists, a card with the ticket's own id under its title (a long hash id shortened in the middle), a phone's
+  # tabs, a ticket's sheet with its whole id and a Copy button whose text is read back from the clipboard, a failed read and an incomplete list; 390 and 1440 in light and dark in one run
+  # (TICKETS_CELLS=light:390,dark:1440 narrows it; DEMO_PAGE=<the option-2 demo's html> adds the demo's frame beside each). The Designs capture at 1440, dark rides in the same run, taken first.
+  tickets-board:
+    command: 'npm run build > /dev/null && DESIGNS_DAYS_BACK=2 DESIGNS_WIDTH=1440 DESIGNS_THEME=dark node .agents/skills/done-done-verify-sign-off/designs-shots.mjs "$DONE_DONE_EVIDENCE_ROOT" dark 1440 && node .agents/skills/done-done-verify-sign-off/tickets-board-shots.mjs "$DONE_DONE_EVIDENCE_ROOT"'
   # The Tickets screens that make and group tickets, over the ticket adapter with the stand-in: the New ticket sheet whose fields and allowed words come from `describe`, a ticket
-  # made under an epic, All tickets grouped by Epic, one epic's page with New ticket in this epic, and Activity filtered to one person. The journey drives 390 and 1280 in light
+  # made under an epic, the Epics view with each epic's count, one epic's page with New ticket in this epic, and Activity filtered to one person. The journey drives 390 and 1280 in light
   # and dark in one run (TICKETS_CELLS=light:390,dark:1280 narrows it); the Designs capture at 1440, dark rides in the same run, taken first so the
   # run's step record is the journey's own.
   tickets-create:

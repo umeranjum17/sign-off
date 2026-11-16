@@ -453,16 +453,20 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const tkAll = () => tk.tickets ?? [];
   const tkById = (id) => tkAll().find((t) => t.id === id);
   const tkUnder = (t) => tkAll().filter((x) => x.parent === t.id);
-  /** Where a ticket stands is its status, in the backend's own word and the order `describe` lists them; a status describe does not list follows them, in the order they first appear. */
-  function tkGroups(list) {
+  /** The statuses in the order `describe` lists them; a status it does not list follows them, in the order they first appear in the list just read. */
+  function tkOrder() {
     const order = tkValues('status').map((v) => v.value);
-    for (const t of list) if (!order.includes(t.status)) order.push(t.status);
-    return order.map((value) => ({ value, name: tkWord('status', value), list: list.filter((t) => t.status === value) })).filter((g) => g.list.length);
+    for (const t of tkAll()) if (!order.includes(t.status)) order.push(t.status);
+    return order;
+  }
+  /** Where a ticket stands is its status, in the backend's own word and that order; each group says its place in the order (`stage`: which one of how many). */
+  function tkGroups(list) {
+    const order = tkOrder();
+    return order.map((value, i) => ({ value, name: tkWord('status', value), stage: [i, order.length], list: list.filter((t) => t.status === value) })).filter((g) => g.list.length);
   }
   /** The counts of a set of tickets by status, said in the backend's words. */
   const tkCounts = (list) => tkGroups(list).map((g) => `${g.list.length} ${g.name}`).join(' · ');
   const tkWhen = (at) => (isToday(at) ? hhmm(at) : day(at));
-  const tkProp = (draw, k, ...v) => el('div', { class: 'ui-pr' }, el('span', { class: 'k' }, tkMark(draw), k), el('span', { class: 'v' }, ...v));
   /** The filters: every field `describe` gives allowed words for (an enum, or any field that suggests some), picked one word at a time. */
   let tkFilters = {};
   const tkFilterFields = () => (tk.fields?.fields ?? []).filter((f) => f.values?.length && !f.name.startsWith('extra.'));
@@ -489,71 +493,26 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return b;
   }
   const tkPills = () => Object.entries(tkFilters).filter(([, v]) => v).map(([name, v]) => { const p = el('button', { class: 'tk-fpill', 'aria-label': `Stop filtering by ${tkName(name)} ${tkWord(name, v)}` }, `${tkName(name)}: ${tkWord(name, v)}`, glyph('x')); p.onclick = () => { tkFilters = { ...tkFilters, [name]: '' }; render(); }; return p; });
-  // A tap is aimed where the finger went down. When the list moves under it before the tap lands (a redraw, an image, the page settling), the tap lands on the row that slid under
-  // the finger and opens a ticket; a tap that began on a section's See all or Show fewer does that button's work instead.
-  let tkSeeDown = null;
-  addEventListener('pointerdown', (e) => { const b = e.target.closest?.('body.tickets .ui-sec button.see'); tkSeeDown = b && { label: b.closest('section')?.getAttribute('aria-label'), at: e.timeStamp }; }, true);
-  addEventListener('click', (e) => {
-    const down = tkSeeDown;
-    tkSeeDown = null;
-    if (!down || e.timeStamp - down.at > 1000 || e.target.closest?.('.ui-sec button.see')) return;
-    e.preventDefault(), e.stopPropagation();
-    [...document.querySelectorAll('main section[aria-label]')].find((s) => s.getAttribute('aria-label') === down.label)?.querySelector('.ui-sec button.see')?.click();
-  }, true);
-  /** On a phone the ticket rises over the list as a sheet: a grab handle, then the ticket with its close. Close (or Escape, or a tap above it) goes back. */
+  /** A ticket over the board as a sheet: from the foot on a phone, from the right edge on a desk, on a dimmed board. Close, Escape or a tap on the dim goes back to where it came from. */
   let tkUp = '';
-  function tkSheet(t) {
+  function tkOver(id, label, page) {
     const rise = !tkUp, x = el('a', { class: 'x', href: ticketBack || '#tickets', 'aria-label': 'Close' }, glyph('x'));
-    tkUp = t.id;
-    return el('div', { class: `tk-over${rise ? ' up' : ''}`, 'data-key': t.id }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
-      el('section', { class: 'tk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': t.title }, el('div', { class: 'grab', 'aria-hidden': 'true' }), ...ticketPage(t, x)));
+    tkUp = id;
+    return el('div', { class: `tk-over${rise ? ' up' : ''}`, 'data-key': id }, el('a', { class: 'tk-scrim', href: ticketBack || '#tickets', tabindex: '-1', 'aria-label': 'Close' }),
+      el('section', { class: 'tk-sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': label }, el('div', { class: 'grab', 'aria-hidden': 'true' }), ...page(x)));
   }
+  const tkSheet = (t) => tkOver(t.id, t.title, (x) => ticketPage(t, x));
   addEventListener('keydown', (e) => e.key === 'Escape' && !e.defaultPrevented && document.querySelector('.tk-sheet') && !document.querySelector('dialog[open]') && (location.hash = ticketBack || '#tickets'));
   const tkShown = { id: '' };
-  const tkMore = new Set();
   /** A ticket's row: its tile (the one with others under it wears the epic's), its title, and in one line its kind, assignee, what is under it and when it changed. */
   function tkRow(t) {
     const kids = tkUnder(t), meta = [tkWord('kind', t.kind), t.assignee, kids.length && `${kids.length} under it`, tkWhen(t.updated_at)].filter(Boolean).join(' · ');
     const link = el('a', { class: 'ui-row tk-row', href: `#ticket/${t.id}`, ...(t.id === tkShown.id && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ${tkWord('status', t.status)}${meta ? `, ${meta}` : ''}` }, ...uiRow({ tile: tkTile(kids.length > 0), title: t.title, meta }));
     return el('li', {}, link);
   }
-  /** One status's tickets under its head: five with See all on a phone, a scrolling card on a desk. */
-  function tkGroup(g, desk) {
-    const rows = g.list.map(tkRow);
-    if (desk) return el('section', { class: 'ui-card tk-card', 'aria-label': g.name }, el('h2', { class: 'tk-ch' }, g.name, el('small', {}, String(g.list.length))), el('ul', { class: 'ui-list tk-rows' }, ...rows));
-    const all = tkMore.has(g.value), see = el('button', { class: 'see' }, all ? 'Show fewer' : 'See all');
-    see.onclick = () => { all ? tkMore.delete(g.value) : tkMore.add(g.value); render(); };
-    return el('section', { 'aria-label': g.name }, el('h2', { class: 'ui-sec' }, g.name, el('small', {}, String(g.list.length)), g.list.length > 5 ? see : ''), el('ul', { class: 'ui-card ui-list' }, ...(all ? rows : rows.slice(0, 5))));
-  }
-  /** How All tickets is grouped: by the status words the backend lists, or by the epic each ticket sits under. The pick is kept while the board is open. */
-  let tkGroupBy = 'status';
   /** In the order the backend lists its statuses, then the most recently changed: the client ranks no status word of its own. */
   const tkStanding = (list) => { const rank = new Map(tkValues('status').map((v, i) => [v.value, i])), of = (t) => rank.get(t.status) ?? rank.size;
     return [...list].sort((x, y) => of(x) - of(y) || (Date.parse(y.updated_at) || 0) - (Date.parse(x.updated_at) || 0)); };
-  /** The epic a ticket sits under: the last ticket up its `parent` links, which the interface calls the ticket others name as their parent. A ticket with no parent sits under none. */
-  function tkEpicOf(t) { const seen = new Set(); let at = t; while (at?.parent && !seen.has(at.id)) { seen.add(at.id); at = tkById(at.parent); } return at && at !== t ? at : undefined; }
-  /** The pick between the two groupings, above the lists; it shows only where some ticket names a parent, since without one there is nothing to group by. */
-  function tkGroupPick() {
-    if (!tkAll().some((t) => t.parent)) return '';
-    const b = (v, w) => { const x = el('button', { type: 'button', 'aria-pressed': String(tkGroupBy === v) }, w); x.onclick = () => { if (tkGroupBy !== v) { buzz('tick'); tkGroupBy = v; render(); } }; return x; };
-    return el('div', { class: 'tk-gby' }, el('span', { class: 'tk-gl' }, 'Group by'), el('div', { class: 'ui-seg tk-gseg', role: 'group', 'aria-label': 'Group tickets by' }, b('status', 'Status'), b('epic', 'Epic')));
-  }
-  /** One epic in All tickets grouped by epic: its head opens the epic's page, then the tickets under it — five on a phone, the rest behind one button. */
-  function tkEpicBlock(e, kids, desk) {
-    const key = `epic-${e.id}`, all = tkMore.has(key), shown = all ? kids : kids.slice(0, 5);
-    const head = el('a', { class: 'tk-eh', href: `#epics/${e.id}` }, tkTile(true), el('span', { class: 'tk-et', dir: 'auto' }, e.title), el('small', {}, String(kids.length)), glyph('right'));
-    const more = kids.length > 5 ? (() => { const b = el('button', { class: 'see' }, all ? 'Show fewer' : `${kids.length - 5} more`); b.onclick = () => { all ? tkMore.delete(key) : tkMore.add(key); render(); }; return b; })() : '';
-    return desk ? el('section', { class: 'ui-card tk-card', 'aria-label': e.title }, head, el('ul', { class: 'ui-list tk-rows' }, ...kids.map(tkRow)))
-      : el('section', { class: 'tk-eb', 'aria-label': e.title }, head, el('ul', { class: 'ui-card ui-list' }, ...shown.map(tkRow)), more);
-  }
-  /** All tickets grouped by epic: each epic with the tickets under it, in the backend's own status order, then the tickets under no epic. */
-  function tkByEpic(list, desk) {
-    const kids = new Map();
-    for (const t of list) { const e = tkEpicOf(t); if (e) kids.set(e.id, [...(kids.get(e.id) ?? []), t]); }
-    const blocks = tkAll().filter((t) => kids.has(t.id)).sort((x, y) => kids.get(y.id).length - kids.get(x.id).length).map((e) => tkEpicBlock(e, tkStanding(kids.get(e.id)), desk));
-    const loose = list.filter((t) => !tkEpicOf(t));
-    return [...blocks, ...(loose.length ? [tkGroup({ value: 'noepic', name: 'No epic', list: tkStanding(loose) }, desk)] : [])];
-  }
   /** The head of every Tickets view, on a phone and on a desk. */
   function tkHead(on, ...tools) {
     const sub = tk.tickets ? el('p', { class: 'tk-total', role: 'status' }, `${tk.tickets.length} tickets${tk.tickets.length ? ` · ${tkCounts(tk.tickets)}` : ''}`) : '';
@@ -561,22 +520,83 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return [el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), sub),
       el('div', { class: 'acts' }, ...tkPills(), tkTabs(on), tkNewButton(), ...tools, themeButton()))];
   }
-  /** The list: every ticket (those that fit the filters), grouped by status in the order the backend lists them or by the epic each sits under. */
+  /* ---- The board: one column per status the backend lists, in its own words and its own order. A ticket is a card (its title, its own id under it, who has it and when it changed) that
+     opens its sheet. A phone shows one column at a time with a tab for each; a desk shows them side by side. Only tickets the backend lists are on it: the board holds no word for a
+     finished ticket and filters none out, so a backend that lists only the open ones shows only those. ---- */
+  const TKB_FIRST = 20, TKB_MORE = 25;
+  /** How many cards each column shows (by status), and the column a phone has in view. */
+  const tkLimit = new Map();
+  let tkTab = 0, tkAimed = '';
+  /** A ticket's own id on a card: a long one is shortened in the middle so it keeps one line; the sheet shows and copies the whole of it. */
+  const tkShortId = (id) => (id.length > 22 ? `${id.slice(0, 15)}…${id.slice(-4)}` : id);
+  /** How long ago, in a few words. */
+  function tkAgo(at) {
+    const m = Math.round((Date.now() - Date.parse(at)) / 6e4);
+    if (Number.isNaN(m)) return '';
+    if (m < 1) return 'just now';
+    if (m < 60) return `${m} min ago`;
+    const h = Math.round(m / 60);
+    if (h < 24) return `${h} h ago`;
+    const d = Math.round(h / 24);
+    return d === 1 ? 'yesterday' : `${d} days ago`;
+  }
+  /** A status's mark: its place among the statuses the backend lists, a ring filled that part of the way round (the first one's is dashed). It is drawn from the order alone; no status word is read. */
+  function tkStageMark(at, of) {
+    const mark = el('span', { class: 'tkb-mark', 'aria-hidden': 'true' }), frac = of > 1 ? at / of : 0, a = frac * 2 * Math.PI;
+    mark.innerHTML = `<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5"${frac ? '' : ' stroke-dasharray="2.1 2.1"'}/>${frac ? `<path d="M7 7V1.5A5.5 5.5 0 ${frac > 0.5 ? 1 : 0} 1 ${(7 + 5.5 * Math.sin(a)).toFixed(2)} ${(7 - 5.5 * Math.cos(a)).toFixed(2)}z"/>` : ''}</svg>`;
+    return mark;
+  }
+  /** A card. A ticket with others under it carries how many. */
+  function tkCard(t) {
+    const kids = tkUnder(t).length, ago = tkAgo(t.updated_at), meta = [t.assignee, ago && `Updated ${ago}`].filter(Boolean).join(' · ');
+    return el('a', { class: 'tkb-card', href: `#ticket/${t.id}`, 'data-key': t.id, ...(t.id === tkShown.id && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ticket ${t.id}${meta ? `, ${meta}` : ''}${kids ? `, ${kids} under it` : ''}` },
+      el('span', { class: 't', dir: 'auto' }, t.title), el('span', { class: 'id', dir: 'ltr' }, tkShortId(t.id)),
+      el('span', { class: 'm' }, kids ? el('span', { class: 'o' }, String(kids)) : '', el('span', { dir: 'auto' }, meta)));
+  }
+  function tkColumn(col) {
+    const shown = col.list.slice(0, tkLimit.get(col.value) ?? TKB_FIRST), left = col.list.length - shown.length;
+    return el('section', { class: 'tkb-col', 'aria-label': col.name, 'data-key': `col-${col.value}` },
+      el('h2', { class: 'tkb-ch' }, tkStageMark(...col.stage), el('span', { dir: 'auto' }, col.name), el('span', { class: 'n' }, String(col.list.length))),
+      el('div', { class: 'tkb-cards' }, ...shown.map(tkCard), left > 0 ? el('button', { type: 'button', class: 'tkb-more', 'data-more': col.value }, `Show more · ${left} left`) : ''));
+  }
+  /** On a phone, a tab for each column: its mark and count, and the name of the one in view. */
+  const tkColumnTabs = (cols) => el('nav', { class: 'tkb-tabs', role: 'tablist', 'aria-label': 'Status' }, ...cols.map((c, i) => el('button', { type: 'button', class: 'tkb-tab', role: 'tab', 'data-tab': String(i), 'aria-selected': String(i === tkTab) },
+    tkStageMark(...c.stage), el('span', { class: 'w', dir: 'auto' }, c.name), el('span', { class: 'n' }, String(c.list.length)))));
+  // The board's taps and scrolls are heard on the page, not on the nodes the board redraws, so a redraw keeps each column where it was scrolled.
+  addEventListener('click', (e) => {
+    const tab = e.target.closest?.('.tkb-tab'), more = e.target.closest?.('.tkb-more'), board = document.querySelector('.tkb-board');
+    if (tab && board) { buzz('tick'); board.scrollTo({ left: board.clientWidth * +tab.dataset.tab, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); }
+    if (more) { tkLimit.set(more.dataset.more, (tkLimit.get(more.dataset.more) ?? TKB_FIRST) + TKB_MORE); render(); }
+  });
+  addEventListener('scroll', (e) => {
+    if (!e.target.matches?.('.tkb-board') || !phone()) return;
+    const at = Math.round(e.target.scrollLeft / e.target.clientWidth);
+    if (at === tkTab) return;
+    tkTab = at;
+    document.querySelectorAll('.tkb-tab').forEach((t, i) => { t.setAttribute('aria-selected', String(i === at)); if (i === at) t.scrollIntoView({ inline: 'nearest', block: 'nearest' }); });
+  }, true);
+  /** The board's head: the title, how many tickets it holds (on a desk), and at the right the other two views, the filter, New ticket and light or dark. */
+  const tkBoardHead = (count) => el('header', { class: 'tkb-top' }, el('h1', { tabindex: '-1' }, 'Tickets'), count === undefined ? '' : el('span', { class: 'sum', role: 'status' }, `${count} in all`),
+    el('div', { class: 'tools' }, el('a', { class: 'tkb-link', href: '#epics' }, 'Epics'), el('a', { class: 'tkb-link', href: '#activity' }, 'Activity'), tkFilter(), tkNewButton(), themeButton()));
+  /** The tickets screen: the board, with the open ticket's sheet over it. A ticket the list does not carry (a card names it) is read on its own and opens in the same sheet. */
   function tickets(by, id, subpage) {
     if (subpage === 'activity') return activityPage();
     if (subpage === 'epics') return epicsPage(id);
-    const desk = !phone(), picked = id && tkById(id), list = tkFiltered(), open = picked || (desk ? list[0] : undefined);
-    tkShown.id = open?.id ?? '';
+    const list = tkFiltered(), picked = id && (tkById(id) ?? (tkDetail.id === id ? tkDetail.ticket : undefined)), cols = tkGroups(tkStanding(list));
+    tkShown.id = picked?.id ?? '';
     if (id) tkWant(id);
     const empty = !tk.tickets || !tk.tickets.length ? tkNote('tickets', 'pick', 'No tickets yet', 'Tickets show here as the ticket system has them.') : !list.length
       ? emptyState('empty', { mark: 'list', title: 'No tickets match', text: 'Nothing matches these filters right now.', act: ['Clear filters', () => { tkFilters = {}; render(); }] }) : null;
-    if (empty) empty.classList.add('tk-empty');
-    const head = tkHead('tickets', tkFilter()),
-      parts = tkGroupBy === 'epic' ? tkByEpic(list, desk) : tkGroups(list).map((g) => tkGroup(g, desk));
-    if (!desk) return [...head, ...(empty ? [empty] : [tkGroupPick(), ...parts]), picked ? tkSheet(picked) : (tkUp = '')];
-    const half = Math.ceil(parts.length / 2);
-    return [el('div', { class: 'ui-desk tk-desk' }, ...head, empty ? empty : el('div', { class: 'ui-dgrid' }, el('div', { class: 'ui-col s4' }, tkGroupPick(), ...parts.slice(0, half)), el('div', { class: 'ui-col s4' }, ...parts.slice(half)),
-      open ? el('section', { class: 'ui-card ui-pane s4 tk-pane', 'aria-label': open.title }, ...ticketPage(open)) : el('section', { class: 'ui-card ui-pane s4 tk-pane' }, emptyState('empty', { mark: 'pick', title: id ? 'Ticket not found' : 'No ticket open', text: id ? 'It may have been moved. Pick another from the list.' : 'Pick a ticket from the list to read it here.', small: true }))))];
+    // A ticket reached by its address is brought into view: its column on a phone.
+    const at = picked ? cols.findIndex((c) => c.list.some((t) => t.id === picked.id)) : -1;
+    if (picked && at >= 0 && tkAimed !== picked.id) { tkAimed = picked.id; tkTab = at; requestAnimationFrame(() => { const b = document.querySelector('.tkb-board'); if (b && phone()) b.scrollLeft = b.clientWidth * at; }); }
+    if (!picked) tkAimed = '';
+    tkTab = Math.min(tkTab, Math.max(0, cols.length - 1));
+    const sheet = picked ? tkSheet(picked) : id && tk.tickets ? tkOver(id, 'Ticket', (x) => [el('div', { class: 'tk-shd ui-head' }, el('span', { class: 'ui-lab' }), x),
+      tkDetail.id === id && tkDetail.error ? emptyState('error', { title: tkDetail.error.code === 'not_found' ? 'Ticket not found' : 'Couldn’t read this ticket', text: tkSaid(tkDetail.error), act: tkDetail.error.retryable ? ['Retry', () => readDetail(id)] : undefined, small: true })
+        : emptyState('loading', { title: 'Loading ticket', small: true })]) : (tkUp = '');
+    const pills = tkPills();
+    return [el('div', { class: 'tkb' }, tkBoardHead(tk.tickets && list.length), pills.length ? el('div', { class: 'tkb-pills' }, ...pills) : '', ...(empty ? [empty] : [tkColumnTabs(cols), el('div', { class: 'tkb-board' }, ...cols.map(tkColumn))])), sheet];
   }
   /** The Epics view: every ticket that others name as their parent, as a card with the tickets under it and how they stand; a card opens that epic's own page — its tickets grouped by status, and New ticket in this epic. */
   function epicsPage(by) {
@@ -684,6 +704,22 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   const tkLink = (l) => { const other = tkById(l.id); return el('li', {}, el('a', { class: 'ui-row', href: `#ticket/${l.id}` }, ...uiRow({ tile: tkTile(false), title: other?.title ?? l.id, meta: l.type }))); };
   /** The ticket the page names, read on its own the first time it is asked for. */
   function tkWant(id) { if (!FROZEN && tk.tickets && tkDetail.id !== id) readDetail(id); }
+  /** A ticket's own id on its sheet, whole: one tap copies it, and the button says Copied for a moment. The moment is kept here, not on the button, which the page draws fresh on a redraw. */
+  let tkCopied = { id: '', until: 0 };
+  function tkIdChip(id) {
+    const left = tkCopied.id === id ? tkCopied.until - Date.now() : 0, word = el('span', {}, left > 0 ? 'Copied' : 'Copy'), b = el('button', { type: 'button', class: 'tkb-id', 'aria-label': `Copy ticket number ${id}` }, el('code', { dir: 'ltr' }, id), word);
+    b.dataset.name = b.getAttribute('aria-label');
+    const back = (ms) => { clearTimeout(b.said2); b.said2 = setTimeout(() => { word.textContent = 'Copy'; }, ms); };
+    if (left > 0) back(left);
+    b.onclick = async () => { const ok = await copyValue(id, b, true); word.textContent = ok ? 'Copied' : 'Press Ctrl+C'; tkCopied = ok ? { id, until: Date.now() + 1600 } : { id: '', until: 0 }; back(1600); };
+    return b;
+  }
+  /** One fact of the sheet: its name, and its value. */
+  const tkFact = (name, ...value) => el('div', {}, el('dt', {}, name), el('dd', {}, ...value));
+  /** A ticket's history as the sheet draws it: the events the backend recorded, oldest first, each a dot on a line with who and when; the latest is marked. */
+  const tkLife = (events) => el('ol', { class: 'tkb-life' }, ...events.map((e, i) => el('li', { ...(i === events.length - 1 && { class: 'now' }) },
+    el('b', { dir: 'auto' }, e.type), e.actor ? el('span', { class: 'by', dir: 'auto' }, ` by ${e.actor}`) : '', el('time', { class: 'when', datetime: e.at }, `${stamp(e.at)} · ${tkAgo(e.at)}`),
+    e.text ? el('span', { class: 'note', dir: 'auto' }, e.text) : '', ...e.changes.map((c) => el('span', { class: 'note', dir: 'auto' }, tkChange(c))))));
   function ticketPage(listed, close = '') {
     const t = tkDetail.id === listed.id && tkDetail.ticket ? tkDetail.ticket : listed;
     const gone = new Set(state.dismissed ?? []), cards = state.decisions.filter((d) => d.ticket === t.id && !gone.has(d.key)).reverse().sort((x, y) => (Date.parse(y.filed) || 0) - (Date.parse(x.filed) || 0));
@@ -695,21 +731,23 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     if (edit) edit.onclick = () => tkForm(t);
     const history = tkCan('history') ? (tkDetail.id !== t.id || tkDetail.loading ? emptyState('loading', { title: 'Loading history', small: true }) : tkDetail.eventsError
       ? emptyState('error', { title: 'Couldn’t load history', text: tkSaid(tkDetail.eventsError), act: ['Retry', () => readDetail(t.id)], small: true })
-      : tkDetail.events.length ? el('ul', { class: 'ui-list tk-feed' }, ...tkDetail.events.map((e) => tkEvent({ ticket: t.id, event: e }, ''))) : emptyState('empty', { mark: 'clock', title: 'No history yet', text: 'The backend has recorded no events for this ticket.', small: true }))
+      : tkDetail.events.length ? tkLife(tkDetail.events) : el('p', { class: 'meta tk-note' }, 'The backend has recorded no events for this ticket.'))
       : el('p', { class: 'meta tk-note' }, 'This backend keeps no history.');
-    return [el('div', { class: 'tk-shd ui-head' }, el('span', { class: 'ui-lab' }, tkTile(kids.length > 0), el('span', {}, [tkWord('kind', t.kind), tkWord('status', t.status)].filter(Boolean).join(' · '))), edit, close),
+    const at = tkOrder().indexOf(t.status);
+    return [el('div', { class: 'tk-shd ui-head' }, el('span', { class: 'ui-lab', dir: 'auto' }, tkWord('kind', t.kind) ?? ''), edit, close),
       ...(tkDetail.id === t.id && tkDetail.error ? [emptyState('error', { title: tkDetail.error.code === 'not_found' ? 'Ticket not found' : 'Couldn’t read this ticket', text: tkSaid(tkDetail.error), act: tkDetail.error.retryable ? ['Retry', () => readDetail(t.id)] : undefined, small: true })] : []),
-      el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title), el('p', { class: 'tk-slug', dir: 'ltr' }, t.id),
-      el('div', { class: 'ui-props' }, tkProp('half', tkName('status'), el('span', {}, tkWord('status', t.status))), tkProp('chip', tkName('kind'), el('span', {}, tkWord('kind', t.kind))),
-        tkProp('person', tkName('assignee'), t.assignee ? el('span', { dir: 'auto' }, t.assignee) : el('span', { class: 'tk-none' }, 'Unassigned')),
-        t.labels.length ? tkProp('flag', tkName('labels'), ...t.labels.map((l) => el('span', { class: 'ui-pc', dir: 'auto' }, l))) : '',
-        up ? tkProp('layers', 'Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : t.parent ? tkProp('layers', 'Part of', el('span', { dir: 'auto' }, t.parent)) : '',
-        tkProp('clock', 'Created', el('time', { datetime: t.created_at }, stamp(t.created_at))), tkProp('clock', 'Last update', el('time', { datetime: t.updated_at }, stamp(t.updated_at)))),
+      tkIdChip(t.id), el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
+      el('p', { class: 'tkb-state' }, at >= 0 ? tkStageMark(at, tkOrder().length) : '', el('span', { dir: 'auto' }, tkWord('status', t.status))),
+      el('dl', { class: 'tkb-facts' }, tkFact(tkName('assignee'), t.assignee ? el('span', { dir: 'auto' }, t.assignee) : el('span', { class: 'tk-none' }, 'Unassigned')),
+        t.kind ? tkFact(tkName('kind'), el('span', { dir: 'auto' }, tkWord('kind', t.kind))) : '',
+        t.labels.length ? tkFact(tkName('labels'), ...t.labels.map((l) => el('span', { class: 'tkb-lab', dir: 'auto' }, l))) : '',
+        up ? tkFact('Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : t.parent ? tkFact('Part of', el('span', { dir: 'auto' }, t.parent)) : '',
+        tkFact('Created', el('time', { datetime: t.created_at }, stamp(t.created_at))), tkFact('Last update', el('time', { datetime: t.updated_at }, stamp(t.updated_at)))),
       ...(t.body ? [el('p', { class: 'ui-dl' }, tkName('body')), el('div', { class: 'tk-desc' }, ...tkBody(t.body))] : []),
       ...tkMoreFields(t),
       ...(t.links.length ? [el('p', { class: 'ui-dl' }, 'Linked tickets'), el('ul', { class: 'ui-list tk-in' }, ...t.links.map(tkLink))] : []),
       ...(kids.length ? [el('p', { class: 'ui-dl' }, `Under this ticket · ${tkCounts(kids)}`), el('ul', { class: 'ui-list tk-in' }, ...kids.map(tkRow))] : []),
-      el('p', { class: 'ui-dl' }, 'Linked'), cards.length ? el('ul', { class: 'ui-list tk-in' }, ...cards.map(linked)) : emptyState('empty', { mark: 'plan', title: 'No cards yet', text: 'Cards that name this ticket show here.', small: true }),
+      el('p', { class: 'ui-dl' }, 'Linked'), cards.length ? el('ul', { class: 'ui-list tk-in' }, ...cards.map(linked)) : el('p', { class: 'meta tk-note' }, 'No cards name this ticket yet.'),
       ...(said.length ? [el('p', { class: 'ui-dl' }, 'Your comments'), ...said.map((c) => el('div', { class: 'tk-said' }, trailTrack(c, true, c.said)))] : []),
       el('p', { class: 'ui-dl' }, 'History'), history, ...(tkCan('comment') && tkCanWrite() ? [tkCommentBox(t)] : [])];
   }
