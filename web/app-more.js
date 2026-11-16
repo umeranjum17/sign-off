@@ -2254,12 +2254,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const quick = matchMedia('(prefers-reduced-motion: reduce)').matches;
     const io = new IntersectionObserver((es) => es.forEach((en) => { const p = en.target.dataset.part; if (en.isIntersecting) timers.set(p, setTimeout(() => mark(p), 1400)); else clearTimeout(timers.get(p)); }), { root: scroll, threshold: 0.35 });
     parts.forEach((c) => io.observe(c));
-    const io2 = new IntersectionObserver((es) => es.forEach((en) => { if (en.isIntersecting) { setStage(en.target.dataset.stage); if (!plan && en.target.dataset.part) { curPart = en.target.dataset.part; paintBar(); } } }), { root: scroll, rootMargin: '-30% 0px -60% 0px' });
-    stageEl.forEach((s) => io2.observe(s));
     parts.forEach((c) => c.dataset.stage = stageOf.get(c.dataset.part));
-    parts.forEach((c) => io2.observe(c));
-    // The part in view is measured as well as observed: a flick, a font swap or a reflow can carry a part past a band between two frames, and the bar
-    // must name the part the person is looking at rather than the one that was there before they moved.
+    // The part in view has one owner: this measure names the stage and the bar's part, from where the parts are now, whatever asked for it (a scroll, the
+    // typeface swapping in, a fold or a reflow). A part must never be named by a rule of its own, such as an observer's band above the middle: two rules
+    // gave two answers for one screen, and the one that ran last stayed on the bar until the next scroll.
     const onScroll = () => requestAnimationFrame(() => {
       if (!scroll.isConnected) return;
       // The actions bar is the foot of the screen from Next step on, and gives way to the real block when the person reaches it.
@@ -2284,6 +2282,9 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     });
     // A scroll of either kind counts, wherever it happened in the reader, and so does the moment Next step or the block crosses the fold.
     document.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    // A part also crosses the middle with no scroll at all, when a fold opens or the page reflows: that asks for the same measure.
+    const middle = new IntersectionObserver(() => onScroll(), { root: scroll, rootMargin: '-50% 0px -50% 0px' });
+    parts.forEach((c) => middle.observe(c));
     if (stick) {
       const fold = new IntersectionObserver(() => onScroll(), { root: scroll, threshold: [0, 0.01, 0.99, 1] });
       if (stageEl.get('next')) fold.observe(stageEl.get('next'));
