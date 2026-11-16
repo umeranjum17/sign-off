@@ -461,10 +461,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     for (const t of tkAll()) if (!order.includes(t.status)) order.push(t.status);
     return order;
   }
-  /** Where a ticket stands is its status, in the backend's own word and that order; each group says its place in the order (`stage`: which one of how many). */
-  function tkGroups(list) {
-    const order = tkOrder();
-    return order.map((value, i) => ({ value, name: tkWord('status', value), stage: [i, order.length], list: list.filter((t) => t.status === value) })).filter((g) => g.list.length);
+  /** Where a ticket stands is its status, in the backend's own word and that order; each group says its place in the order (`stage`: which one of how many). A status none of `list` has is no group, unless the caller keeps the empty ones (the board does: a column for each status the backend lists). */
+  function tkGroups(list, keepEmpty = false) {
+    const order = tkOrder(), groups = order.map((value, i) => ({ value, name: tkWord('status', value), stage: [i, order.length], list: list.filter((t) => t.status === value) }));
+    return keepEmpty ? groups : groups.filter((g) => g.list.length);
   }
   /** The counts of a set of tickets by status, said in the backend's words. */
   const tkCounts = (list) => tkGroups(list).map((g) => `${g.list.length} ${g.name}`).join(' · ');
@@ -522,7 +522,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return [el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), sub),
       el('div', { class: 'acts' }, ...tkPills(), tkTabs(on), tkNewButton(), ...tools, themeButton()))];
   }
-  /* ---- The board: one column per status the backend lists, in its own words (made readable by one rule where it gives no label: in_progress is In progress) and its own order. A ticket is a card (its title, its own id under it, who has it and when it changed) that
+  /* ---- The board: one column per status the backend lists, empty or not, in its own words (made readable by one rule where it gives no label: in_progress is In progress) and its own order. A ticket is a card (its title, its own id under it, its project, who has it and when it changed) that
      opens its sheet. A phone shows one column at a time with a tab for each; a desk shows them side by side. Only tickets the backend lists are on it: the board holds no word for a
      finished ticket and filters none out, so a backend that lists only the open ones shows only those. ---- */
   const TKB_FIRST = 20, TKB_MORE = 25;
@@ -548,18 +548,22 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     mark.innerHTML = `<svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5"${frac ? '' : ' stroke-dasharray="2.1 2.1"'}/>${frac ? `<path d="M7 7V1.5A5.5 5.5 0 ${frac > 0.5 ? 1 : 0} 1 ${(7 + 5.5 * Math.sin(a)).toFixed(2)} ${(7 - 5.5 * Math.cos(a)).toFixed(2)}z"/>` : ''}</svg>`;
     return mark;
   }
-  /** A card. A ticket with others under it carries how many. */
+  /** The project a ticket belongs to, where the backend names one (a read-only string field of its own); a ticket with none has no label. */
+  const tkProject = (t) => (typeof t.project === 'string' ? t.project.trim() : '');
+  /** A card. Under its title and id, one small line: the ticket's project, who has it and when it changed, set off by dots. The project keeps its words (up to half the line), a long assignee gives way first with an ellipsis, and the time stays whole; on a card too narrow for all
+   * three the time drops its "Updated". A ticket with others under it carries how many. */
   function tkCard(t) {
-    const kids = tkUnder(t).length, ago = tkAgo(t.updated_at), meta = [t.assignee, ago && `Updated ${ago}`].filter(Boolean).join(' · ');
-    return el('a', { class: 'tkb-card', href: `#ticket/${t.id}`, 'data-key': t.id, ...(t.id === tkShown.id && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ticket ${t.id}${meta ? `, ${meta}` : ''}${kids ? `, ${kids} under it` : ''}` },
+    const kids = tkUnder(t).length, ago = tkAgo(t.updated_at), project = tkProject(t), part = (name, text, ...nodes) => [name, text, el('span', { class: name, dir: 'auto' }, ...(nodes.length ? nodes : [text]))];
+    const bits = [project && part('proj', project), t.assignee && part('who', t.assignee), ago && part('ago', `Updated ${ago}`, el('span', { class: 'u' }, 'Updated '), ago)].filter(Boolean);
+    return el('a', { class: 'tkb-card', href: `#ticket/${t.id}`, 'data-key': t.id, ...(t.id === tkShown.id && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ticket ${t.id}${bits.length ? `, ${bits.map(([, text]) => text).join(' · ')}` : ''}${kids ? `, ${kids} under it` : ''}` },
       el('span', { class: 't', dir: 'auto' }, t.title), el('span', { class: 'id', dir: 'ltr' }, tkShortId(t.id)),
-      el('span', { class: 'm' }, kids ? el('span', { class: 'o' }, String(kids)) : '', t.assignee ? el('span', { class: 'who', dir: 'auto' }, t.assignee) : '', ago ? el('span', { class: 'ago' }, `Updated ${ago}`) : ''));
+      el('span', { class: 'm' }, kids ? el('span', { class: 'o' }, String(kids)) : '', ...bits.flatMap(([, , node], i) => (i ? [el('span', { class: 'dot', 'aria-hidden': 'true' }, '·'), node] : [node]))));
   }
   function tkColumn(col) {
     const shown = col.list.slice(0, tkLimit.get(col.value) ?? TKB_FIRST), left = col.list.length - shown.length;
     return el('section', { class: 'tkb-col', 'aria-label': col.name, 'data-key': `col-${col.value}` },
       el('h2', { class: 'tkb-ch' }, tkStageMark(...col.stage), el('span', { dir: 'auto' }, col.name), el('span', { class: 'n' }, String(col.list.length))),
-      el('div', { class: 'tkb-cards' }, ...shown.map(tkCard), left > 0 ? el('button', { type: 'button', class: 'tkb-more', 'data-more': col.value }, `Show more · ${left} left`) : ''));
+      el('div', { class: 'tkb-cards' }, ...(col.list.length ? shown.map(tkCard) : [el('p', { class: 'tkb-none' }, 'Nothing here.')]), left > 0 ? el('button', { type: 'button', class: 'tkb-more', 'data-more': col.value }, `Show more · ${left} left`) : ''));
   }
   /** On a phone, a tab for each column: its mark and count, and the name of the one in view. */
   const tkColumnTabs = (cols) => el('nav', { class: 'tkb-tabs', role: 'tablist', 'aria-label': 'Status' }, ...cols.map((c, i) => el('button', { type: 'button', class: 'tkb-tab', role: 'tab', 'data-tab': String(i), 'aria-selected': String(i === tkTab) },
@@ -584,7 +588,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   function tickets(by, id, subpage) {
     if (subpage === 'activity') return activityPage();
     if (subpage === 'epics') return epicsPage(id);
-    const list = tkFiltered(), picked = id && (tkById(id) ?? (tkDetail.id === id ? tkDetail.ticket : undefined)), cols = tkGroups(tkStanding(list));
+    const list = tkFiltered(), picked = id && (tkById(id) ?? (tkDetail.id === id ? tkDetail.ticket : undefined)), cols = tkGroups(tkStanding(list), true);
     tkShown.id = picked?.id ?? '';
     if (id) tkWant(id);
     const empty = !tk.tickets || !tk.tickets.length ? tkNote('tickets', 'pick', 'No tickets yet', 'Tickets show here as the ticket system has them.') : !list.length
@@ -694,7 +698,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return blocks.map((b, i) => b.t === 'h' ? el('h4', { class: 'tk-dh', dir: 'auto' }, ...tkInline(b.text)) : b.t === 'ul' ? el('ul', { class: 'tk-dl', dir: 'auto' }, ...b.items.map((x) => el('li', {}, ...tkInline(x))))
       : b.t === 'q' ? el('blockquote', { class: 'tk-dq', dir: 'auto' }, ...b.items.map((x) => el('p', {}, ...tkInline(x)))) : el('p', { class: `tk-dp${i === first ? ' tk-sum' : ''}`, dir: 'auto' }, ...tkInline(b.lines.join(' '))));
   }
-  const KNOWN = ['id', 'rev', 'title', 'body', 'kind', 'status', 'assignee', 'labels', 'parent', 'links', 'created_at', 'updated_at', 'extra'];
+  const KNOWN = ['id', 'rev', 'title', 'body', 'kind', 'status', 'assignee', 'labels', 'parent', 'links', 'created_at', 'updated_at', 'extra', 'project'];
   /** What a value is, as text, without rewriting it: a string is shown as it is, anything else as its JSON. */
   const tkText = (v) => (typeof v === 'string' ? v : JSON.stringify(v));
   /** The More fields block: every key of `extra` and every top-level key this page does not know, with the value as the backend has it. They are shown and never sent back. */
@@ -740,7 +744,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       ...(tkDetail.id === t.id && tkDetail.error ? [emptyState('error', { title: tkDetail.error.code === 'not_found' ? 'Ticket not found' : 'Couldn’t read this ticket', text: tkSaid(tkDetail.error), act: tkDetail.error.retryable ? ['Retry', () => readDetail(t.id)] : undefined, small: true })] : []),
       tkIdChip(t.id), el('h2', { class: 'tk-dt', tabindex: '-1', dir: 'auto' }, t.title),
       el('p', { class: 'tkb-state' }, at >= 0 ? tkStageMark(at, tkOrder().length) : '', el('span', { dir: 'auto' }, tkWord('status', t.status))),
-      el('dl', { class: 'tkb-facts' }, tkFact(tkName('assignee'), t.assignee ? el('span', { dir: 'auto' }, t.assignee) : el('span', { class: 'tk-none' }, 'Unassigned')),
+      el('dl', { class: 'tkb-facts' }, tkProject(t) ? tkFact(tkName('project'), el('span', { dir: 'auto' }, tkProject(t))) : '', tkFact(tkName('assignee'), t.assignee ? el('span', { dir: 'auto' }, t.assignee) : el('span', { class: 'tk-none' }, 'Unassigned')),
         t.kind ? tkFact(tkName('kind'), el('span', { dir: 'auto' }, tkWord('kind', t.kind))) : '',
         t.labels.length ? tkFact(tkName('labels'), ...t.labels.map((l) => el('span', { class: 'tkb-lab', dir: 'auto' }, l))) : '',
         up ? tkFact('Part of', el('a', { href: `#ticket/${up.id}`, dir: 'auto' }, up.title)) : t.parent ? tkFact('Part of', el('span', { dir: 'auto' }, t.parent)) : '',

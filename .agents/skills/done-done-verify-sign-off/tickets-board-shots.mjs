@@ -1,6 +1,7 @@
 // The Tickets board over a ticket adapter, driven in a headless Chromium of its own over the DevTools protocol with exact device metrics (390x844 with mobile emulation, and 1440x900),
-// on a throwaway board and the repo's stand-in adapter: one column per status the backend lists (its own words made readable by one rule, its own order, and two statuses its `describe` does not list), a card for each
-// ticket with the backend's own id under the title (a long hash id shortened in the middle on the card), a phone's tabs, a ticket's sheet with its whole id and the copy button (the text
+// on a throwaway board and the repo's stand-in adapter: one column per status the backend lists (its own words made readable by one rule, its own order, and two statuses its `describe` does not list; a column
+// with no ticket says so), a card for each ticket with the backend's own id under the title (a long hash id shortened in the middle on the card) and, on its small line, the ticket's project where the backend names
+// one (a long project or assignee gives way with an ellipsis, the time stays whole), a phone's tabs, a ticket's sheet with its whole id and the copy button (the text
 // that lands on the clipboard is read back), a ticket the list does not carry, a failed read (the adapter's code and message, no cards) and a list that is not whole (incomplete, no cards).
 // DEMO_PAGE=<the option-2 demo's html> also captures the demo in the same frame beside each capture, side by side in one image, so the build is looked at against what was approved.
 // Usage: node tickets-board-shots.mjs <evidence folder> [light|dark] [390|1440]   (no theme or width: all four combinations, one run each)
@@ -37,33 +38,36 @@ process.on('exit', () => { try { chrome.kill(); } catch {} });
 let ws;
 const errors = [], steps = [];
 
-/** The backend's tickets, as it holds them: ids of every length the real source gives (a short one, and a long hash one), the three statuses it lists and two it does not (one a hyphenated word, one with an underscore), and who has each. */
-const LONG = 'jg-9840b11cf1f3116b33e2ef5cfbea241f';
-const MIN = 60_000, seed = () => {
+/** The backend's tickets, as it holds them: ids of every length the real source gives (a short one, and a long hash one), the three statuses it lists and two it does not (one a hyphenated word, one with an underscore), who has each,
+ * and the project of most (one has none as null, one has no such key at all; one project name and one assignee are long). */
+const LONG = 'jg-9840b11cf1f3116b33e2ef5cfbea241f', LONG_PROJECT = 'customer-portal-redesign-experiments', LONG_WHO = 'lane-4821-session-handoff-worker';
+const MIN = 60_000;
+const ROWS = [
+  // id, title, kind, status, assignee, parent, how long ago it changed, body, project
+  ['jg-y1di', 'Make the Tickets screen calm: four soft columns, borderless cards, one sheet', 'kind-a', 'stage-2', 'Umer', null, 190 * MIN, 'The captain picked option 2.\n\n- every card shows the ticket number\n- the sheet copies it', 'sign-off'],
+  ['jg-z4xm', 'Tickets screen as option 2', 'kind-b', 'stage-2', 'Sam', 'jg-y1di', 14 * MIN, '', 'sign-off'],
+  ['jg-0byx', 'Show the real error when the ticket list cannot be read', 'kind-b', 'stage-2', 'Umer', 'jg-y1di', 52 * MIN, '', 'sign-off'],
+  [LONG, 'Make a ticket, pick its epic and assignee, group by epic, and see who moved a ticket on the Tickets screens', 'kind-b', 'stage-1', null, 'jg-y1di', 26 * 60 * MIN, 'A long hash id: the card shortens it in the middle, the sheet shows it whole.', 'juggernaut'],
+  ['jg-k3x9', 'Keep the old settings link for a week', 'kind-b', 'stage-1', null, null, 5 * 60 * MIN, '', null],
+  ['jg-7q2m', 'Rename the export button to Download', 'kind-b', 'stage-1', 'Sam', null, 2 * 24 * 60 * MIN, '', 'sign-off'],
+  ['jg-m8c1', 'Sort the inbox by hand', 'kind-b', 'stage-1', 'Sam', null, 3 * 60 * MIN, '', 'juggernaut'],
+  ['jg-p5d6', 'Write the release note for 0.10.4', 'kind-a', 'stage-1', 'Umer', null, 9 * MIN, '', 'sign-off'],
+  ['jg-h2v4', 'Check the save twice on a slow network', 'kind-b', 'stage-1', null, null, 40 * 60 * MIN, '', undefined],
+  ['jg-r6n0', 'Move the export to its own page', 'kind-b', 'stage-3', 'Umer', null, 6 * 60 * MIN, '', 'sign-off'],
+  ['jg-t1w8', 'Publish the plan reader', 'kind-a', 'stage-3', LONG_WHO, null, 20 * MIN, '', 'sign-off'],
+  ['jg-c9f3', 'Fix the sheet that opens behind the dock', 'kind-b', 'stage-3', 'Umer', null, 2 * 60 * MIN, '', 'juggernaut'],
+  ['jg-e4b7', 'Wait for the vendor to answer the sign-in question', 'kind-b', 'stage-4', 'Sam', null, 30 * 60 * MIN, '', LONG_PROJECT],
+  ['jg-w6s5', 'Hold the export until the vendor answers', 'kind-b', 'on_hold', null, null, 4 * 60 * MIN, '', 'juggernaut'],
+];
+const seed = () => {
   const now = Date.now(), at = (ago) => new Date(now - ago).toISOString().replace(/\.\d+Z$/, 'Z');
-  const rows = [
-    ['jg-y1di', 'Make the Tickets screen calm: four soft columns, borderless cards, one sheet', 'kind-a', 'stage-2', 'Umer', null, 190 * MIN, 'The captain picked option 2.\n\n- every card shows the ticket number\n- the sheet copies it'],
-    ['jg-z4xm', 'Tickets screen as option 2', 'kind-b', 'stage-2', 'Sam', 'jg-y1di', 14 * MIN, ''],
-    ['jg-0byx', 'Show the real error when the ticket list cannot be read', 'kind-b', 'stage-2', 'Umer', 'jg-y1di', 52 * MIN, ''],
-    [LONG, 'Make a ticket, pick its epic and assignee, group by epic, and see who moved a ticket on the Tickets screens', 'kind-b', 'stage-1', null, 'jg-y1di', 26 * 60 * MIN, 'A long hash id: the card shortens it in the middle, the sheet shows it whole.'],
-    ['jg-k3x9', 'Keep the old settings link for a week', 'kind-b', 'stage-1', null, null, 5 * 60 * MIN, ''],
-    ['jg-7q2m', 'Rename the export button to Download', 'kind-b', 'stage-1', 'Sam', null, 2 * 24 * 60 * MIN, ''],
-    ['jg-m8c1', 'Sort the inbox by hand', 'kind-b', 'stage-1', 'Sam', null, 3 * 60 * MIN, ''],
-    ['jg-p5d6', 'Write the release note for 0.10.4', 'kind-a', 'stage-1', 'Umer', null, 9 * MIN, ''],
-    ['jg-h2v4', 'Check the save twice on a slow network', 'kind-b', 'stage-1', null, null, 40 * 60 * MIN, ''],
-    ['jg-r6n0', 'Move the export to its own page', 'kind-b', 'stage-3', 'Umer', null, 6 * 60 * MIN, ''],
-    ['jg-t1w8', 'Publish the plan reader', 'kind-a', 'stage-3', 'Sam', null, 20 * MIN, ''],
-    ['jg-c9f3', 'Fix the sheet that opens behind the dock', 'kind-b', 'stage-3', 'Umer', null, 2 * 60 * MIN, ''],
-    ['jg-e4b7', 'Wait for the vendor to answer the sign-in question', 'kind-b', 'stage-4', 'Sam', null, 30 * 60 * MIN, ''],
-    ['jg-w6s5', 'Hold the export until the vendor answers', 'kind-b', 'on_hold', null, null, 4 * 60 * MIN, ''],
-  ];
-  const tickets = rows.map(([id, title, kind, status, assignee, parent, ago, body], i) => ({ id, rev: `r-${i + 1}`, title, body, kind, status, assignee, labels: id === 'jg-z4xm' ? ['captain-ask'] : [], parent, links: [],
-    created_at: at(ago + 3 * 60 * MIN), updated_at: at(ago), extra: id === 'jg-z4xm' ? { estimate: '3' } : {} }));
+  const tickets = ROWS.map(([id, title, kind, status, assignee, parent, ago, body, project], i) => ({ id, rev: `r-${i + 1}`, title, body, kind, status, assignee, labels: id === 'jg-z4xm' ? ['captain-ask'] : [], parent, links: [],
+    created_at: at(ago + 3 * 60 * MIN), updated_at: at(ago), extra: id === 'jg-z4xm' ? { estimate: '3' } : {}, ...(project !== undefined && { project }) }));
   const events = { 'jg-z4xm': [
     { id: 'e-1', at: at(3 * 60 * MIN + 14 * MIN), actor: 'Sam', type: 'created', text: null, changes: [], extra: {} },
     { id: 'e-2', at: at(2 * 60 * MIN), actor: 'Sam', type: 'changed', text: null, changes: [{ field: 'status', from: 'stage-1', to: 'stage-2' }], extra: {} },
     { id: 'e-3', at: at(14 * MIN), actor: 'Umer', type: 'comment', text: 'I like option 2.', changes: [], extra: {} }] };
-  writeFileSync(join(dir, 'store.json'), JSON.stringify({ counter: rows.length, tickets, events, ops: {} }));
+  writeFileSync(join(dir, 'store.json'), JSON.stringify({ counter: ROWS.length, tickets, events, ops: {} }));
 };
 
 try {
@@ -135,16 +139,44 @@ try {
   await until(`document.querySelectorAll('.tkb-card').length >= 14`, 'the cards');
   let f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, sum: document.querySelector('.tkb-top .sum')?.textContent ?? null,
     cols: [...document.querySelectorAll('.tkb-col')].map((c) => [c.getAttribute('aria-label'), c.querySelectorAll('.tkb-card').length]),
-    cards: [...document.querySelectorAll('.tkb-card')].map((c) => ({ id: c.getAttribute('href').slice(8), shown: c.querySelector('.id').textContent, title: c.querySelector('.t').textContent, label: c.getAttribute('aria-label') })) })`);
+    cards: [...document.querySelectorAll('.tkb-card')].map((c) => { const part = (k) => c.querySelector('.m .' + k), clipped = (n) => !!n && n.scrollWidth > n.clientWidth, inside = (n) => !n || n.getBoundingClientRect().right <= c.querySelector('.m').getBoundingClientRect().right + 0.5;
+      return { id: c.getAttribute('href').slice(8), shown: c.querySelector('.id').textContent, title: c.querySelector('.t').textContent, label: c.getAttribute('aria-label'),
+        project: part('proj')?.textContent ?? null, projectClipped: clipped(part('proj')), whoClipped: clipped(part('who')), ago: part('ago')?.textContent ?? null, agoWhole: !clipped(part('ago')) && inside(part('ago')), whoWidth: part('who')?.getBoundingClientRect().width ?? null,
+        line: [...c.querySelectorAll('.m > span:not(.o)')].map((x) => x.textContent).join(' ') }; }) })`);
   assert.equal(f.width, width), assert.equal(f.overflow, false, 'no sideways overflow');
   assert.deepEqual(f.cols, [['Stage 1', 6], ['Stage 2', 3], ['Stage 3', 3], ['Stage 4', 1], ['On hold', 1]], 'a column for each status, in the order the backend lists them, the unlisted ones last, each word made readable by the one rule (stage-1 is Stage 1, on_hold is On hold)');
   assert.ok(phone || f.sum === '14 in all', `the count ${f.sum}`);
   for (const c of f.cards) assert.ok(c.id === c.shown || (c.id.length > 22 && c.shown === `${c.id.slice(0, 15)}…${c.id.slice(-4)}`), `the card shows the ticket's own id: ${JSON.stringify(c)}`);
   const long = f.cards.find((c) => c.id === LONG);
   assert.equal(long.shown, `${LONG.slice(0, 15)}…${LONG.slice(-4)}`), assert.match(long.label, new RegExp(LONG), 'its whole id is still in what a screen reader says');
+  // The project is on its small line where the backend names one, first, set off from who has it and when it changed by dots; a ticket with none (null, or no such key) has no label at all.
+  const projects = new Map(ROWS.map(([id, , , , , , , , project]) => [id, project ?? null]));
+  for (const c of f.cards) {
+    assert.equal(c.project, projects.get(c.id), `the card's project is the backend's own, or none (${c.id})`);
+    assert.ok(!c.project || c.label.includes(c.project), `a screen reader hears the project (${c.id}): ${c.label}`);
+    assert.ok(!c.project || c.line.startsWith(c.project), `the project comes first on the small line (${c.id}): ${c.line}`);
+    assert.ok(c.agoWhole && c.ago?.startsWith('Updated '), `the time after them stays whole, inside the line (${c.id}): ${c.ago}`);
+    assert.ok(c.whoWidth === null || c.whoWidth >= 14, `a name keeps some room (${c.id}): ${c.whoWidth}px`);
+  }
+  assert.equal(f.cards.filter((c) => !c.project).length, 2, 'two tickets have no project'), assert.ok(f.cards.every((c) => !/^·|· ·|·$/.test(c.line)), 'no stray dot stands where a label would be');
+  assert.ok(f.cards.find((c) => c.project === LONG_PROJECT).projectClipped && f.cards.find((c) => c.line.includes('lane-4821')).whoClipped, 'a long project and a long assignee give way with an ellipsis');
   save('board', f);
   await check('board', 'Tickets is one column for each status the backend lists, its own words in its own order, and each card has the ticket\'s own id under its title', '.tkb');
   await side('board');
+  // A column with no ticket stays and says so: the Kind filter on kind-a leaves nothing in two of the five.
+  await js(`document.querySelector('.tkb-top .tk-rb').click()`);
+  await until(`!!document.querySelector('dialog[open] .tk-pick')`, 'the filter');
+  await js(`[...document.querySelectorAll('dialog[open] .tk-pick')].find((p) => p.querySelector('.k').textContent === 'Kind a').click()`);
+  await until(`document.querySelector('.tkb-pills .tk-fpill')`, 'the filter pill');
+  f = await js(`({ cols: [...document.querySelectorAll('.tkb-col')].map((c) => [c.getAttribute('aria-label'), c.querySelectorAll('.tkb-card').length, c.querySelector('.tkb-none')?.textContent ?? null, +c.querySelector('.tkb-ch .n').textContent]),
+    tabs: [...document.querySelectorAll('.tkb-tab')].map((t) => t.innerText.replace(/\\s+/g, ' ').trim()) })`);
+  assert.deepEqual(f.cols, [['Stage 1', 1, null, 1], ['Stage 2', 1, null, 1], ['Stage 3', 1, null, 1], ['Stage 4', 0, 'Nothing here.', 0], ['On hold', 0, 'Nothing here.', 0]], 'a column with no ticket is still there, with its count and a word for it');
+  save('empty', f);
+  if (phone) { await js(`document.querySelector('.tkb-tab[data-tab="3"]').click()`); await until(`document.querySelector('.tkb-tab[aria-selected="true"]')?.dataset.tab === '3' && Math.abs(document.querySelector('.tkb-board').scrollLeft - 3 * document.querySelector('.tkb-board').clientWidth) < 2`, 'the empty column in view'); }
+  await check('empty', 'A column with no ticket stays, with its count at 0 and Nothing here.', '.tkb', true);
+  await js(`document.querySelector('.tkb-pills .tk-fpill').click()`);
+  await until(`document.querySelectorAll('.tkb-card').length >= 14 && !document.querySelector('.tkb-none')`, 'the filter cleared');
+  if (phone) { await js(`document.querySelector('.tkb-tab[data-tab="0"]').click()`); await until(`document.querySelector('.tkb-board').scrollLeft < 2`, 'the first column back in view'); }
   if (phone) {
     // A phone has one column in view and a tab for each: a tap on a tab brings its column in view and the tab says its name.
     await js(`document.querySelector('.tkb-tab[data-tab="2"]').click()`);
@@ -160,13 +192,14 @@ try {
   // A ticket's sheet: its whole id first, then its title and where it stands, who has it, and its history; the open card is marked.
   await js(`document.querySelector('.tkb-card[href="#ticket/${LONG}"]').click()`);
   await until(`!!document.querySelector('.tk-sheet .tkb-id')`, 'the sheet');
-  await until(`!!document.querySelector('.tk-sheet .tkb-life, .tk-sheet .tk-note, .tk-sheet .es')`, 'the history read');
+  await until(`!!document.querySelector('.tk-sheet .tkb-id') && !document.querySelector('.tk-sheet .es-loading')`, 'the history read (no loading placeholder left in the sheet)');
   await wait(500);
   f = await js(`({ chip: document.querySelector('.tkb-id code').textContent, copyWord: document.querySelector('.tkb-id span').textContent, title: document.querySelector('.tk-sheet .tk-dt').textContent,
     state: document.querySelector('.tkb-state').innerText.trim(), facts: [...document.querySelectorAll('.tkb-facts > div')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim()), hash: location.hash,
     current: document.querySelector('.tkb-card[aria-current]')?.getAttribute('href'), rect: (() => { const r = document.querySelector('.tk-sheet').getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })() })`);
   assert.equal(f.chip, LONG, 'the sheet shows the whole id'), assert.equal(f.copyWord, 'Copy'), assert.equal(f.hash, `#ticket/${LONG}`), assert.equal(f.current, `#ticket/${LONG}`, 'the open ticket\'s card is marked');
   assert.ok(f.facts.some((r) => r.startsWith('Assignee') && r.includes('Unassigned')) && f.facts.some((r) => r.startsWith('Part of') && r.includes('Make the Tickets screen calm')), `the facts ${JSON.stringify(f.facts)}`);
+  assert.equal(f.facts[0], 'Project juggernaut', `the sheet names the project first, in the backend's own word for it: ${JSON.stringify(f.facts)}`);
   assert.equal(phone ? Math.round(f.rect.bottom) : Math.round(f.rect.right), phone ? height : width, 'the sheet rises from the foot on a phone and from the right edge on a desk');
   save('sheet', f);
   await check('sheet', 'A ticket opens as a sheet over the board (from the foot on a phone, from the right edge on a desk) with its whole id, a Copy button, its title, where it stands and who has it', '.tk-sheet');
@@ -194,9 +227,17 @@ try {
   f = await js(`({ life: [...document.querySelectorAll('.tkb-life li')].map((l) => l.innerText.replace(/\\s+/g, ' ').trim()), more: [...document.querySelectorAll('.tk-more-fields .ui-pr')].map((r) => r.innerText.replace(/\\s+/g, ' ').trim()) })`);
   assert.equal(f.life.length, 3), assert.ok(f.life[2].startsWith('comment by Umer') && f.life[2].includes('I like option 2.'), `the history ${JSON.stringify(f.life)}`);
   assert.ok(f.more.some((m) => m.includes('estimate') && m.endsWith('3')), `More fields ${JSON.stringify(f.more)}`);
+  assert.ok(!f.more.some((m) => /project/i.test(m)), `the project is a fact of the sheet, not an unknown field: ${JSON.stringify(f.more)}`);
   save('history', f);
   await js(`document.querySelector('.tk-sheet').scrollTo(0, 99999)`);
   await check('history', 'The sheet\'s history is the events the backend recorded, oldest first, each with who and when, the latest marked', '.tk-sheet', true);
+  await js(`document.querySelector('.tk-sheet .x').click()`);
+  await until(`!document.querySelector('.tk-sheet')`, 'the sheet closes');
+  // A ticket with no project has no Project fact.
+  await js(`document.querySelector('.tkb-card[href="#ticket/jg-k3x9"]').click()`);
+  await until(`!!document.querySelector('.tk-sheet .tkb-facts')`, 'the sheet of a ticket with no project');
+  f = await js(`[...document.querySelectorAll('.tkb-facts dt')].map((d) => d.textContent)`);
+  assert.ok(!f.includes('Project') && f.includes('Assignee'), `no Project fact: ${JSON.stringify(f)}`);
   await js(`document.querySelector('.tk-sheet .x').click()`);
   await until(`!document.querySelector('.tk-sheet')`, 'the sheet closes');
   // Escape closes it too, and an address no list carries opens a sheet that says so.
@@ -226,9 +267,9 @@ try {
   await until(`document.querySelectorAll('.tkb-card').length >= 14`, 'the board after Retry');
   assert.deepEqual(errors, [], 'no page error');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: fourteen tickets in the three statuses it lists and two it does not, with short ids and one long hash id, an epic, and two people',
-    steps: ['Open Tickets', phone ? 'Tap the third column\'s tab' : 'Look across the columns', 'Open the ticket with the long id', 'Tap its id to copy it', 'Open a ticket with history', 'Open an address no list carries and press Escape', 'Make the backend unreadable and open Tickets', 'Make it readable only in part and press Retry', 'Make it readable again and press Retry'],
-    result: `At ${width}px${phone ? ' with mobile emulation' : ''}, ${theme}: Tickets is a column for each status the backend lists, each card shows the ticket's own id, a ticket opens as a sheet with its whole id and a Copy button that puts exactly that on the clipboard, an unreadable backend shows the adapter's code and message with Retry and no cards, and a partial list shows incomplete and no cards.` }, null, 2));
+    start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: fourteen tickets in the three statuses it lists and two it does not, with short ids and one long hash id, an epic, two people, two projects (one name long) and two tickets with none',
+    steps: ['Open Tickets', 'Filter by a kind that leaves two columns empty and clear it', phone ? 'Tap the third column\'s tab' : 'Look across the columns', 'Open the ticket with the long id', 'Tap its id to copy it', 'Open a ticket with history', 'Open a ticket with no project', 'Open an address no list carries and press Escape', 'Make the backend unreadable and open Tickets', 'Make it readable only in part and press Retry', 'Make it readable again and press Retry'],
+    result: `At ${width}px${phone ? ' with mobile emulation' : ''}, ${theme}: Tickets is a column for each status the backend lists (one with no ticket says so), each card shows the ticket's own id and its project where it has one, a ticket opens as a sheet with its whole id and a Copy button that puts exactly that on the clipboard, an unreadable backend shows the adapter's code and message with Retry and no cards, and a partial list shows incomplete and no cards.` }, null, 2));
 } finally {
   try { ws?.close(); } catch {}
   try { chrome.kill(); } catch {}
