@@ -437,8 +437,10 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
   }
   const tkField = (name) => tk.fields?.fields.find((f) => f.name === name);
   const tkValues = (name) => tkField(name)?.values ?? [];
-  /** A value's display word where the backend gives one, else the value as it is. */
-  const tkWord = (name, value) => tkValues(name).find((v) => v.value === value)?.label ?? value;
+  /** An allowed word `describe` gives no label for, as a person reads it, by one rule: a lowercase word of letters and digits joined by _ or - gets spaces and a capital first letter (in_progress: In progress); any other word is shown as it is. */
+  const tkReadable = (word) => (/^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$/.test(word) ? word.replace(/[_-]/g, ' ').replace(/^./, (c) => c.toUpperCase()) : word);
+  /** A value's display word: the backend's label where it gives one; else, for a field whose words it lists (an enum: status, kind), the value by that rule; any other value (an assignee) as it is. */
+  const tkWord = (name, value) => { const f = tkField(name); return f?.values?.find((v) => v.value === value)?.label ?? (f?.type === 'enum' ? tkReadable(value) : value); };
   /** A field's name for a person: the backend's own label, else its key with a capital. */
   const tkName = (name) => tkField(name)?.label ?? name.replace(/^extra\./, '').replace(/^./, (c) => c.toUpperCase());
   const tkCan = (op) => !!tk.fields?.capabilities.includes(op);
@@ -486,7 +488,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
       const pick = (name, value, label, n) => { const x = el('button', { class: 'ui-pr tk-pick', ...((tkFilters[name] ?? '') === value && { 'aria-current': 'true' }) }, el('span', { class: 'k' }, label), el('span', { class: 'v' }, el('span', { class: 'n' }, String(n)), (tkFilters[name] ?? '') === value ? glyph('check') : ''));
         x.onclick = () => { tkFilters = { ...tkFilters, [name]: value }; tkFilterSheet.close(); render(); }; return x; };
       tkFilterSheet.replaceChildren(el('div', {}, sheetHead('tk-filter', 'Filter tickets'), ...fields.flatMap((f) => [el('p', { class: 'ui-dl' }, tkName(f.name)),
-        el('div', { class: 'ui-props' }, pick(f.name, '', `Every ${tkName(f.name).toLowerCase()}`, tkAll().length), ...f.values.map((v) => pick(f.name, v.value, v.label ?? v.value, tkAll().filter((t) => t[f.name] === v.value).length)))])));
+        el('div', { class: 'ui-props' }, pick(f.name, '', `Every ${tkName(f.name).toLowerCase()}`, tkAll().length), ...f.values.map((v) => pick(f.name, v.value, tkWord(f.name, v.value), tkAll().filter((t) => t[f.name] === v.value).length)))])));
       tkFilterSheet.showModal();
       tkFilterSheet.querySelector('h2').focus();
     };
@@ -520,7 +522,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     return [el('header', { class: 'ui-dhead tk-dhead' }, el('div', { class: 'tx' }, el('p', { class: 'crumb' }, 'Sign-off', el('span', { 'aria-hidden': 'true' }, '›'), 'Tickets'), el('h1', { tabindex: '-1' }, 'Tickets'), sub),
       el('div', { class: 'acts' }, ...tkPills(), tkTabs(on), tkNewButton(), ...tools, themeButton()))];
   }
-  /* ---- The board: one column per status the backend lists, in its own words and its own order. A ticket is a card (its title, its own id under it, who has it and when it changed) that
+  /* ---- The board: one column per status the backend lists, in its own words (made readable by one rule where it gives no label: in_progress is In progress) and its own order. A ticket is a card (its title, its own id under it, who has it and when it changed) that
      opens its sheet. A phone shows one column at a time with a tab for each; a desk shows them side by side. Only tickets the backend lists are on it: the board holds no word for a
      finished ticket and filters none out, so a backend that lists only the open ones shows only those. ---- */
   const TKB_FIRST = 20, TKB_MORE = 25;
@@ -551,7 +553,7 @@ if (!document.getElementById('tk-sprite')) document.body.insertAdjacentHTML('aft
     const kids = tkUnder(t).length, ago = tkAgo(t.updated_at), meta = [t.assignee, ago && `Updated ${ago}`].filter(Boolean).join(' · ');
     return el('a', { class: 'tkb-card', href: `#ticket/${t.id}`, 'data-key': t.id, ...(t.id === tkShown.id && { 'aria-current': 'true' }), 'aria-label': `${t.title}, ticket ${t.id}${meta ? `, ${meta}` : ''}${kids ? `, ${kids} under it` : ''}` },
       el('span', { class: 't', dir: 'auto' }, t.title), el('span', { class: 'id', dir: 'ltr' }, tkShortId(t.id)),
-      el('span', { class: 'm' }, kids ? el('span', { class: 'o' }, String(kids)) : '', el('span', { dir: 'auto' }, meta)));
+      el('span', { class: 'm' }, kids ? el('span', { class: 'o' }, String(kids)) : '', t.assignee ? el('span', { class: 'who', dir: 'auto' }, t.assignee) : '', ago ? el('span', { class: 'ago' }, `Updated ${ago}`) : ''));
   }
   function tkColumn(col) {
     const shown = col.list.slice(0, tkLimit.get(col.value) ?? TKB_FIRST), left = col.list.length - shown.length;

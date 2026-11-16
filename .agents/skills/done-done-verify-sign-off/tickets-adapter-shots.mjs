@@ -70,7 +70,7 @@ try {
   await until(`document.querySelectorAll('.tkb-card').length >= 5`, 'the ticket rows');
   let f = await facts(`, groups: [...document.querySelectorAll('main section[aria-label] h2')].map((h) => h.textContent)`);
   assert.equal(f.width, width), assert.equal(f.overflow, false, 'no sideways overflow');
-  assert.ok(f.groups.some((g) => g.startsWith('stage-1')) && f.groups.some((g) => g.startsWith('stage-3')), `groups ${JSON.stringify(f.groups)}`);
+  assert.ok(f.groups.some((g) => g.startsWith('Stage 1')) && f.groups.some((g) => g.startsWith('Stage 3')), `groups ${JSON.stringify(f.groups)}`);
   save('list', f);
   await png('list', 'Tickets is a column for each status word the backend gave, with their counts, and each card has the ticket\'s own id');
   // One ticket: its fields, the More fields block, the history the backend recorded.

@@ -117,7 +117,7 @@ try {
   f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, add: !!${button('New ticket in this epic')},
     groups: [...document.querySelectorAll('main section[aria-label] h2')].map((h) => h.textContent.trim()), rows: [...document.querySelectorAll('.tk-row .t')].map((r) => r.textContent.trim()) })`);
   assert.ok(f.add, 'New ticket in this epic is on the epic'), assert.equal(f.overflow, false, 'no sideways overflow');
-  assert.ok(f.groups.some((g) => g.startsWith('stage-1')) && f.groups.some((g) => g.startsWith('stage-2')), `its tickets by status ${JSON.stringify(f.groups)}`);
+  assert.ok(f.groups.some((g) => g.startsWith('Stage 1')) && f.groups.some((g) => g.startsWith('Stage 2')), `its tickets by status ${JSON.stringify(f.groups)}`);
   assert.ok(f.rows.includes('Ship the billing page'), 'the ticket just made is under its epic');
   assert.ok(!f.rows.includes('Sort the inbox by hand'), 'a ticket under no epic is not on this epic');
   save('epic', f);

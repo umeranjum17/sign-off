@@ -1,5 +1,5 @@
 // The Tickets board over a ticket adapter, driven in a headless Chromium of its own over the DevTools protocol with exact device metrics (390x844 with mobile emulation, and 1440x900),
-// on a throwaway board and the repo's stand-in adapter: one column per status the backend lists (its own words, its own order, and one status its `describe` does not list), a card for each
+// on a throwaway board and the repo's stand-in adapter: one column per status the backend lists (its own words made readable by one rule, its own order, and two statuses its `describe` does not list), a card for each
 // ticket with the backend's own id under the title (a long hash id shortened in the middle on the card), a phone's tabs, a ticket's sheet with its whole id and the copy button (the text
 // that lands on the clipboard is read back), a ticket the list does not carry, a failed read (the adapter's code and message, no cards) and a list that is not whole (incomplete, no cards).
 // DEMO_PAGE=<the option-2 demo's html> also captures the demo in the same frame beside each capture, side by side in one image, so the build is looked at against what was approved.
@@ -37,7 +37,7 @@ process.on('exit', () => { try { chrome.kill(); } catch {} });
 let ws;
 const errors = [], steps = [];
 
-/** The backend's tickets, as it holds them: ids of every length the real source gives (a short one, and a long hash one), the three statuses it lists and one it does not, and who has each. */
+/** The backend's tickets, as it holds them: ids of every length the real source gives (a short one, and a long hash one), the three statuses it lists and two it does not (one a hyphenated word, one with an underscore), and who has each. */
 const LONG = 'jg-9840b11cf1f3116b33e2ef5cfbea241f';
 const MIN = 60_000, seed = () => {
   const now = Date.now(), at = (ago) => new Date(now - ago).toISOString().replace(/\.\d+Z$/, 'Z');
@@ -55,6 +55,7 @@ const MIN = 60_000, seed = () => {
     ['jg-t1w8', 'Publish the plan reader', 'kind-a', 'stage-3', 'Sam', null, 20 * MIN, ''],
     ['jg-c9f3', 'Fix the sheet that opens behind the dock', 'kind-b', 'stage-3', 'Umer', null, 2 * 60 * MIN, ''],
     ['jg-e4b7', 'Wait for the vendor to answer the sign-in question', 'kind-b', 'stage-4', 'Sam', null, 30 * 60 * MIN, ''],
+    ['jg-w6s5', 'Hold the export until the vendor answers', 'kind-b', 'on_hold', null, null, 4 * 60 * MIN, ''],
   ];
   const tickets = rows.map(([id, title, kind, status, assignee, parent, ago, body], i) => ({ id, rev: `r-${i + 1}`, title, body, kind, status, assignee, labels: id === 'jg-z4xm' ? ['captain-ask'] : [], parent, links: [],
     created_at: at(ago + 3 * 60 * MIN), updated_at: at(ago), extra: id === 'jg-z4xm' ? { estimate: '3' } : {} }));
@@ -129,15 +130,15 @@ try {
   const page = () => js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, cards: document.querySelectorAll('.tkb-card').length, text: document.body.innerText })`);
   fault('none');
 
-  // The board: a column for each status the backend lists, then the one it does not list; every card names its ticket's own id.
+  // The board: a column for each status the backend lists, then the two it does not list, each word made readable by the board's one rule; every card names its ticket's own id.
   await go('#tickets');
-  await until(`document.querySelectorAll('.tkb-card').length >= 13`, 'the cards');
+  await until(`document.querySelectorAll('.tkb-card').length >= 14`, 'the cards');
   let f = await js(`({ width: innerWidth, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth, sum: document.querySelector('.tkb-top .sum')?.textContent ?? null,
     cols: [...document.querySelectorAll('.tkb-col')].map((c) => [c.getAttribute('aria-label'), c.querySelectorAll('.tkb-card').length]),
     cards: [...document.querySelectorAll('.tkb-card')].map((c) => ({ id: c.getAttribute('href').slice(8), shown: c.querySelector('.id').textContent, title: c.querySelector('.t').textContent, label: c.getAttribute('aria-label') })) })`);
   assert.equal(f.width, width), assert.equal(f.overflow, false, 'no sideways overflow');
-  assert.deepEqual(f.cols, [['stage-1', 6], ['stage-2', 3], ['stage-3', 3], ['stage-4', 1]], 'a column for each status, in the order the backend lists them, the unlisted one last');
-  assert.ok(phone || f.sum === '13 in all', `the count ${f.sum}`);
+  assert.deepEqual(f.cols, [['Stage 1', 6], ['Stage 2', 3], ['Stage 3', 3], ['Stage 4', 1], ['On hold', 1]], 'a column for each status, in the order the backend lists them, the unlisted ones last, each word made readable by the one rule (stage-1 is Stage 1, on_hold is On hold)');
+  assert.ok(phone || f.sum === '14 in all', `the count ${f.sum}`);
   for (const c of f.cards) assert.ok(c.id === c.shown || (c.id.length > 22 && c.shown === `${c.id.slice(0, 15)}…${c.id.slice(-4)}`), `the card shows the ticket's own id: ${JSON.stringify(c)}`);
   const long = f.cards.find((c) => c.id === LONG);
   assert.equal(long.shown, `${LONG.slice(0, 15)}…${LONG.slice(-4)}`), assert.match(long.label, new RegExp(LONG), 'its whole id is still in what a screen reader says');
@@ -149,7 +150,7 @@ try {
     await js(`document.querySelector('.tkb-tab[data-tab="2"]').click()`);
     await until(`document.querySelector('.tkb-tab[aria-selected="true"]')?.dataset.tab === '2' && Math.abs(document.querySelector('.tkb-board').scrollLeft - 2 * document.querySelector('.tkb-board').clientWidth) < 2`, 'the third column in view');
     f = await js(`({ selected: document.querySelector('.tkb-tab[aria-selected="true"] .w').textContent, tabs: [...document.querySelectorAll('.tkb-tab')].map((t) => t.innerText.replace(/\\s+/g, ' ').trim()) })`);
-    assert.equal(f.selected, 'stage-3');
+    assert.equal(f.selected, 'Stage 3');
     save('tab', f);
     await check('tab', 'On a phone a tap on a tab brings that column in view, and the tab in view says its name', '.tkb', true);
     await js(`document.querySelector('.tkb-tab[data-tab="0"]').click()`);
@@ -222,10 +223,10 @@ try {
   await png('incomplete', 'A list that is not whole shows incomplete with the adapter\'s message and Retry, never the tickets that could be read', true);
   fault('none');
   await js(`${button('Retry')}.click()`);
-  await until(`document.querySelectorAll('.tkb-card').length >= 13`, 'the board after Retry');
+  await until(`document.querySelectorAll('.tkb-card').length >= 14`, 'the board after Retry');
   assert.deepEqual(errors, [], 'no page error');
   writeFileSync(join(out, 'steps.json'), JSON.stringify({ target: { version: JSON.parse(readFileSync(join(repo, 'package.json'), 'utf8')).version },
-    start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: thirteen tickets in the three statuses it lists and one it does not, with short ids and one long hash id, an epic, and two people',
+    start: 'A new board whose tickets live in the repo\'s stand-in ticket adapter: fourteen tickets in the three statuses it lists and two it does not, with short ids and one long hash id, an epic, and two people',
     steps: ['Open Tickets', phone ? 'Tap the third column\'s tab' : 'Look across the columns', 'Open the ticket with the long id', 'Tap its id to copy it', 'Open a ticket with history', 'Open an address no list carries and press Escape', 'Make the backend unreadable and open Tickets', 'Make it readable only in part and press Retry', 'Make it readable again and press Retry'],
     result: `At ${width}px${phone ? ' with mobile emulation' : ''}, ${theme}: Tickets is a column for each status the backend lists, each card shows the ticket's own id, a ticket opens as a sheet with its whole id and a Copy button that puts exactly that on the clipboard, an unreadable backend shows the adapter's code and message with Retry and no cards, and a partial list shows incomplete and no cards.` }, null, 2));
 } finally {

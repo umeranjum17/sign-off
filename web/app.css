@@ -2106,6 +2106,9 @@
   .tkb-card .id { display: block; margin-top: 5px; color: var(--cb-ink3); }
   .tkb-card .m { display: flex; align-items: center; gap: 6px; margin-top: 6px; overflow: hidden; color: var(--cb-ink3); font-size: 12px; white-space: nowrap; }
   .tkb-card .m span:not(.o) { overflow: hidden; text-overflow: ellipsis; }
+  /* A long assignee (a real lane's name) gives way with an ellipsis; the time after it stays whole, set off by a dot. */
+  .tkb-card .m span.ago { flex: none; overflow: visible; }
+  .tkb-card .m .who + .ago::before { content: '·'; margin-right: 6px; }
   .tkb-card .o { display: grid; flex: none; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--cb-panel); color: var(--cb-ink2); font-size: 11px; }
   .tkb-more { padding: 8px 10px; border: 0; border-radius: 6px; background: none; color: var(--cb-ink2); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
   .tkb-more:hover { background: var(--cb-hover); color: var(--cb-ink); }
