@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 const here = resolve('.'), repo = resolve(process.env.SIGN_OFF_REPO ?? '.'), out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT);
@@ -27,26 +28,33 @@ writeFileSync(board, JSON.stringify({ schema: 2, items: [{ filed: new Date().toI
 const sh = (bin, args, options = {}) => spawnSync(bin, args, { encoding: 'utf8', timeout: 120000, ...options });
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 let server;
-const browserEnv = { ...process.env, AGENT_BROWSER_SESSION: `inbox-layout-${process.pid}`, AGENT_BROWSER_NAMESPACE: 'sign-off-inbox-layout', ...(process.env.INBOX_LAYOUT_BROWSER_TMPDIR ? { TMPDIR: process.env.INBOX_LAYOUT_BROWSER_TMPDIR } : {}) };
-const browser = (args, options = {}) => {
-  const r = sh('agent-browser', ['--json', ...args], { env: browserEnv, maxBuffer: 4 * 1024 * 1024, ...options });
+// The browser is chrome-devtools-axi (the driver the CI test job installs) in a session of its own, with a free port for its bridge: the port a session name derives can be one another run's bridge already holds.
+const port = await new Promise((ok) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => ok(port)); }); });
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-inbox-layout-${process.pid}-${Date.now()}`, CHROME_DEVTOOLS_AXI_PORT: String(port), CHROME_DEVTOOLS_AXI_BRIDGE_TIMEOUT_MS: '90000' };
+const axi = (args, options = {}) => {
+  const r = sh('chrome-devtools-axi', args, { env: browserEnv, maxBuffer: 4 * 1024 * 1024, ...options });
   assert.equal(r.status, 0, r.stderr || r.stdout);
-  const reply = JSON.parse(r.stdout); assert.equal(reply.success, true, JSON.stringify(reply.error)); return reply.data;
+  return r.stdout;
 };
-const evalIn = async (expression) => browser(['eval', '--stdin'], { input: expression }).result;
+// An expression as an async arrow, so any expression (an IIFE and a promise too) is one function the driver passes to the page unchanged.
+const evalIn = async (expression) => { const last = axi(['run'], { input: `console.log(JSON.stringify(await page.eval(${JSON.stringify(`async () => (${expression}\n)`)})));` }).trim().split('\n').pop(); return last === 'undefined' ? undefined : JSON.parse(last); };
+// Console errors the page has drawn since its own navigation (an uncaught error is one of them). The one message not counted is the browser's own report that a page's
+// meta Content-Security-Policy (default-src 'none', in each option page) blocked the inline bridge script the board adds to every HTML view: nothing the page's code raised.
+const consoleErrors = () => [...axi(['console', '--type', 'error']).matchAll(/^msgid=\d+ \[error\] (.*) \(\d+ args\)$/gm)].map((x) => x[1])
+  .filter((text) => !text.startsWith("Executing inline script violates the following Content Security Policy directive 'default-src 'none''."));
 
 try {
   server = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'serve', board, '--port', '0'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const url = await new Promise((ok, no) => { let log = ''; server.stdout.on('data', (b) => { log += b; const m = /http:\/\/127.0.0.1:\d+\//.exec(log); if (m) ok(m[0]); }); server.once('exit', () => no(Error('server exited'))); });
-  browser(['open', 'about:blank']);
+  // The first page of a fresh session is opened on the board itself: the driver has no selected page to send about:blank to.
+  axi(['open', url]);
   const HEIGHT = { 390: 844, 1280: 800 }, records = [];
   const open = async (width, theme, address) => {
-    browser(['open', 'about:blank']);
-    browser(['set', 'viewport', String(width), String(HEIGHT[width]), '2']);
-    browser(['set', 'media', theme]);
-    browser(['open', address]); await wait(600);
+    axi(['open', 'about:blank']);
+    axi(['emulate', '--viewport', `${width}x${HEIGHT[width]}x2`, '--color-scheme', theme]);
+    axi(['open', address]); await wait(600);
   };
-  const shoot = async (file) => browser(['screenshot', join(dest, file)]);
+  const shoot = async (file) => axi(['screenshot', join(dest, file)]);
   if (!before) for (const [v, label] of OPTIONS) for (const width of [390, 1280]) for (const theme of ['light', 'dark']) {
     await open(width, theme, `${url}mock/local/${v === 'b' ? 'inbox-feed-report~' : `inbox-layout~${v}`}/option-${v}.html`);
     await wait(600);
@@ -57,7 +65,7 @@ try {
         .filter((e) => { const b = e.getBoundingClientRect(); return b.width && b.height && b.bottom > 0 && b.top < innerHeight && b.right > 0 && b.left < innerWidth; }).map((e) => parseFloat(getComputedStyle(e).fontSize));
       return { width: innerWidth, overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth, smallest: Math.min(...sizes), background: getComputedStyle(document.body).backgroundColor,
         text: document.body.innerText.replace(/\\s+/g, ' ').slice(0, 200) }; })()`);
-    const errors = [...browser(['errors']).errors, ...browser(['console']).messages.filter((m) => m.type === 'error').map((m) => m.text)];
+    const errors = consoleErrors();
     records.push({ file, option: label, theme, ...r, console_errors: errors });
     assert.equal(r.overflowX, false, `${file}: no sideways scroll`);
     assert.match(r.text, /Ship the new settings page Friday\?/, `${file}: the page shows the inbox's threads`);
@@ -101,7 +109,7 @@ try {
 } catch (error) {
   console.error(error); throw error;
 } finally {
-  browser(['close']);
+  try { axi(['stop']); } catch (error) { console.log(`cleanup: chrome-devtools-axi stop failed: ${error.message.replace(/\s+/g, ' ').slice(0, 160)}`); }
   if (server) await new Promise((ok, no) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', no); stop.once('exit', (code) => code === 0 ? ok() : no(Error(log))); });
   await wait(400); rmSync(dir, { recursive: true, force: true });
 }

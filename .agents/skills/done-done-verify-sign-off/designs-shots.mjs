@@ -1,5 +1,5 @@
-// Designs in the new look, at one theme and width per run, driven through an isolated agent-browser session
-// at exact viewport metrics (390x844, 1280x800 or 1440x900, 2x).
+// Designs in the new look, at one theme and width per run, driven through an isolated chrome-devtools-axi session
+// (the driver the CI test job installs) at exact viewport metrics (390x844, 1280x800 or 1440x900, 2x).
 // The board holds three designs posted through the real CLI (Umer's demo data, under Designs, none promoted to Decide; their screens are the board's own docs/media shots):
 // Today on a phone (three screens and two directions; changes asked with a pick and a note on one screen), Today on a desk in one column or two (a pick, approved) and the Reports list on a phone (in review).
 // The Sign-off project has its own icon (sign-off-axi project --icon); the others show initials. Today on a desk sits on a finished ticket (its row's full bar). Three evidence updates give the sidebar's Evidence a count.
@@ -17,6 +17,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const out = resolve(process.argv[2] ?? process.env.DONE_DONE_EVIDENCE_ROOT), theme = process.argv[3] ?? 'light', width = +(process.argv[4] ?? 390), phone = width < 1024;
@@ -152,12 +153,16 @@ const MEASURE = `(async () => {
     words: words.replace(/\\s+/g, ' ').trim().slice(0, 900), dom: { url: location.href, overflow: document.documentElement.scrollWidth > w, overflowing } };
 })()`;
 
-const browserEnv = { ...process.env, AGENT_BROWSER_SESSION: `designs-${process.pid}`, AGENT_BROWSER_NAMESPACE: 'sign-off-designs',
-  ...(process.env.INBOX_LAYOUT_BROWSER_TMPDIR ? { TMPDIR: process.env.INBOX_LAYOUT_BROWSER_TMPDIR } : {}) };
-const browser = (args, options = {}) => {
-  const r = sh('agent-browser', ['--json', '--hide-scrollbars', String(phone), ...args], { env: browserEnv, maxBuffer: 4 * 1024 * 1024, ...options });
-  const reply = JSON.parse(r); assert.equal(reply.success, true, JSON.stringify(reply.error)); return reply.data;
-};
+// The browser is chrome-devtools-axi in a session of its own; its page, console and network lists reset with each navigation, so what a capture reports is read from the
+// list the page has drawn since its own `go` (the first `read` entries of each list were reported by an earlier capture of the same page).
+// Its bridge gets a free port of its own: the port a session name derives can be one another run's bridge already holds.
+const port = await new Promise((ok) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => ok(port)); }); });
+const browserEnv = { ...process.env, CHROME_DEVTOOLS_AXI_SESSION: `so-designs-${theme}-${width}-${process.pid}-${Date.now()}`, CHROME_DEVTOOLS_AXI_PORT: String(port), CHROME_DEVTOOLS_AXI_BRIDGE_TIMEOUT_MS: '90000' };
+const axi = (...args) => sh('chrome-devtools-axi', args, { env: browserEnv, maxBuffer: 4 * 1024 * 1024 });
+const drive = (script) => sh('chrome-devtools-axi', ['run'], { env: browserEnv, input: script, maxBuffer: 4 * 1024 * 1024 });
+// An expression as an async arrow, so any expression (an IIFE and a promise too) is one function the driver passes to the page unchanged.
+const asFunction = (expression) => JSON.stringify(`async () => (${expression}\n)`);
+const read = { console: 0, network: 0 };
 let server;
 const errors = [], failed = [], report = [], problems = [], shots = [];
 try {
@@ -200,22 +205,27 @@ try {
   await answer({ key: 'today-phone', verdict: 'change', pick: 'up-next', notes: [{ journey: 'morning', screen: 'ask', verdict: 'change', note: 'The ask cuts its last answer at the foot of a small phone; let the answers scroll above the button.' }] });
   await answer({ key: 'today-desk', verdict: 'approve', pick: 'two', notes: [] });
 
-  browser(['open', 'about:blank']);
-  const js = async (expression) => browser(['eval', '--stdin'], { input: expression }).result;
-  const until = async (expression, what) => { for (let i = 0; i < 60; i++) { if (await js(expression)) return; await wait(100); } assert.fail(`timed out: ${what}`); };
-  // The selector is resolved by agent-browser and receives a real browser click.
-  const tap = async (sel) => browser(['click', sel]);
-  const setup = async () => { browser(['set', 'viewport', String(metrics.width), String(metrics.height), String(metrics.deviceScaleFactor)]); browser(['set', 'media', theme]); };
+  // The first page of a fresh session is opened on the board itself: the driver has no selected page to send about:blank to.
+  axi('open', base);
+  const js = async (expression) => { const value = drive(`console.log(JSON.stringify(await page.eval(${asFunction(expression)})));`).trim().split('\n').pop(); return value === 'undefined' ? undefined : JSON.parse(value); };
+  // A poll that fails once on a page still loading is tried again; one that never holds fails the run by what it waited for.
+  const until = async (expression, what) => assert.match(drive(`for (let i = 0; i < 120; i++) { try { if (await page.eval(${asFunction(expression)})) { console.log('ready'); break; } } catch {} await new Promise((ok) => setTimeout(ok, 100)); }`), /ready/, `timed out: ${what}`);
+  // The selector is resolved in the page, which scrolls the element to the middle and clicks it (the driver's own selector click needs a page that answers its script call; this is the click the other journeys make).
+  const tap = async (sel) => js(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); if (!el) throw new Error('no element for ' + ${JSON.stringify(sel)}); el.scrollIntoView({ block: 'center' }); el.click(); })()`);
+  const setup = async () => axi('emulate', '--viewport', `${metrics.width}x${metrics.height}x${metrics.deviceScaleFactor}`, '--color-scheme', theme);
   await setup();
-  const png = async (file) => browser(['screenshot', file]);
-  const go = async (address, ms = 1200) => { browser(['open', 'about:blank']); browser(['open', address]); await wait(ms); };
+  const png = async (file) => axi('screenshot', file);
+  const go = async (address, ms = 1200) => { axi('open', 'about:blank'); axi('open', address); read.console = read.network = 0; await wait(ms); };
   const capture = async (state) => {
     await wait(450);
     await js(`document.activeElement?.blur?.()`);
     await png(join(out, `${name(state)}.png`)); shots.push(`${name(state)}.png`);
     const m = await js(MEASURE);
-    errors.push(...browser(['errors']).errors, ...browser(['console']).messages.filter((m) => m.type === 'error').map((m) => m.text));
-    failed.push(...browser(['network', 'requests']).requests.filter((r) => r.status >= 400).map(({ url, status }) => ({ url, status })));
+    // Uncaught errors are console errors in this list; what an earlier capture of this page reported is not reported again.
+    const logged = [...axi('console', '--type', 'error').matchAll(/^msgid=\d+ \[error\] (.*) \(\d+ args\)$/gm)].map((x) => x[1]);
+    errors.push(...logged.slice(read.console)); read.console = logged.length;
+    const requests = [...axi('network').matchAll(/^reqid=\d+ \S+ (\S+) \[(\d+)\]$/gm)].map((x) => ({ url: x[1], status: Number(x[2]) }));
+    failed.push(...requests.slice(read.network).filter((r) => r.status >= 400)); read.network = requests.length;
     writeFileSync(join(out, `${name(state)}.dom.json`), JSON.stringify({ ...m.dom, console_errors: [...errors], failed_requests: [...failed] }, null, 2) + '\n');
     delete m.dom;
     writeFileSync(join(out, `${name(state)}.measure.json`), JSON.stringify(m, null, 2) + '\n');
@@ -225,7 +235,6 @@ try {
       + `${m.clear !== undefined && m.clear !== null ? `; last block ${m.clear}px above the dock` : ''}; under 44px ${m.under.length}; failures ${m.fail.length}${m.fail.length ? ': ' + m.fail.join('; ') : ''}`);
     if ([m.fail, m.under, errors, failed].some((x) => x.length)) problems.push(`${name(state)}: ${JSON.stringify({ fail: m.fail, under: m.under, errors, failed })}`);
     errors.length = 0; failed.length = 0;
-    browser(['errors', '--clear']); browser(['console', '--clear']); browser(['network', 'requests', '--clear']);
     return m;
   };
   const pair = async (state, protoHash, scroll = 0, shot = state) => {
@@ -237,7 +246,7 @@ try {
     const html = `<body style="margin:0;padding:24px;display:flex;${phone ? '' : 'flex-direction:column;'}gap:24px;background:#888;font:600 26px system-ui;color:#fff">${[['Approved prototype', img(join(out, 'vs-proto', `${name(state)}.proto.png`))], ['Board, this build', img(join(out, `${name(shot)}.png`))]]
       .map(([t, s]) => `<figure style="margin:0"><figcaption style="margin:0 0 12px">${t}: ${state}, ${metrics.width} x ${metrics.height}, ${theme}</figcaption><img src="${s}" style="display:block;width:${metrics.width}px"></figure>`).join('')}</body>`;
     writeFileSync(join(dir, 'pair.html'), html);
-    browser(['set', 'viewport', String(phone ? metrics.width * 2 + 72 : metrics.width + 48), String(phone ? metrics.height + 96 : metrics.height * 2 + 144), '1']);
+    axi('emulate', '--viewport', `${phone ? metrics.width * 2 + 72 : metrics.width + 48}x${phone ? metrics.height + 96 : metrics.height * 2 + 144}x1`);
     await go(`file://${join(dir, 'pair.html')}`, 600);
     await png(join(out, 'vs-proto', `${name(state)}.pair.png`)); shots.push(`vs-proto/${name(state)}.pair.png`);
     await setup();
@@ -275,7 +284,7 @@ try {
     if (/\bfd-/.test(head.lab) || !head.lab) problems.push(`design: the header reads "${head.lab}", not a plain project name`);
     if (head.gone || !head.drawn) problems.push(`design: the preview is not drawn ${JSON.stringify(head)}`);
     await capture('design');
-    await js(`document.querySelector('#reader .design-review').scrollTop = 1e5; scrollTo(0, 1e5)`);
+    await js(`(() => { document.querySelector('#reader .design-review').scrollTop = 1e5; scrollTo(0, 1e5); })()`);
     await capture('design-end');
     const rep = await firstReport();
     await pair('design', `v=reports&o=${encodeURIComponent(rep)}`);
@@ -313,8 +322,9 @@ try {
     // A note typed on the Reports list design and Change tapped: the answer is saved and the list says so.
     await go(`${base}#designs/reports-phone`);
     await until(`!!document.querySelector('#reader textarea')`, 'the note box drawn');
-    await tap('#reader textarea');
-    browser(['keyboard', 'inserttext', 'Put the day of each report on the right, as the desk does.']);
+    // A click on a text box does not focus it as a tap does, so the box takes focus first and the words are typed at it.
+    await js(`document.querySelector('#reader textarea').focus()`);
+    drive(`await page.type(${JSON.stringify('Put the day of each report on the right, as the desk does.')});`);
     await tap('#reader .dz-change');
     await until(`(() => { try { return document.querySelector('#reader .ui-props').textContent.includes('Changes requested'); } catch { return false; } })()`, 'the answer saved');
     facts.answers = readFileSync(join(dir, 'board.answers.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).map((a) => `${a.key}=${a.answer}${a.notes?.length ? ` "${a.notes.at(-1).note}"` : ''}`);
@@ -341,10 +351,10 @@ try {
   if (after) assert.deepEqual(problems, [], 'every capture measures clean');
 } finally {
   // Cleanup, not a check: every capture and its measurements are asserted above, so a close or a stop that fails or is killed (no status, a signal)
-  // is named in one line and never fails the journey, nor replaces the error already on its way out. The captures still go through `browser` and `sh`.
+  // is named in one line and never fails the journey, nor replaces the error already on its way out. The captures still go through `axi`, `drive` and `sh`.
   const ended = (status, signal, said) => `exit status ${status}${signal ? `, signal ${signal}` : ''}${said.trim() ? `: ${said.replace(/\s+/g, ' ').trim().slice(0, 120)}` : ''}`;
-  const closed = spawnSync('agent-browser', ['--json', '--hide-scrollbars', String(phone), 'close'], { encoding: 'utf8', timeout: 30000, env: browserEnv });
-  if (closed.status !== 0) console.log(`cleanup: agent-browser close ended with ${ended(closed.status, closed.signal, closed.error?.message ?? closed.stdout + closed.stderr)}`);
+  const closed = spawnSync('chrome-devtools-axi', ['stop'], { encoding: 'utf8', timeout: 30000, env: browserEnv });
+  if (closed.status !== 0) console.log(`cleanup: chrome-devtools-axi stop ended with ${ended(closed.status, closed.signal, closed.error?.message ?? closed.stdout + closed.stderr)}`);
   if (server) {
     const stopped = await new Promise((ok) => { const stop = spawn(process.execPath, [join(repo, 'dist/cli.js'), 'stop', board], { env, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; stop.stdout.on('data', (b) => log += b); stop.stderr.on('data', (b) => log += b); stop.once('error', (e) => ok(e.message)); stop.once('exit', (code, signal) => ok(code === 0 ? '' : ended(code, signal, log))); });
     // The board is this run's own child: a stop that failed ends it here, so it cannot keep the run waiting.
